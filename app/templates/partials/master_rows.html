@@ -1,0 +1,11 @@
+{% for row in rows %}
+<tr>
+  {% for col in spec.list_columns %}<td>{{ row|attr(col) }}</td>{% endfor %}
+  <td class="text-right whitespace-nowrap">
+    {% if spec.slug == 'farmers' %}<a class="btn btn-ghost btn-xs" href="/farmers/{{ row.id }}/statement">{{ L['statement'][0] }} / {{ L['statement'][1] }}</a>{% endif %}
+    <a class="btn btn-ghost btn-xs" href="/masters/{{ spec.slug }}/{{ row.id }}/edit">{{ L['edit'][0] }} / {{ L['edit'][1] }}</a>
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="{{ spec.list_columns | length + 1 }}" class="text-center opacity-60">{{ L['no_records'][0] }} / {{ L['no_records'][1] }}</td></tr>
+{% endfor %}

@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th %}
+{% block title %}Dues{% endblock %}
+{% block content %}
+<div class="tabs tabs-boxed bg-base-100 mb-3 w-fit flex-wrap">
+  {% for key, spec in parties.items() %}
+  <a href="/dues?type={{ key }}" class="tab {{ 'tab-active' if key == type }}">{{ spec.label[0] }} <span class="gu ml-1">{{ spec.label[1] }}</span></a>
+  {% endfor %}
+</div>
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-xl font-semibold flex-1">{{ t('Payables', 'ચૂકવવાપાત્ર') }} · {{ parties[type].label[0] }} <span class="gu text-base">{{ parties[type].label[1] }}</span></h1>
+  {% if villages %}
+  <form method="get" class="flex items-center gap-2">
+    <input type="hidden" name="type" value="{{ type }}">
+    <select name="village" class="select select-bordered select-sm" onchange="this.form.submit()">
+      <option value="">{{ t('All villages', 'બધા ગામ') }}</option>
+      {% for v in villages %}<option {{ 'selected' if v == village }}>{{ v }}</option>{% endfor %}
+    </select>
+  </form>
+  {% endif %}
+  <span class="badge badge-lg">{{ t('Total due', 'કુલ બાકી') }}: {{ summary.due | inr }}</span>
+  {% if type == 'farmer' %}<span class="badge badge-lg badge-error">{{ t('Overdue', 'મુદત વીતી') }}: {{ summary.overdue | inr }}</span>{% endif %}
+</div>
+<div class="overflow-x-auto bg-base-100 rounded-box shadow">
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Name', 'નામ') }}{% if type == 'farmer' %}{{ th('Village', 'ગામ') }}{% endif %}{{ th('Mobile', 'મોબાઇલ') }}{{ th('Items', 'નંગ') }}{{ th('Oldest', 'સૌથી જૂની') }}{% if type == 'farmer' %}{{ th('Overdue', 'મુદત વીતી') }}{% endif %}{{ th('Total due', 'કુલ બાકી') }}<th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><a class="link" href="/statements/{{ type }}/{{ r.party_id }}">{{ r.name }}</a></td>
+        {% if type == 'farmer' %}<td>{{ r.village }}</td>{% endif %}
+        <td>{{ r.mobile }}</td><td>{{ r.items }}</td>
+        <td class="{{ 'text-error' if type == 'farmer' and r.earliest < today }}">{{ r.earliest }}</td>
+        {% if type == 'farmer' %}<td class="{{ 'text-error font-semibold' if r.overdue }}">{{ r.overdue | inr }}</td>{% endif %}
+        <td class="font-semibold">{{ r.due | inr }}</td>
+        <td class="text-right whitespace-nowrap">
+          <a class="btn btn-primary btn-xs" href="/pay/{{ type }}/{{ r.party_id }}">{{ t('Pay', 'ચુકવણી') }}</a>
+          <a class="btn btn-ghost btn-xs" href="/statements/{{ type }}/{{ r.party_id }}">{{ t('Statement', 'ખાતાવહી') }}</a>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" class="text-center opacity-60">{{ t('Nothing due', 'કંઈ બાકી નથી') }} ✔</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

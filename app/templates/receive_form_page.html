@@ -1,0 +1,8 @@
+{% extends "master_form_page.html" %}
+{% from "partials/bilabel.html" import t %}
+{% block pre_form %}
+<div class="alert bg-base-100 shadow-sm mb-3 text-sm flex-wrap">
+  <span>{{ t('Outstanding', 'બાકી') }}: <b>{{ summary.due | inr }}</b></span>
+  {% if summary.awaiting_weight %}<span class="badge badge-warning">{{ summary.awaiting_weight }} {{ t('truck(s) still need the industry weight', 'ટ્રકનું કારખાનાનું વજન બાકી') }}</span>{% endif %}
+</div>
+{% endblock %}

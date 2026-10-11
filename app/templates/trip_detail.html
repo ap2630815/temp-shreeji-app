@@ -1,0 +1,100 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th %}
+{% macro row(en, gu, value, cls='') %}<tr><td>{{ t(en, gu) }}</td><td class="text-right {{ cls }}">{{ value }}</td></tr>{% endmacro %}
+{% macro kg(v) %}{{ '{:,}'.format(v) if v is not none else '—' }}{% endmacro %}
+{% block title %}{{ trip.truck.truck_number }}{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <a href="/trips?year={{ trip.business_year }}" class="btn btn-ghost btn-sm">←</a>
+  <h1 class="text-xl font-semibold flex-1">{{ trip.truck.truck_number }} → {{ trip.industry.name }} · {{ trip.grain.name }}</h1>
+  <a href="/trips/{{ trip.id }}/edit" class="btn btn-sm">{{ t('Edit trip', 'ટ્રીપ સુધારો') }}</a>
+  <a href="/trips/{{ trip.id }}/bilty" class="btn btn-primary btn-sm">{{ t('Edit bilty', 'બિલ્ટી સુધારો') if bilty else t('Add bilty', 'બિલ્ટી ઉમેરો') }}</a>
+</div>
+<p class="text-sm mb-1">{{ trip.trip_date }} · {{ t('Transport', 'ટ્રાન્સપોર્ટ') }}: <a class="link" href="/statements/transporter/{{ trip.transport_id }}">{{ trip.transport.pet_name }}</a>
+  · {{ t('Driver', 'ડ્રાઇવર') }}: {{ trip.truck.driver_name }} ({{ trip.truck.driver_mobile }}) · {{ t('Labour', 'મજૂર') }}: {{ trip.labour_group.group_name }}</p>
+{% if trip.description %}<p class="text-sm opacity-80 mb-2">{{ trip.description }}</p>{% endif %}
+<div id="flash" class="mb-3"></div>
+
+<div class="grid lg:grid-cols-2 gap-4">
+  <!-- ------------------------------------------------ load lines -->
+  <div class="card bg-base-100 shadow"><div class="card-body p-4">
+    <h2 class="font-semibold">{{ t('Loaded from', 'ક્યાંથી ભર્યું') }} · {{ trip.bags }} {{ t('bags', 'બેગ') }}</h2>
+    <table class="table table-sm"><tbody>
+      {% for line in trip.load_lines %}
+      <tr>
+        <td><a class="link" href="/commencings/{{ line.commencing_id }}">{{ line.commencing.village }}</a> <span class="opacity-60 text-xs">{{ line.commencing.commencing_date }}</span></td>
+        <td class="text-right">{{ line.bags }}</td>
+        <td class="text-right"><button class="btn btn-ghost btn-xs text-error" hx-post="/trips/lines/{{ line.id }}/delete" hx-target="#flash"
+            hx-confirm="Remove this load? / આ લોડ કાઢી નાખવો?">✕</button></td>
+      </tr>
+      {% else %}<tr><td class="opacity-60">{{ t('Nothing loaded yet', 'હજી કંઈ ભર્યું નથી') }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% if line_form['fields'][0].options %}
+      {% with fields=line_form['fields'], values=line_form['values'], errors=line_form['errors'], action=line_form['action'], back_url=line_form['back_url'] %}{% include "partials/master_form.html" %}{% endwith %}
+    {% else %}
+      <p class="text-sm opacity-60">{{ t('No village has unloaded stock of this grain', 'આ અનાજનો કોઈ ગામમાં બિનલોડ સ્ટોક નથી') }}</p>
+    {% endif %}
+  </div></div>
+
+  <!-- ------------------------------------------------ weights -->
+  <div class="card bg-base-100 shadow"><div class="card-body p-4">
+    <h2 class="font-semibold">{{ t('Weights', 'વજન') }} (kg){% if bilty %} · {{ t('Bill', 'બિલ') }} #{{ bilty.bill_number }} · {{ bilty.bilty_date }}{% endif %}</h2>
+    {% if bilty %}
+    <table class="table table-sm">
+      <thead><tr><th></th>{{ th('Ours', 'આપણું') }}{{ th('Industry', 'કારખાનું') }}{{ th('Difference', 'તફાવત') }}</tr></thead>
+      <tbody>
+        <tr><td>{{ t('Loaded truck', 'ભરેલી ટ્રક') }}</td><td>{{ kg(bilty.merchant_total_weight) }}</td><td>{{ kg(bilty.industry_total_weight) }}</td><td>{{ kg(bilty.difference_total_weight) }}</td></tr>
+        <tr><td>{{ t('Empty truck', 'ખાલી ટ્રક') }}</td><td>{{ kg(bilty.merchant_tare_weight) }}</td><td>{{ kg(bilty.industry_tare_weight) }}</td><td>{{ kg(bilty.difference_tare_weight) }}</td></tr>
+        <tr class="font-semibold"><td>{{ t('Grain', 'અનાજ') }}</td><td>{{ kg(bilty.merchant_net_weight) }}</td><td>{{ kg(bilty.industry_net_weight) }}</td><td>{{ kg(bilty.difference_net_weight) }}</td></tr>
+      </tbody>
+    </table>
+    {% if bilty.percentage_difference is not none %}
+      {% set p = bilty.percentage_difference %}
+      <div class="text-sm">{{ t('Difference', 'તફાવત') }}: <span class="badge {{ 'badge-warning' if p >= warn_pct or p <= -warn_pct else 'badge-ghost' }}">{{ p }}%</span>
+        {% if p > 0 %}<span class="opacity-70">({{ t('industry weighed less', 'કારખાનામાં ઓછું તોલાયું') }})</span>{% elif p < 0 %}<span class="opacity-70">({{ t('industry weighed more', 'કારખાનામાં વધુ તોલાયું') }})</span>{% endif %}</div>
+    {% else %}
+      <div class="alert alert-warning text-sm py-2">{{ t('Industry weight not entered yet — receivable and freight are provisional', 'કારખાનાનું વજન હજી નથી — લેણાં અને ભાડું કામચલાઉ') }}</div>
+    {% endif %}
+    {% if bilty.description %}<p class="text-sm opacity-80">{{ bilty.description }}</p>{% endif %}
+    <p class="text-sm">{{ t('Broker', 'દલાલ') }}: <a class="link" href="/statements/broker/{{ bilty.broker_id }}">{{ bilty.broker.name }}</a></p>
+    {% else %}
+      <p class="text-sm opacity-60">{{ t('No bilty yet — add it once the truck is weighed', 'હજી બિલ્ટી નથી — ટ્રક તોલાય પછી ઉમેરો') }}</p>
+    {% endif %}
+  </div></div>
+
+  <!-- ------------------------------------------------ freight -->
+  <div class="card bg-base-100 shadow"><div class="card-body p-4">
+    <h2 class="font-semibold">{{ t('Freight to transport', 'ટ્રાન્સપોર્ટને ભાડું') }}{% if trip.freight_is_provisional %} <span class="badge badge-warning badge-sm">{{ t('provisional', 'કામચલાઉ') }}</span>{% endif %}</h2>
+    <table class="table table-sm"><tbody>
+      {{ row('By weight', 'વજન મુજબ', ('%s kg × ₹%s/t = ' % ('{:,}'.format(trip.freight_weight_kg or 0), trip.rent_per_ton)) ~ (trip.freight_by_weight | inr)) }}
+      {{ row('By bags', 'બેગ મુજબ', ('%s × ₹%s = ' % (trip.bags, trip.rent_per_bag)) ~ (trip.freight_by_bags | inr)) }}
+      {{ row('Freight (larger)', 'ભાડું (મોટું)', trip.freight | inr, 'font-semibold') }}
+      {{ row('Advance to driver', 'ડ્રાઇવરને એડવાન્સ', '− ' ~ (trip.advance_amount | inr)) }}
+      {{ row('Other deduction', 'અન્ય કપાત', '− ' ~ (trip.other_deduction | inr)) }}
+      {{ row('Payable to transport', 'ટ્રાન્સપોર્ટને ચૂકવવાપાત્ર', trip.final_payment | inr, 'font-semibold') }}
+      {{ row('Paid', 'ચૂકવ્યું', freight_paid | inr) }}
+      {{ row('Balance', 'બાકી', (trip.final_payment - freight_paid) | inr, 'font-semibold') }}
+    </tbody></table>
+    <a class="btn btn-sm btn-outline w-fit" href="/pay/transporter/{{ trip.transport_id }}">{{ t('Pay transport', 'ટ્રાન્સપોર્ટને ચુકવણી') }}</a>
+  </div></div>
+
+  <!-- ------------------------------------------------ sale -->
+  <div class="card bg-base-100 shadow"><div class="card-body p-4">
+    <h2 class="font-semibold">{{ t('Sale to industry', 'ઉદ્યોગને વેચાણ') }}</h2>
+    {% if bilty %}
+    <table class="table table-sm"><tbody>
+      {{ row('Rate', 'ભાવ', '₹%s per %s kg%s' % (bilty.grain_rate, bilty.rate_unit_kg, (' − ₹%s' % bilty.rate_change) if bilty.rate_change else '')) }}
+      {{ row('Estimated (our weight)', 'અંદાજ (આપણું વજન)', bilty.estimated_amount | inr) }}
+      {% if bilty.receivable_amount is not none %}
+        {{ row('Receivable (industry weight)', 'લેણાં (કારખાનાનું વજન)', bilty.receivable_amount | inr, 'font-semibold') }}
+        {{ row('Difference vs estimate', 'અંદાજથી તફાવત', bilty.error_receivable_amount | inr, 'text-error' if bilty.error_receivable_amount < 0 else '') }}
+        {{ row('Received', 'મળ્યા', received | inr) }}
+        {{ row('Balance', 'બાકી', (bilty.receivable_amount - received) | inr, 'font-semibold') }}
+      {% endif %}
+      {{ row('Brokerage', 'દલાલી', (bilty.brokerage_amount | inr) ~ ' (' ~ t('paid', 'ચૂકવ્યું') ~ ' ' ~ (brokerage_paid | inr) ~ ')') }}
+    </tbody></table>
+    <a class="btn btn-sm btn-outline w-fit" href="/industries/{{ trip.industry_id }}/account">{{ t('Industry account', 'ઉદ્યોગ ખાતું') }}</a>
+    {% else %}<p class="text-sm opacity-60">—</p>{% endif %}
+  </div></div>
+</div>
+{% endblock %}

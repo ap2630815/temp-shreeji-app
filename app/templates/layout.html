@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "partials/bilabel.html" import bi, t %}
+{% block body %}
+<div class="navbar bg-base-100 shadow flex-wrap gap-2">
+  <div class="flex-1 px-2 font-bold"><a href="/">{{ bi('app_name') }}</a></div>
+  <div class="flex-none flex-wrap gap-1 px-2">
+    <a class="btn btn-sm btn-ghost" href="/commencings">{{ t('Commencing', 'કમેન્સિંગ') }}</a>
+    <a class="btn btn-sm btn-ghost" href="/trips">{{ t('Trips', 'ટ્રીપ') }}</a>
+    <a class="btn btn-sm btn-ghost" href="/receivables">{{ t('Receivables', 'લેણાં') }}</a>
+    <a class="btn btn-sm btn-ghost" href="/dues">{{ t('Payables', 'ચૂકવવાપાત્ર') }}</a>
+    <a class="btn btn-sm btn-ghost" href="/reports/year">{{ t('Report', 'અહેવાલ') }}</a>
+    {% if user.role == 'owner' %}<a class="btn btn-sm btn-ghost" href="/years">{{ t('Years', 'વર્ષ') }}</a>{% endif %}
+    <span class="badge badge-outline">{{ user.username }} · {{ user.role }}</span>
+    <a class="btn btn-sm btn-ghost" href="/account/password">{{ bi('change_password') }}</a>
+    <button class="btn btn-sm" hx-post="/logout">{{ bi('logout') }}</button>
+  </div>
+</div>
+<main class="p-4 max-w-6xl mx-auto">
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}

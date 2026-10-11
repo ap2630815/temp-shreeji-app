@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import bi, t %}
+{% block title %}{{ L['dashboard'][0] }}{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">{{ bi('dashboard') }}</h1>
+
+{% macro card(href, en, gu) %}<a href="{{ href }}" class="card bg-base-100 shadow-sm hover:shadow-md transition"><div class="card-body p-4"><span>{{ en }}</span><span class="gu text-sm">{{ gu }}</span></div></a>{% endmacro %}
+<h2 class="font-semibold mb-2">{{ t('Buying (villages)', 'ખરીદી (ગામ)') }}</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {{ card('/commencings', 'Commencing', 'કમેન્સિંગ') }}
+  {{ card('/dues?type=farmer', 'Farmer dues', 'ખેડૂતોની બાકી ચુકવણી') }}
+  {{ card('/bag-supplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
+  {{ card('/labour-work', 'Labour work', 'મજૂર કામ') }}
+</div>
+<h2 class="font-semibold mb-2">{{ t('Selling (trucks)', 'વેચાણ (ટ્રક)') }}</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {{ card('/trips', 'Truck trips & bilty', 'ટ્રક ટ્રીપ અને બિલ્ટી') }}
+  {{ card('/receivables', 'Receivables', 'ઉદ્યોગો પાસેથી લેણાં') }}
+  {{ card('/dues?type=transporter', 'Transport dues', 'ટ્રાન્સપોર્ટને ચૂકવવાના') }}
+  {{ card('/dues?type=broker', 'Broker dues', 'દલાલને ચૂકવવાના') }}
+</div>
+<h2 class="font-semibold mb-2">{{ t('Accounts', 'હિસાબ') }}</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {{ card('/dues', 'All payables', 'બધી ચૂકવણીઓ') }}
+  {{ card('/reports/year', 'Year report', 'વર્ષનો અહેવાલ') }}
+  {% if user.role == 'owner' %}{{ card('/years', 'Business years', 'વ્યવસાય વર્ષ') }}{% endif %}
+</div>
+
+<h2 class="font-semibold mb-2">{{ t('Masters', 'માસ્ટર્સ') }}</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  {% for slug, spec in masters.items() %}
+  <a href="/masters/{{ slug }}" class="card bg-base-100 shadow-sm hover:shadow-md transition">
+    <div class="card-body p-4"><span>{{ spec.label[0] }}</span><span class="gu text-sm">{{ spec.label[1] }}</span></div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+<form id="master-form" class="card bg-base-100 shadow" hx-post="{{ action }}" hx-target="#master-form" hx-swap="outerHTML">
+  <div class="card-body gap-3">
+    {% for f in fields %}
+    <label class="form-control">
+      <span class="label-text">{{ f.en }} <span class="gu">/ {{ f.gu }}</span>{% if f.required %} <span class="text-error">*</span>{% endif %}</span>
+      {% set v = values.get(f.name, '') %}
+      {% if f.kind == 'textarea' %}
+        <textarea name="{{ f.name }}" rows="2" class="textarea textarea-bordered {{ 'textarea-error' if f.name in errors }}">{{ v }}</textarea>
+      {% elif f.kind == 'select' %}
+        <select name="{{ f.name }}" class="select select-bordered {{ 'select-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
+          <option value="">—</option>
+          {% for val, label in f.options %}<option value="{{ val }}" {{ 'selected' if v|string == val|string }}>{{ label }}</option>{% endfor %}
+        </select>
+      {% elif f.kind == 'choice' %}
+        <select name="{{ f.name }}" class="select select-bordered {{ 'select-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
+          <option value="">—</option>
+          {% for c in f.choices %}<option value="{{ c }}" {{ 'selected' if v|string == c|string }}>{{ c }}</option>{% endfor %}
+        </select>
+      {% else %}
+        <input name="{{ f.name }}" value="{{ v }}" maxlength="{{ f.max_length }}"
+               {% if f.kind == 'tel' %}inputmode="numeric"{% elif f.kind == 'int' %}type="number" min="0" inputmode="numeric"{% elif f.kind == 'date' %}type="date"{% endif %}
+               class="input input-bordered {{ 'input-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
+      {% endif %}
+      {% if f.help %}<span class="text-xs opacity-60 mt-1">{{ f.help[0] }} <span class="gu">/ {{ f.help[1] }}</span></span>{% endif %}
+      {% if f.name in errors %}
+        <span class="text-error text-sm mt-1">{{ errors[f.name][0] }} <span class="gu">/ {{ errors[f.name][1] }}</span></span>
+      {% endif %}
+    </label>
+    {% endfor %}
+    <div class="flex gap-2 mt-2">
+      <button class="btn btn-primary">{{ L['save'][0] }} / {{ L['save'][1] }}</button>
+      <a class="btn btn-ghost" href="{{ back_url }}">{{ L['back'][0] }} / {{ L['back'][1] }}</a>
+    </div>
+  </div>
+</form>

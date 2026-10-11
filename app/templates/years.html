@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th %}
+{% block title %}Years{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-1">{{ t('Business years', 'વ્યવસાય વર્ષ') }}</h1>
+<p class="text-sm opacity-70 mb-4">{{ t('Oct–Sep. A locked year rejects any new or changed entry or payment dated inside it.', 'ઓક્ટો–સપ્ટે. લૉક કરેલા વર્ષમાં નવી કે બદલાયેલી એન્ટ્રી અથવા ચુકવણી થઈ શકતી નથી.') }}</p>
+<div class="overflow-x-auto bg-base-100 rounded-box shadow max-w-2xl">
+  <table class="table"><thead><tr>{{ th('Year', 'વર્ષ') }}{{ th('From – to', 'થી – સુધી') }}{{ th('Status', 'સ્થિતિ') }}<th></th></tr></thead>
+  <tbody>{% for y in rows %}{% include "partials/year_row.html" %}{% endfor %}</tbody></table>
+</div>
+{% endblock %}

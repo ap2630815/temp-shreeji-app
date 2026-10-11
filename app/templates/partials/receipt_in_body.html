@@ -1,0 +1,26 @@
+{% from "partials/bilabel.html" import t, dth %}
+<div class="head">
+  <div>
+    <h1>{{ t('Receipt Voucher', 'પ્રાપ્તિ વાઉચર') }}</h1>
+    <div>{{ L['app_name'][0] }} <span class="gu">/ {{ L['app_name'][1] }}</span></div>
+  </div>
+  <div style="text-align:right">{{ t('Voucher no.', 'વાઉચર નં.') }} <b>#{{ receipt.id }}</b><br>{{ t('Date', 'તારીખ') }}: {{ receipt.receipt_date }}</div>
+</div>
+<div class="meta">
+  <div>{{ t('Received from', 'મળ્યા') }}: <b>{{ industry.name }}</b></div>
+  <div>{{ t('Location', 'સ્થળ') }}: {{ industry.location }}</div>
+  <div>{{ t('Paid by', 'આપનાર') }}: {{ receipt.payer_name or '—' }}</div>
+  <div>{{ t('Method', 'રીત') }}: <b>{{ receipt.method | upper }}</b> · {{ t('Reference', 'રેફરન્સ') }}: {{ receipt.reference_no or '—' }}</div>
+</div>
+<div class="sum"><div>{{ t('Amount received', 'મળેલી રકમ') }}<b class="big">{{ receipt.amount | inr }}</b></div></div>
+{% if receipt.note %}<div>{{ t('Note', 'નોંધ') }}: {{ receipt.note }}</div>{% endif %}
+<h2>{{ t('Settled against', 'આની સામે') }}</h2>
+<table>
+  <thead><tr>{{ dth('Bill', 'બિલ') }}{{ dth('Date', 'તારીખ') }}{{ dth('Truck', 'ટ્રક') }}{{ dth('Bill amount', 'બિલ રકમ', 'n') }}{{ dth('This receipt', 'આ પ્રાપ્તિ', 'n') }}{{ dth('Still due', 'હજી બાકી', 'n') }}</tr></thead>
+  <tbody>
+  {% for l in lines %}{% set b = l.bilty %}
+    <tr><td>{{ b.bill_number }}</td><td>{{ b.bilty_date }}</td><td>{{ b.trip.truck.truck_number }}</td><td class="n">{{ b.receivable_amount | inr }}</td><td class="n">{{ l.amount | inr }}</td><td class="n">{{ l.remaining | inr }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="sign"><div>{{ t('Received by', 'લેનાર') }}</div><div>{{ t('Authorised signatory', 'અધિકૃત સહી') }}</div></div>

@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import bi %}
+{% block title %}{{ heading[0] }}{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">
+  {{ heading[0] }} <span class="gu">/ {{ heading[1] }}</span>
+</h1>
+{% block pre_form %}{% endblock %}
+<div class="max-w-2xl">{% include "partials/master_form.html" %}</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t %}
+{% block title %}{{ industry.name }}{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-2 mb-3">
+  <a href="/receivables" class="btn btn-ghost btn-sm">←</a>
+  <span class="flex-1"></span>
+  <a class="btn btn-sm" href="/industries/{{ industry.id }}/account.pdf" target="_blank">PDF</a>
+  <a class="btn btn-primary btn-sm" href="/industries/{{ industry.id }}/receive">{{ t('Receive payment', 'પ્રાપ્તિ નોંધો') }}</a>
+</div>
+<div class="bg-white rounded-box shadow p-4 overflow-x-auto">{% include "partials/doc_css.html" %}<div class="doc">{% include "partials/industry_body.html" %}</div></div>
+{% endblock %}

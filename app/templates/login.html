@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "partials/bilabel.html" import bi %}
+{% block title %}{{ L['login'][0] }}{% endblock %}
+{% block body %}
+<main class="min-h-screen flex items-center justify-center p-4">
+  <form class="card bg-base-100 shadow-xl w-full max-w-sm" hx-post="/login" hx-target="#login-error" hx-swap="innerHTML">
+    <div class="card-body gap-3">
+      <h1 class="card-title">{{ bi('app_name') }}</h1>
+      <label class="form-control">
+        <span class="label-text">{{ bi('username') }}</span>
+        <input name="username" class="input input-bordered" autocomplete="username" required autofocus>
+      </label>
+      <label class="form-control">
+        <span class="label-text">{{ bi('password') }}</span>
+        <input name="password" type="password" class="input input-bordered" autocomplete="current-password" required>
+      </label>
+      <label class="label cursor-pointer justify-start gap-2">
+        <input type="checkbox" class="checkbox checkbox-sm" onchange="this.form.password.type = this.checked ? 'text' : 'password'">
+        <span class="label-text">{{ bi('show_password') }}</span>
+      </label>
+      <div id="login-error"></div>
+      <button class="btn btn-primary">{{ bi('login') }}</button>
+    </div>
+  </form>
+</main>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% from "partials/bilabel.html" import t, dth %}
+<div class="head">
+  <div>
+    <h1>{{ t('Farmer Statement', 'ખેડૂત ખાતાવહી') }}</h1>
+    <div>{{ L['app_name'][0] }} <span class="gu">/ {{ L['app_name'][1] }}</span></div>
+  </div>
+  <div style="text-align:right">{{ t('Date', 'તારીખ') }}: {{ today }}</div>
+</div>
+<div class="meta">
+  <div>{{ t('Farmer', 'ખેડૂત') }}: <b>{{ farmer.name }}</b>{% if farmer.name_gu %} <span class="gu">({{ farmer.name_gu }})</span>{% endif %}</div>
+  <div>{{ t('Village', 'ગામ') }}: <b>{{ farmer.village }}</b>{% if farmer.village_gu %} <span class="gu">({{ farmer.village_gu }})</span>{% endif %}</div>
+  <div>{{ t('Mobile', 'મોબાઇલ') }}: {{ farmer.mobile }}</div>
+  {% if farmer.head_of_family %}<div>{{ t('Head of family', 'કુટુંબના વડા') }}: {{ farmer.head_of_family }}</div>{% endif %}
+</div>
+<div class="sum">
+  <div>{{ t('Total payable', 'કુલ ચૂકવવાપાત્ર') }}<b>{{ totals.net_payable | inr }}</b></div>
+  <div>{{ t('Paid', 'ચૂકવ્યું') }}<b>{{ totals.paid | inr }}</b></div>
+  <div>{{ t('Balance', 'બાકી') }}<b>{{ totals.due | inr }}</b></div>
+  <div>{{ t('Overdue', 'મુદત વીતી') }}<b class="{{ 'over' if totals.overdue }}">{{ totals.overdue | inr }}</b></div>
+</div>
+
+<h2>{{ t('Purchases', 'ખરીદી') }}</h2>
+<table>
+  <thead><tr>
+    {{ dth('Date', 'તારીખ') }}{{ dth('Village / grain', 'ગામ / અનાજ') }}{{ dth('Bags', 'બેગ', 'n') }}
+    {{ dth('Kg', 'કિલો', 'n') }}{{ dth('Rate/20kg', 'ભાવ/20કિ', 'n') }}{{ dth('Amount', 'રકમ', 'n') }}
+    {{ dth('Borrow', 'ઉધાર', 'n') }}{{ dth('Due on', 'ચૂકવણી તા.') }}{{ dth('Paid', 'ચૂકવ્યું', 'n') }}{{ dth('Balance', 'બાકી', 'n') }}
+  </tr></thead>
+  <tbody>
+  {% for v in views %}{% set e = v.entry %}
+    <tr>
+      <td>{{ e.entry_date }}</td>
+      <td>{{ e.commencing.village }} · {{ e.commencing.grain.name }}</td>
+      <td class="n">{{ e.filled_bags }}</td>
+      <td class="n">{{ e.filled_bags * e.commencing.net_weight + e.extra_kilos }}</td>
+      <td class="n">{{ e.commencing.rate_per_20kg }}</td>
+      <td class="n">{{ e.payable_amount | inr }}</td>
+      <td class="n">{{ e.borrowing | inr if e.borrowing else '' }}</td>
+      <td class="{{ 'over' if v.is_overdue(today) }}">{{ e.due_date }}</td>
+      <td class="n">{{ v.paid | inr }}</td>
+      <td class="n"><b>{{ v.due | inr }}</b></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="10">{{ t('No purchases', 'કોઈ ખરીદી નથી') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>{{ t('Payments', 'ચુકવણીઓ') }}</h2>
+<table>
+  <thead><tr>
+    {{ dth('Receipt', 'રસીદ') }}{{ dth('Date', 'તારીખ') }}{{ dth('Amount', 'રકમ', 'n') }}{{ dth('Method', 'રીત') }}
+    {{ dth('Received by', 'લેનાર') }}{{ dth('Reference', 'રેફરન્સ') }}
+  </tr></thead>
+  <tbody>
+  {% for p in payments %}
+    <tr>
+      <td>#{{ p.id }}</td><td>{{ p.payment_date }}</td><td class="n">{{ p.amount | inr }}</td><td>{{ p.method | upper }}</td>
+      <td>{{ p.receiver_name }} ({{ p.receiver_mobile }})</td><td>{{ p.reference_no or '' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">{{ t('No payments yet', 'હજી કોઈ ચુકવણી નથી') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

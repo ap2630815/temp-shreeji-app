@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+sqlalchemy[asyncio]>=2.0
+asyncpg
+alembic
+pydantic>=2
+pydantic-settings
+email-validator
+argon2-cffi
+itsdangerous
+fastapi-csrf-protect
+weasyprint
+pytest
+pytest-asyncio
+httpx
