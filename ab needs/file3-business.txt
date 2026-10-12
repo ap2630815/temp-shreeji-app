@@ -1,0 +1,242 @@
+user info tables :  farmer, bag-supplier, labour, transport, trucks, industries.
+bussiness tables :  merchant, bag-supplier, bag-storage, labour, truck, bilty, industries,   
+
+year-format: 2025-oct to 2026-sept,  data-format: YYYY-MM-DD 
+
+----------------------------------------------------------------------------
+. about 150-200 trucks loaded yearly 
+. lock year calander as per year-format 
+. only login by business-owner & accountant,  
+. no OTP verification of mobile & email 
+. 
+
+
+
+----------------------------------------------------------------------------
+** commencing table                                                    @@ edit later
+----------------------------------------------------------------------------
+column | type | constraints
+
+id | INTEGER | primary key, auto-increment 
+terms-&-conditions-info-id | INTEGER | not null, foreign key --> terms-&-conditions-info.id, 
+
+farmer-id | INTEGER | not null, foreign key --> farmer-info.id, 
+farmer-name | TEXT | not null,  farmer-name = farmer-info.farmer-name
+
+commencing-date | TEXT | default datetime ("now") 
+grain-name | TEXT | not null,                                           @@ edit later
+
+terms-&-conditions | TEXT | not null, terms-&-conditions = terms-&-conditions-info.${grain-name}-terms-&-condition
+description | TEXT | optinal 
+
+
+----------------------------------------------------------------------------
+** farmer table 
+----------------------------------------------------------------------------
+column | type | constraints
+
+id | INTEGER | primary key, auto-increment 
+farmer-info-id | INTEGER | not null, foreign key --> farmer-info.id, 
+farmer-name | TEXT | not null,  farmer-name = farmer-info.farmer-name
+
+labour-info-id | INTEGER | not null, foreign key --> labour-info.id, 
+labour-group | TEXT | not null,  labour-group = labour-info-id.group-name
+
+no-of-filled-bags | INTEGER | not null, 
+kilos | INTEGER | optional, default value is 0, kilos from 14 filled-bags + 15 kg 
+rate | INTEGER | not null, in rupees per 20 kg 
+pay-after | INTEGER | not null, in days
+raw-weight | INTEGER | not null, in kg,  variable set by business-owner, just for its reference, never used in payment calculation 
+net-weight | INTEGER | not null, in kg, fix-bag-size one of from (35, 50, 70, 100) decided as per grain 
+
+payable-amount | NUMBER | payable-amount = { (no-of-filled-bags * net-weight + kilos) / 20 } * rate , ceil-round-off
+payment-status | TEXT |  enum: pending, partial or paid
+
+commencing-id | INTEGER | optional, if any 
+borrowing | NUMBER | optional, if any 
+description | TEXT | optional, if any, (2 quality grains, warning)
+
+----------------------------------------------------------------------------
+** merchant table 
+----------------------------------------------------------------------------
+column | type | constraints
+
+id | INTEGER | primary key, auto-increment 
+business year | TEXT | not null, oct-2025 to sept-2026
+grain-name | TEXT | not null,                                                         @@ edit later
+
+village | TEXT | not null, 
+date | TEXT | default datetime ("now") 
+
+labour-info-id | INTEGER | not null, foreign key --> labour-info.id, 
+labour-group | TEXT | not null,  labour-group = labour-info-id.group-name
+
+farmer-table-id | INTEGER | not null, foreign key --> farmer-table.id, 
+total-filled-bags | NUMBER | default value is 0, total-filled bags = total-filled-bags + farmer-table-id.no-of-filled-bags 
+
+no-of-bags-loaded-to-truck | INTEGER | default value is 0,                             @@ edit later
+available-filled bags | INTEGER | default value is 0, available-filled-bags = total-filled-bags - bag-loaded-to-truck 
+
+description | TEXT | optional
+
+----------------------------------------------------------------------------
+** bag-supplier table
+----------------------------------------------------------------------------
+column | type | constraints
+
+id | INTEGER | primary key, auto-increment 
+bag-supplier-info-id | INTEGER | not null, foreign key --> bag-supplier-info.id 
+supplier-name | TEXT | not null, bag-supplier-info-id.supplier-pet-name 
+
+farmer-info-id | INTEGER | not null, foreign key --> farmer-info.id 
+farmer-name | TEXT | farmer-info-id.farmer-name (fetch from)
+village | TEXT | not null, farmer-info-id.village (fetch from) 
+
+rate | INTEGER | not null 
+units | INTEGER | not null 
+
+payable-amount | INTEGER | default value is 0, payable-amount = rate * units 
+payment-done-amount | INTEGER | default value is 0, 
+
+description | TEXT | optional
+
+----------------------------------------------------------------------------
+** bag-storage table 
+----------------------------------------------------------------------------
+column | type | constraints
+
+id | INTEGER | primary key, auto-increment 
+bag-supplier-table-id | TEXT | not null, foreign key --> bag-supplier-table.id
+
+farmer-info-id | INTEGER | not null, foreign key --> farmer-info.id 
+farmer-name | TEXT | farmer-name = farmer-info-id.farmer-name (fetch from) 
+village | TEXT | not null, village = farmer-info-id.village
+
+total-units | INTEGER | not null, default value is 0, total-units = total-units + bag-supplier-table-id.units 
+
+description | TEXT | optinal 
+
+----------------------------------------------------------------------------
+** labour table
+----------------------------------------------------------------------------
+column | type | constraints
+
+id | INTEGER | primary key, auto-increment 
+labour-info-id | INTEGER | not null, foreign key --> labour-info.id, 
+labour-group | TEXT | not null,  labour-group = labour-info-id.group-name
+
+date | TEXT | default datetime ("now") 
+
+payable-amount | INTEGER | default value is 0, 
+borrowing-amount | INTEGER | default value is 0, 
+petrol | INTEGER | default value is 0,  no deduction from final payment
+meal | INTEGER | default value is 0,    no deduction from final payment
+
+descripton | TEXT | optional 
+
+----------------------------------------------------------------------------
+** truck table 
+----------------------------------------------------------------------------
+column | type | constraints 
+
+id | INTEGER | primary key, auto-increment 
+
+truck-info-id | INTEGER | not null, foreign key --> truck-info.id, 
+truck-number | TEXT | not null,  truck-number = truck-info-id.truck-number 
+truck-driver-mobile-number | NUMBER (10 digits) | truck-driver-mobile-number = truck-info-id.truck-driver-mobile-number
+transport-info-id | INTEGER | not null, foreign key --> transport-info.id, 
+transport-name | TEXT | not null,  transport-name = transport-info-id.transport-pet-name
+
+labour-info-id | INTEGER | not null, foreign key --> labour-info.id, 
+labour-group | TEXT | not null,  labour-group = labour-info-id.group-name
+industries-info-id | INTEGER | not null, foreign key --> industries-info.id
+industry-name | TEXT | not null, industry-name = industries-info-id.industry-name 
+
+industry-table-id | INTEGER | not null, foreign key --> industry-table.id
+industry-grain-weight | TEXT | not null, industry-name = industry-table-id.industry-grain-weight 
+
+date | TEXT | default datetime ("now") 
+rent-per-ton | INTEGER | default value is 0, not null, per ton 
+rent-per-bag | INTEGER | default value is 0, not null, per bag 
+
+no-of-bags-loaded | INTEGER | not null                              @@ edit later (loaded from multiple villages & farmers) 
+grain-name | TEXT | not null  
+advance-amount | INTEGER | default value is 0, 
+
+payable-amount | NUMBER | default value is 0, payable-amount = max { (industry-grain-weight / 1000) * rent-per-ton , no-of-bags-loaded * rent-per-bag }
+other-deduction | NUMBER | default value is 0, optional 
+final-payment-amount | NUMBER | final-payment-amount = payable-amount - advance - other-deduction 
+
+payment-status | TEXT |  enum: pending, partial or paid 
+descripton | TEXT | optional 
+
+----------------------------------------------------------------------------
+** bilty table 
+----------------------------------------------------------------------------
+column | type | constraints
+
+id | INTEGER | primary key, auto-increment
+truck-table-id | INTEGER | not null, foreign key --> truck-table.id, 
+truck-number | TEXT | not null,  truck-number = truck-table-id.truck-number
+truck-driver-mobile-number | NUMBER (10 digits) | truck driver mobile number = truck-table-id.truck-driver-mobile-number
+transport-name | TEXT | not null,  transport-name = truck-table-id.transport-name
+no-of-bags-loaded | INTEGER | not null,  no-of-bags-loaded = truck-table-id.no-of-bags-loaded
+
+brokers-info-id | interger | not null, foreign key --> brokes-info.id       @@ edit later
+broker-name | TEXT | not null,  broker-name = brokers-info-id.broker-name 
+
+bill-number | INTEGER | not null 
+date | TEXT | default datetime ("now") 
+
+grain-name | TEXT | not null,                                        @@ edit later
+grain-rate | INTEGER | not null,                                     @@ edit later 
+
+merchant-total-weight | NUMBER | not null,   @ accountant input
+merchant-tare-weight | NUMBER | not null,    @ accountant input
+merchant-grain-weight | NUMBER | not null,   @ accountant input
+
+industry-total-weight | NUMBER | not null,   @ accountant input
+industry-tare-weight | NUMBER | not null,    @ accountant input
+industry-grain-weight | NUMBER | not null,   @ accountant input
+
+difference-total-weight | NUMBER | not null, @ accountant input
+difference-tare-weight | NUMBER | not null,  @ accountant input
+difference-grain-weight | NUMBER | not null, @ accountant input
+
+percentage-difference | float | percentage-difference = (difference-grain-weight / merchant-grain-weight) * 100
+
+
+----------------------------------------------------------------------------
+** industries table  
+----------------------------------------------------------------------------
+column | type | constraints
+
+id | INTEGER | primary key, auto-increment 
+bilty-table-id | INTEGER | not null, foreign key --> bilty-table.id 
+bill-number | INTEGER | not null, bill-number = bilty-table-id.bill-number 
+
+truck-table-id | INTEGER | not null, foreign key --> truck-table.id, 
+truck-number | TEXT | not null,  truck-number = truck-table-id.truck-number 
+
+date | TEXT | default datetime ("now")  
+any-rate-change | INTEGER | default value is 0, 
+
+grain-name | TEXT | not null,                                             @@ edit later
+grain-rate | INTEGER | not null, in rupees,                               @@ edit later 
+grain-bag-weight | INTEGER | not null,                                    @@ edit later 
+
+industry-grain-weight | NUMBER | not null,  industry-grain-weight = bilty-table-id.industry-grain-weight
+
+receivable-amount | NUMBER | receivable-amount = (industry-grain-weight / grain-bag-weight) * (grain-rate - any-rate-change)
+estimated-amount | NUMBER | default value is 0,                           @@ edit later
+error-receivable-amount | NUMBER | error-receivable-amount = receivable-amount - estimated-amount 
+
+receiving-status | TEXT | enum: pending, partial or paid 
+description | TEXT | optional (like mismatch, 120 bags unload)
+
+----------------------------------------------------------------------------
+** no-of-bags-loaded log 
+----------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------

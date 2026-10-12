@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th %}
+{% block title %}Trips{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-xl font-semibold flex-1">{{ t('Truck trips', 'ટ્રક ટ્રીપ') }}</h1>
+  <form method="get" class="flex items-center gap-2">
+    <span class="text-sm">{{ t('Business year', 'વ્યવસાય વર્ષ') }}</span>
+    <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
+      {% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+    </select>
+    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Locked', 'લૉક') }}</span>{% endif %}
+  </form>
+  <a href="/trips/new" class="btn btn-primary btn-sm">+ {{ t('New trip', 'નવી ટ્રીપ') }}</a>
+</div>
+<div class="overflow-x-auto bg-base-100 rounded-box shadow">
+  <table class="table table-zebra table-sm">
+    <thead><tr>
+      {{ th('Date', 'તારીખ') }}{{ th('Truck', 'ટ્રક') }}{{ th('Industry', 'ઉદ્યોગ') }}{{ th('Grain', 'અનાજ') }}{{ th('Bags', 'બેગ') }}{{ th('Bill', 'બિલ') }}
+      {{ th('Our kg', 'આપણું કિલો') }}{{ th('Industry kg', 'કારખાનું કિલો') }}{{ th('Diff %', 'તફાવત %') }}{{ th('Freight', 'ભાડું') }}{{ th('Receivable', 'લેણાં') }}<th></th>
+    </tr></thead>
+    <tbody>
+    {% for tr in trips %}{% set b = tr.bilty %}
+      <tr>
+        <td class="whitespace-nowrap">{{ tr.trip_date }}</td>
+        <td>{{ tr.truck.truck_number }}<div class="text-xs opacity-60">{{ tr.transport.pet_name }}</div></td>
+        <td>{{ tr.industry.name }}</td>
+        <td>{{ tr.grain.name }}</td>
+        <td>{{ tr.bags }}</td>
+        <td>{{ b.bill_number if b else '—' }}</td>
+        <td>{{ '{:,}'.format(b.merchant_net_weight) if b else '—' }}</td>
+        <td>{% if b and b.industry_net_weight is not none %}{{ '{:,}'.format(b.industry_net_weight) }}{% elif b %}<span class="opacity-50">{{ t('awaited', 'બાકી') }}</span>{% else %}—{% endif %}</td>
+        <td>{% if b and b.percentage_difference is not none %}<span class="badge badge-sm {{ 'badge-warning' if b.percentage_difference >= warn_pct or b.percentage_difference <= -warn_pct else 'badge-ghost' }}">{{ b.percentage_difference }}%</span>{% endif %}</td>
+        <td>{{ '~' if tr.freight_is_provisional and tr.freight }}{{ tr.freight | inr }}</td>
+        <td>{% if b and b.receivable_amount is not none %}{{ b.receivable_amount | inr }}{% elif b %}<span class="opacity-50">~{{ b.estimated_amount | inr }}</span>{% endif %}</td>
+        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/trips/{{ tr.id }}">{{ t('Open', 'ખોલો') }}</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="12" class="text-center opacity-60">{{ t('No trips in this year', 'આ વર્ષમાં કોઈ ટ્રીપ નથી') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="text-xs opacity-60 mt-2">~ {{ t('provisional (industry weight not in yet)', 'કામચલાઉ (કારખાનાનું વજન હજી નથી)') }}</p>
+{% endblock %}

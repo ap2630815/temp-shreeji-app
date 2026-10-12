@@ -1,0 +1,26 @@
+{# usage: {% from "partials/bilabel.html" import bi, t, badge %} #}
+{% macro bi(key) -%}
+<span>{{ L[key][0] }}</span> <span class="gu">{{ L[key][1] }}</span>
+{%- endmacro %}
+
+{# inline English / Gujarati pair #}
+{% macro t(en, gu) -%}
+<span>{{ en }}</span> <span class="gu">{{ gu }}</span>
+{%- endmacro %}
+
+{# stacked pair, for table headers #}
+{% macro th(en, gu) -%}
+<th class="whitespace-nowrap">{{ en }}<br><span class="gu text-xs font-normal">{{ gu }}</span></th>
+{%- endmacro %}
+
+{% macro badge(status, overdue=false) -%}
+{% if status == 'paid' %}<span class="badge badge-success badge-sm">Paid ચૂકવાયું</span>
+{% elif overdue %}<span class="badge badge-error badge-sm">Overdue મુદત વીતી</span>
+{% elif status == 'partial' %}<span class="badge badge-info badge-sm">Partial આંશિક</span>
+{% else %}<span class="badge badge-warning badge-sm">Pending બાકી</span>{% endif %}
+{%- endmacro %}
+
+{# document table header: English over Gujarati, wraps instead of stretching the table #}
+{% macro dth(en, gu, cls="") -%}
+<th class="{{ cls }}">{{ en }}<br><span class="gu">{{ gu }}</span></th>
+{%- endmacro %}

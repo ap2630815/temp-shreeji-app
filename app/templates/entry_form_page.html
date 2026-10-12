@@ -1,0 +1,32 @@
+{% extends "master_form_page.html" %}
+{% from "partials/bilabel.html" import t %}
+{% block pre_form %}
+<div class="alert bg-base-100 shadow-sm mb-3 text-sm flex-wrap">
+  <span>{{ c.village }} · {{ t('Rate', 'ભાવ') }} <b>{{ c.rate_per_20kg | inr }}</b> / 20 kg · {{ t('bag', 'બેગ') }} <b>{{ c.net_weight }}</b> kg · {{ t('pay after', 'ચુકવણી') }} {{ c.pay_after_days }} {{ t('days', 'દિવસ') }}</span>
+  {% if village_filtered %}<a class="link" href="{{ show_all_url }}">{{ t('Farmer not listed? Show all villages', 'ખેડૂત નથી? બધા ગામ બતાવો') }}</a>{% endif %}
+</div>
+<div class="mb-3 text-sm" id="payable-preview" data-rate="{{ c.rate_per_20kg }}" data-net="{{ c.net_weight }}">
+  {{ t('Payable amount', 'ચૂકવવાપાત્ર રકમ') }}: <b id="pv-amount">—</b>
+  <span class="opacity-60">· {{ t('after borrowing', 'ઉધાર બાદ') }}: <b id="pv-net">—</b></span>
+</div>
+<script>
+(function () {
+  const box = document.getElementById('payable-preview');
+  const rate = +box.dataset.rate, net = +box.dataset.net;
+  const fmt = n => '₹' + n.toLocaleString('en-IN');
+  function update() {
+    const f = document.getElementById('master-form');
+    if (!f) return;
+    const bags = parseInt(f.filled_bags.value || '0', 10) || 0;
+    const kilos = parseInt(f.extra_kilos.value || '0', 10) || 0;
+    const borrow = parseInt(f.borrowing.value || '0', 10) || 0;
+    const amount = Math.ceil((bags * net + kilos) * rate / 20);
+    document.getElementById('pv-amount').textContent = fmt(amount);
+    document.getElementById('pv-net').textContent = fmt(amount - borrow);
+  }
+  document.addEventListener('input', update);
+  document.body.addEventListener('htmx:afterSwap', update);
+  update();
+})();
+</script>
+{% endblock %}

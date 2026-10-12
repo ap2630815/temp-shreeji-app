@@ -1,0 +1,39 @@
+{% from "partials/bilabel.html" import t, dth %}
+<div class="head">
+  <div>
+    <h1>{{ party_label[0] }} {{ t('Statement', 'ખાતાવહી') }} <span class="gu">{{ party_label[1] }}</span></h1>
+    <div>{{ L['app_name'][0] }} <span class="gu">{{ L['app_name'][1] }}</span></div>
+  </div>
+  <div style="text-align:right">{{ t('Date', 'તારીખ') }}: {{ today }}</div>
+</div>
+<div class="meta">
+  <div>{{ party_label[0] }}: <b>{{ party_name }}</b>{% if party.name_gu %} <span class="gu">({{ party.name_gu }})</span>{% endif %}</div>
+  <div>{{ t('Mobile', 'મોબાઇલ') }}: {{ party.mobile }}</div>
+</div>
+<div class="sum">
+  <div>{{ t('Total', 'કુલ') }}<b>{{ totals.amount | inr }}</b></div>
+  <div>{{ t('Paid', 'ચૂકવ્યું') }}<b>{{ totals.paid | inr }}</b></div>
+  <div>{{ t('Balance', 'બાકી') }}<b>{{ totals.due | inr }}</b></div>
+</div>
+<h2>{{ t('Items', 'વિગતો') }}</h2>
+<table>
+  <thead><tr>{{ dth('Date', 'તારીખ') }}{{ dth('Details', 'વિગત') }}{{ dth('Amount', 'રકમ', 'n') }}{{ dth('Paid', 'ચૂકવ્યું', 'n') }}{{ dth('Balance', 'બાકી', 'n') }}</tr></thead>
+  <tbody>
+  {% for p in rows %}
+    <tr><td>{{ p.doc_date }}</td><td>{{ p.label }}</td><td class="n">{{ p.amount | inr }}</td><td class="n">{{ p.paid | inr }}</td><td class="n"><b>{{ p.due | inr }}</b></td></tr>
+  {% else %}
+    <tr><td colspan="5">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h2>{{ t('Payments', 'ચુકવણીઓ') }}</h2>
+<table>
+  <thead><tr>{{ dth('Receipt', 'રસીદ') }}{{ dth('Date', 'તારીખ') }}{{ dth('Amount', 'રકમ', 'n') }}{{ dth('Method', 'રીત') }}{{ dth('Received by', 'લેનાર') }}{{ dth('Reference', 'રેફરન્સ') }}</tr></thead>
+  <tbody>
+  {% for p in payments %}
+    <tr><td>#{{ p.id }}</td><td>{{ p.payment_date }}</td><td class="n">{{ p.amount | inr }}</td><td>{{ p.method | upper }}</td><td>{{ p.receiver_name }} ({{ p.receiver_mobile }})</td><td>{{ p.reference_no or '' }}</td></tr>
+  {% else %}
+    <tr><td colspan="6">{{ t('No payments yet', 'હજી કોઈ ચુકવણી નથી') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

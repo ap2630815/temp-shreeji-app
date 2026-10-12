@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}{% endblock %}</title>
+  <style>
+    @font-face { font-family: "Noto Sans Gujarati"; src: url("static/NotoSansGujarati-Regular.ttf"); font-weight: 400; }
+    @font-face { font-family: "Noto Sans Gujarati"; src: url("static/NotoSansGujarati-Bold.ttf"); font-weight: 700; }
+    @page { size: A4; margin: 12mm; @bottom-right { content: counter(page) " / " counter(pages); font-size: 9px; color: #555; } }
+    body { font-family: "DejaVu Sans", sans-serif, "Noto Sans Gujarati"; margin: 0; }
+    .gu { font-family: "Noto Sans Gujarati", "DejaVu Sans", sans-serif; }
+  </style>
+  {% include "partials/doc_css.html" %}
+</head>
+<body><div class="doc">{% block body %}{% endblock %}</div></body>
+</html>

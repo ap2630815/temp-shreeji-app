@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th %}
+{% macro line(label, value, cls='') %}<tr><td>{{ t(label[0], label[1]) }}</td><td class="text-right {{ cls }}">{{ value | inr }}</td></tr>{% endmacro %}
+{% block title %}Report {{ year }}{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-xl font-semibold flex-1">{{ t('Year report', 'વર્ષનો અહેવાલ') }}</h1>
+  <form method="get" class="flex items-center gap-2">
+    <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
+  </form>
+</div>
+
+<div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
+  <div class="stat py-2"><div class="stat-title">{{ t('Income', 'આવક') }}</div><div class="stat-value text-2xl">{{ income | inr }}</div>
+    <div class="stat-desc">{{ t('billed', 'બિલ') }} {{ sales.billed | inr }}{% if estimated_unweighed %} + {{ t('estimated', 'અંદાજ') }} {{ estimated_unweighed | inr }}{% endif %}</div></div>
+  <div class="stat py-2"><div class="stat-title">{{ t('Costs of goods sold & expenses', 'વેચાયેલા માલનો ખર્ચ અને અન્ય ખર્ચ') }}</div><div class="stat-value text-2xl">{{ net_costs | inr }}</div>
+    <div class="stat-desc">{{ t('after stock in hand', 'સ્ટોક બાદ') }} {{ stock_value | inr }}</div></div>
+  <div class="stat py-2"><div class="stat-title">{{ t('Net', 'ચોખ્ખું') }}</div><div class="stat-value text-2xl {{ 'text-error' if net < 0 else 'text-success' }}">{{ net | inr }}</div>
+    <div class="stat-desc">{% if sales.awaiting_weight %}{{ sales.awaiting_weight }} {{ t('truck(s) awaiting industry weight', 'ટ્રકનું કારખાનાનું વજન બાકી') }}{% else %}{{ t('all trucks weighed', 'બધી ટ્રક તોલાઈ') }}{% endif %}</div></div>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-4">
+  <div class="card bg-base-100 shadow"><div class="card-body p-4">
+    <h2 class="font-semibold">{{ t('Costs', 'ખર્ચ') }}</h2>
+    <table class="table table-sm"><tbody>
+      {% for label, amount in costs %}{{ line(label, amount) }}{% endfor %}
+      {{ line(('Total spent', 'કુલ ખર્ચ'), total_costs, 'font-semibold') }}
+      {{ line(('Less: grain still in stock (at purchase cost)', 'બાદ: હજી સ્ટોકમાં રહેલું અનાજ (ખરીદ કિંમતે)'), -stock_value) }}
+      {{ line(('Cost of goods sold & expenses', 'વેચાયેલા માલનો ખર્ચ અને અન્ય ખર્ચ'), net_costs, 'font-semibold') }}
+    </tbody></table>
+    <p class="text-xs opacity-60">{{ t('By document date. Borrowing and advances are part of the cost they were taken against. Unsold grain is stock, not an expense.', 'દસ્તાવેજની તારીખ મુજબ. ઉધાર અને એડવાન્સ જેની સામે લીધા તે ખર્ચનો ભાગ છે. વેચાયા વગરનું અનાજ સ્ટોક છે, ખર્ચ નથી.') }}</p>
+  </div></div>
+
+  <div class="card bg-base-100 shadow"><div class="card-body p-4">
+    <h2 class="font-semibold">{{ t('Cash movement', 'રોકડ હિલચાલ') }}</h2>
+    <table class="table table-sm"><tbody>
+      {{ line(('Received from industries', 'ઉદ્યોગો પાસેથી મળ્યા'), cash_in) }}
+      {% for key, spec in parties.items() %}{% if cash_out.get(key) %}{{ line(('Paid: ' ~ spec.label[0], 'ચૂકવ્યા: ' ~ spec.label[1]), cash_out[key]) }}{% endif %}{% endfor %}
+      {{ line(('Total paid out', 'કુલ ચૂકવ્યા'), cash_out_total) }}
+      {{ line(('Net cash', 'ચોખ્ખી રોકડ'), cash_in - cash_out_total, 'font-semibold') }}
+    </tbody></table>
+  </div></div>
+
+  <div class="card bg-base-100 shadow"><div class="card-body p-4">
+    <h2 class="font-semibold">{{ t('Outstanding now (all years)', 'અત્યારે બાકી (બધા વર્ષ)') }}</h2>
+    <table class="table table-sm"><tbody>
+      {{ line(('To receive from industries', 'ઉદ્યોગો પાસેથી લેવાના'), receivable_now, 'font-semibold') }}
+      {% for key, spec in parties.items() %}<tr><td>{{ t('To pay: ' ~ spec.label[0], 'ચૂકવવાના: ' ~ spec.label[1]) }} <a class="link text-xs" href="/dues?type={{ key }}">→</a></td><td class="text-right">{{ owed[key] | inr }}</td></tr>{% endfor %}
+    </tbody></table>
+  </div></div>
+
+  <div class="card bg-base-100 shadow"><div class="card-body p-4">
+    <h2 class="font-semibold">{{ t('Weight shortage', 'વજન ઘટ') }}</h2>
+    <p class="text-sm">{{ t('Industry weighed', 'કારખાનામાં તોલાયું') }} <b>{{ '{:,}'.format(sales.short_kg) }} kg</b> ({{ ship_pct }}%) {{ t('less than our weighbridge, across weighed trucks.', 'આપણા કાંટા કરતાં ઓછું, તોલાયેલી ટ્રકમાં.') }}</p>
+  </div></div>
+</div>
+
+<div class="card bg-base-100 shadow mt-4"><div class="card-body p-4">
+  <h2 class="font-semibold">{{ t('Village stock (bags)', 'ગામ મુજબ સ્ટોક (બેગ)') }}</h2>
+  <div class="overflow-x-auto"><table class="table table-sm table-zebra">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Village', 'ગામ') }}{{ th('Grain', 'અનાજ') }}{{ th('Bought', 'ખરીદી') }}{{ th('Loaded', 'ભર્યું') }}{{ th('In stock', 'સ્ટોકમાં') }}</tr></thead>
+    <tbody>
+    {% for c in commencings %}{% set s = stock.get(c.id) %}
+      <tr><td>{{ c.commencing_date }}</td><td><a class="link" href="/commencings/{{ c.id }}">{{ c.village }}</a></td><td>{{ c.grain.name }}</td>
+          <td>{{ s.bought if s else 0 }}</td><td>{{ s.loaded if s else 0 }}</td><td class="font-semibold {{ 'text-warning' if s and s.available > 0 }}">{{ s.available if s else 0 }}</td></tr>
+    {% else %}<tr><td colspan="6" class="text-center opacity-60">{{ t('No commencing this year', 'આ વર્ષે કોઈ કમેન્સિંગ નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div></div>
+{% endblock %}

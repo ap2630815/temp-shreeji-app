@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import bi %}
+{% block title %}{{ spec.label[0] }}{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-xl font-semibold flex-1">{{ spec.label[0] }} <span class="gu">{{ spec.label[1] }}</span></h1>
+  <input type="search" name="q" value="{{ q }}" placeholder="{{ L['search'][0] }} {{ L['search'][1] }}" class="input input-bordered input-sm"
+         hx-get="/masters/{{ spec.slug }}" hx-trigger="input changed delay:300ms, search" hx-target="#rows" hx-swap="innerHTML">
+  <a href="/masters/{{ spec.slug }}/new" class="btn btn-primary btn-sm">+ {{ bi('add') }}</a>
+</div>
+<div class="overflow-x-auto bg-base-100 rounded-box shadow">
+  <table class="table table-zebra">
+    <thead>
+      <tr>
+        {% for col in spec.list_columns %}<th>{{ spec.field(col).en }}<br><span class="gu text-xs">{{ spec.field(col).gu }}</span></th>{% endfor %}
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="rows">{% include "partials/master_rows.html" %}</tbody>
+  </table>
+</div>
+{% endblock %}

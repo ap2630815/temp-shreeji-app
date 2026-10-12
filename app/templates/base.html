@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="shreeji">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ L['app_name'][0] }}{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2"></script>
+  <style>
+    /* Custom daisyUI theme modelled on the daisyUI theme-generator reference (light-blue primary, navy neutral, soft rounded cards) */
+    [data-theme="shreeji"] {
+      color-scheme: light;
+      --p: 90% 0.06 230;   --pc: 22% 0.05 240;
+      --s: 75% 0.17 305;  --sc: 25% 0.1 305;
+      --a: 90% 0.06 230;   --ac: 22% 0.05 240;
+      --n: 28% 0.04 255;  --nc: 96% 0.005 255;
+      --b1: 99% 0.002 255; --b2: 96.5% 0.005 255; --b3: 92% 0.008 255; --bc: 28% 0.04 255;
+      --in: 70% 0.15 250; --inc: 20% 0.06 250;
+      --su: 80% 0.14 180; --suc: 22% 0.05 180;
+      --wa: 85% 0.17 90;  --wac: 28% 0.06 80;
+      --er: 70% 0.19 22;  --erc: 25% 0.08 22;
+      --rounded-box: 1.5rem; --rounded-btn: .75rem; --rounded-badge: 1.5rem;
+      --animation-btn: .2s; --animation-input: .2s;
+      --btn-focus-scale: .97; --border-btn: 1px; --tab-border: 1px; --tab-radius: .75rem;
+    }
+    .card { border: 1px solid oklch(var(--b3) / .6); }
+    .card.shadow-xl, .card.shadow-sm, .card.shadow-md { box-shadow: 0 1px 2px oklch(var(--n) / .05), 0 8px 24px -12px oklch(var(--n) / .12); }
+    /* noise texture (daisyUI "noise effect") */
+    body::before { content: ""; position: fixed; inset: 0; z-index: 100; pointer-events: none; opacity: .35; mix-blend-mode: multiply;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+    @media print { body::before { display: none; } }
+    @media (min-width: 1024px) { .sidebar-collapsed .drawer-side { display: none; } }
+    .menu li.menu-title { padding: .5rem .75rem .25rem; }
+    .menu li > a.active { background: oklch(var(--p)) !important; color: #000 !important; font-weight: 600; }
+    .menu li > a { justify-content: space-between; }
+    .btn { font-weight: 600; }
+    .soft-light, .menu li > a.soft-light, .menu li > a.soft-light.active { background: oklch(var(--b2)) !important; color: #000 !important; border: 1px solid oklch(var(--b3)); }
+    .soft-light:hover, .menu li > a.soft-light:hover { background: oklch(var(--b3)) !important; }
+    .btn-primary { box-shadow: 0 2px 0 oklch(var(--p) / .4) inset; }
+    .navbar { border: 1px solid oklch(var(--b3) / .6); border-radius: var(--rounded-box); }
+    .input, .select, .textarea { background: oklch(var(--b1)); }
+    .table :where(thead, tfoot) { color: oklch(var(--bc) / .6); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+    .badge { font-weight: 600; }
+    @font-face { font-family: "Noto Sans Gujarati"; src: url("/static/NotoSansGujarati-Regular.ttf"); font-weight: 400; }
+    @font-face { font-family: "Noto Sans Gujarati"; src: url("/static/NotoSansGujarati-Bold.ttf"); font-weight: 700; }
+    body { font-family: system-ui, "Noto Sans Gujarati", sans-serif; }
+    .gu { font-family: "Noto Sans Gujarati", sans-serif; opacity: .75; }
+  </style>
+</head>
+<body class="min-h-screen bg-base-200" hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+  {% block body %}{% endblock %}
+</body>
+</html>

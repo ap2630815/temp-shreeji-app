@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t %}
+{% block title %}Receipt #{{ payment.id }}{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-2 mb-3">
+  <a href="/statements/{{ party_type }}/{{ party.id }}" class="btn btn-ghost btn-sm">←</a>
+  <span class="flex-1"></span>
+  <a class="btn btn-primary btn-sm" href="/payments/{{ payment.id }}/receipt.pdf" target="_blank">{{ t('Print receipt (PDF)', 'રસીદ છાપો (PDF)') }}</a>
+</div>
+<div class="bg-white rounded-box shadow p-4 overflow-x-auto max-w-3xl">{% include "partials/doc_css.html" %}<div class="doc">{% include "partials/receipt_body.html" %}</div></div>
+{% endblock %}

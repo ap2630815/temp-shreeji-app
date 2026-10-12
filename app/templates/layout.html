@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "partials/bilabel.html" import bi, t %}
+{% macro title(en, gu) %}<span class="flex items-baseline gap-2 w-full justify-between"><span>{{ en }}</span><span class="gu text-xs normal-case">{{ gu }}</span></span>{% endmacro %}
+{% macro item(href, en, gu, match='', cls='') %}
+<li><a href="{{ href }}" class="{{ cls }} {{ 'active' if request.url.path == href.split('?')[0] or (match and request.url.path.startswith(match)) else '' }}"><span>{{ en }}</span><span class="gu text-xs">{{ gu }}</span></a></li>
+{% endmacro %}
+{% block body %}
+<div class="drawer lg:drawer-open">
+  <input id="app-drawer" type="checkbox" class="drawer-toggle">
+  <div class="drawer-content flex flex-col min-w-0">
+    <div class="sticky top-0 z-40 p-3 pb-0">
+      <div class="navbar bg-base-100 shadow-sm gap-2">
+        {% set burger %}<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>{% endset %}
+        <button type="button" class="btn btn-square btn-ghost" aria-label="toggle sidebar" onclick="toggleSidebar()">{{ burger }}</button>
+        <div class="px-2 font-bold flex flex-col items-center text-center leading-tight"><span>{{ L['app_name'][0] }}</span><span class="gu">{{ L['app_name'][1] }}</span></div>
+        <div class="px-2 font-bold flex flex-col items-center text-center leading-tight"><span>{{ L['business_year'][0] }}</span><span class="gu">{{ L['business_year'][1] }}</span></div>
+        {% set cur_year = year if (year is defined and year) else default_year_label() %}
+        {% set ys = year_span(cur_year) %}
+        {% set year_opts = years if (years is defined and years) else year_choices() %}
+        <form method="get" class="relative px-2 rounded-btn hover:bg-base-200 cursor-pointer">
+          {% for k, v in request.query_params.multi_items() if k != 'year' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+          <div class="font-bold flex flex-col items-center text-center leading-tight pointer-events-none"><span>{{ ys[0] }} <span class="text-xs opacity-60">▾</span></span><span>{{ ys[1] }}</span></div>
+          <select name="year" aria-label="Business year" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="this.form.submit()">
+            {% for y in year_opts %}<option value="{{ y }}" {{ 'selected' if y == cur_year }}>{{ y }}</option>{% endfor %}
+          </select>
+        </form>
+        <div class="flex-1"></div>
+        <div class="hidden sm:flex flex-col leading-tight text-sm px-2"><span class="font-semibold">{{ user.username }}</span><span class="opacity-70">{{ user.role }}</span></div>
+        <a class="btn btn-sm btn-ghost h-auto min-h-0 py-1 flex-col gap-0 leading-tight" href="/account/password"><span>{{ L['change_password'][0] }}</span><span class="gu text-xs">{{ L['change_password'][1] }}</span></a>
+        <button class="btn btn-sm bg-base-200 hover:bg-base-300 text-black border-base-300 h-auto min-h-0 py-1 flex-col gap-0 leading-tight" hx-post="/logout"><span>{{ L['logout'][0] }}</span><span class="gu text-xs">{{ L['logout'][1] }}</span></button>
+      </div>
+    </div>
+    <div class="px-3 pt-2">
+      <form method="get" class="flex flex-wrap items-center gap-3 bg-base-100 border border-base-300 rounded-box px-4 py-2">
+        {% for k, v in request.query_params.multi_items() if k != 'grain_id' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <select name="grain_id" aria-label="Grain" class="select select-bordered select-sm min-w-48" onchange="this.form.submit()">
+          <option value="">{{ L['grain'][0] }} {{ L['grain'][1] }}</option>
+          {% for g in request.state.grains %}<option value="{{ g.id }}" {{ 'selected' if request.query_params.get('grain_id') == g.id|string }}>{{ g.name }} {{ g.name_gu }}</option>{% endfor %}
+        </select>
+      </form>
+    </div>
+    <main class="p-4 w-full max-w-6xl mx-auto">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <div class="drawer-side z-30">
+    <label for="app-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+    <aside class="bg-base-100 border-r border-base-300 w-64 min-h-full p-3 pt-20 lg:pt-3 flex flex-col gap-2 overflow-y-auto">
+      <a href="/" class="flex items-center gap-3 font-bold px-2 py-2">
+        <span class="w-20 h-20 text-3xl rounded-full overflow-hidden bg-primary text-primary-content relative grid place-items-center shrink-0"><img src="/static/logo.png" alt="Shreeji Traders" class="absolute inset-0 w-full h-full object-cover bg-base-100" onerror="this.remove()">S</span><span class="flex flex-col leading-tight gap-1"><span class="text-lg">Shreeji Traders</span><span class="gu text-sm font-semibold">શ્રીજી ટ્રેડર્સ</span></span>
+      </a>
+      <ul class="menu w-full p-0 gap-1">
+        {{ item('/', 'Dashboard', 'ડેશબોર્ડ', cls='py-4 soft-light font-semibold') }}
+        <li class="menu-title">{{ title('Buying', 'ખરીદી') }}</li>
+        {{ item('/commencings', 'Commencing', 'કમેન્સિંગ', '/commencings') }}
+        {{ item('/bag-supplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
+        {{ item('/labour-work', 'Labour work', 'મજૂર કામ') }}
+        <li class="menu-title">{{ title('Selling', 'વેચાણ') }}</li>
+        {{ item('/trips', 'Trips', 'ટ્રીપ', '/trips') }}
+        {{ item('/receivables', 'Receivables', 'લેણાં') }}
+        <li class="menu-title">{{ title('Accounts', 'હિસાબ') }}</li>
+        {{ item('/dues', 'Payables', 'ચૂકવવાપાત્ર') }}
+        {{ item('/reports/year', 'Report', 'અહેવાલ') }}
+        {% if user.role == 'owner' %}{{ item('/years', 'Years', 'વર્ષ') }}{% endif %}
+        <li class="menu-title">{{ title('Masters', 'માસ્ટર્સ') }}</li>
+        {% for slug, spec in MASTERS.items() %}{{ item('/masters/' ~ slug, spec.label[0], spec.label[1], '/masters/' ~ slug) }}{% endfor %}
+      </ul>
+    </aside>
+  </div>
+</div>
+<script>
+  function toggleSidebar() {
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      var c = document.body.classList.toggle("sidebar-collapsed");
+      try { localStorage.setItem("sidebar-collapsed", c ? "1" : "0"); } catch (e) {}
+    } else {
+      var cb = document.getElementById("app-drawer");
+      cb.checked = !cb.checked;
+    }
+  }
+  try { if (localStorage.getItem("sidebar-collapsed") === "1") document.body.classList.add("sidebar-collapsed"); } catch (e) {}
+</script>
+{% endblock %}

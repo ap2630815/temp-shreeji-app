@@ -1,0 +1,13 @@
+{% from "partials/bilabel.html" import t %}
+<tr id="year-{{ y.label }}">
+  <td class="font-semibold">{{ y.label }}</td>
+  <td>{{ y.bounds[0] }} → {{ y.bounds[1] }}</td>
+  <td>{% if y.locked %}<span class="badge badge-warning">🔒 {{ t('Locked', 'લૉક') }}</span>{% else %}<span class="badge badge-success">{{ t('Open', 'ખુલ્લું') }}</span>{% endif %}</td>
+  <td class="text-right">
+    <button class="btn btn-sm {{ '' if y.locked else 'btn-outline' }}" hx-post="/years/{{ y.label }}" hx-vals='{"locked": {{ 0 if y.locked else 1 }}}'
+            hx-target="#year-{{ y.label }}" hx-swap="outerHTML"
+            {% if not y.locked %}hx-confirm="Lock {{ y.label }}? / {{ y.label }} લૉક કરવું?"{% endif %}>
+      {% if y.locked %}{{ t('Unlock', 'અનલૉક') }}{% else %}{{ t('Lock', 'લૉક') }}{% endif %}
+    </button>
+  </td>
+</tr>

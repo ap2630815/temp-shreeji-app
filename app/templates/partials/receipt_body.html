@@ -1,0 +1,31 @@
+{% from "partials/bilabel.html" import t, dth %}
+<div class="head">
+  <div>
+    <h1>{{ t('Payment Receipt', 'ચુકવણી રસીદ') }}</h1>
+    <div>{{ L['app_name'][0] }} <span class="gu">{{ L['app_name'][1] }}</span></div>
+  </div>
+  <div style="text-align:right">{{ t('Receipt no.', 'રસીદ નં.') }} <b>#{{ payment.id }}</b><br>{{ t('Date', 'તારીખ') }}: {{ payment.payment_date }}</div>
+</div>
+<div class="meta">
+  <div>{{ t('Paid to', 'ચૂકવ્યા') }} ({{ party_label[0]}} <span class="gu">{{ party_label[1] }}</span>): <b>{{ party_name }}</b>{% if party.name_gu %} <span class="gu">({{ party.name_gu }})</span>{% endif %}</div>
+  <div>{% if party_type == 'farmer' %}{{ t('Village', 'ગામ') }}: <b>{{ party.village }}</b>{% endif %}</div>
+  <div>{{ t('Received by', 'લેનાર') }}: <b>{{ payment.receiver_name }}</b></div>
+  <div>{{ t('Receiver mobile', 'લેનારનો મોબાઇલ') }}: {{ payment.receiver_mobile }}</div>
+  <div>{{ t('Method', 'રીત') }}: <b>{{ payment.method | upper }}</b></div>
+  <div>{{ t('Reference', 'રેફરન્સ') }}: {{ payment.reference_no or '—' }}</div>
+</div>
+<div class="sum"><div>{{ t('Amount paid', 'ચૂકવેલી રકમ') }}<b class="big">{{ payment.amount | inr }}</b></div></div>
+{% if payment.note %}<div>{{ t('Note', 'નોંધ') }}: {{ payment.note }}</div>{% endif %}
+
+<h2>{{ t('Settled against', 'આની સામે ચૂકવ્યા') }}</h2>
+<table>
+  <thead><tr>
+    {{ dth('Date', 'તારીખ') }}{{ dth('Details', 'વિગત') }}{{ dth('Item total', 'કુલ રકમ', 'n') }}{{ dth('This payment', 'આ ચુકવણી', 'n') }}{{ dth('Still due', 'હજી બાકી', 'n') }}
+  </tr></thead>
+  <tbody>
+  {% for l in lines %}{% set p = l.payable %}
+    <tr><td>{{ p.doc_date }}</td><td>{{ p.label }}</td><td class="n">{{ p.amount | inr }}</td><td class="n">{{ l.amount | inr }}</td><td class="n">{{ l.remaining | inr }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="sign"><div>{{ t('Receiver signature', 'લેનારની સહી') }}</div><div>{{ t('Paid by', 'ચૂકવનાર') }}</div></div>
