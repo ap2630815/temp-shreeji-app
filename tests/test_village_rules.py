@@ -107,3 +107,51 @@ def test_bilty_view_status():
     v = view(10_000, 0)  # 10,000 kg / 20 * 300 = 150,000
     assert (v.receivable, v.due, v.status) == (150_000, 150_000, "pending")
     assert view(10_000, 50_000).status == "partial" and view(10_000, 150_000).status == "paid"
+
+
+# ---------------------------------------------------------------- business year closing
+
+import asyncio
+from types import SimpleNamespace
+
+from fastapi import HTTPException
+
+from app.services import years as years_svc
+
+
+def _fake_today(monkeypatch, d):
+    class FakeDate(date):
+        @classmethod
+        def today(cls):
+            return d
+
+    monkeypatch.setattr(years_svc, "date", FakeDate)
+
+
+def test_only_current_business_year_accepts_entries(monkeypatch):
+    _fake_today(monkeypatch, date(2026, 10, 12))  # current year is 2026-27
+    assert asyncio.run(years_svc.assert_year_open(None, date(2026, 10, 1))) == "2026-27"
+    assert asyncio.run(years_svc.assert_year_open(None, date(2027, 9, 30))) == "2026-27"
+    for outside in (date(2026, 9, 30), date(2027, 10, 1), date(2023, 12, 1)):
+        with pytest.raises(years_svc.YearLockedError):
+            asyncio.run(years_svc.assert_year_open(None, outside))
+
+
+def test_year_closes_on_first_october(monkeypatch):
+    _fake_today(monkeypatch, date(2026, 9, 30))
+    assert asyncio.run(years_svc.assert_year_open(None, date(2026, 9, 30))) == "2025-26"
+    _fake_today(monkeypatch, date(2026, 10, 1))
+    with pytest.raises(years_svc.YearLockedError):
+        asyncio.run(years_svc.assert_year_open(None, date(2026, 9, 30)))
+
+
+def test_only_owner_browses_past_years(monkeypatch):
+    _fake_today(monkeypatch, date(2026, 10, 12))
+    owner, accountant = SimpleNamespace(role="owner"), SimpleNamespace(role="accountant")
+    assert years_svc.allowed_years(owner, ["2024-25", "2023-24"]) == ["2026-27", "2024-25", "2023-24"]
+    assert years_svc.allowed_years(accountant, ["2024-25"]) == ["2026-27"]
+    years_svc.require_year_visible(owner, "2024-25")
+    years_svc.require_year_visible(accountant, "2026-27")
+    with pytest.raises(HTTPException) as exc:
+        years_svc.require_year_visible(accountant, "2024-25")
+    assert exc.value.status_code == 403

@@ -1,0 +1,87 @@
+LEDGER TABLES (money paid out / received and how it was allocated)
+Structure only - no data rows.
+==============================================================================
+
+TABLE: payments
+------------------------------------------------------------------------
+column          | type                     | constraints
+------------------------------------------------------------------------
+id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+party_type      | VARCHAR(20)              | NOT NULL
+party_id        | INTEGER                  | NOT NULL
+amount          | BIGINT                   | NOT NULL
+payment_date    | DATE                     | NOT NULL
+business_year   | VARCHAR(7)               | NOT NULL
+method          | VARCHAR(10)              | NOT NULL
+receiver_name   | VARCHAR(200)             | NOT NULL
+receiver_mobile | VARCHAR(10)              | NOT NULL
+reference_no    | VARCHAR(60)              | -
+note            | TEXT                     | -
+created_by      | INTEGER                  | FOREIGN KEY -> users.id
+created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_payments_amount_positive: amount > 0
+  CHECK ck_payments_method: method IN ('cash', 'cheque', 'upi', 'bank')
+  CHECK ck_payments_receiver_mobile: receiver_mobile ~ '^[0-9]{10}$'
+  CHECK ck_payments_party_type: party_type IN ('farmer', 'transporter', 'labour', 'bag_supplier', 'broker')
+  INDEX ix_payments_business_year (business_year)
+  INDEX ix_payments_party (party_type, party_id)
+
+==============================================================================
+
+TABLE: payment_allocations
+-----------------------------------------------------------------
+column       | type        | constraints
+-----------------------------------------------------------------
+id           | INTEGER     | PRIMARY KEY, AUTO INCREMENT
+payment_id   | INTEGER     | NOT NULL, FOREIGN KEY -> payments.id
+payable_type | VARCHAR(20) | NOT NULL, DEFAULT 'purchase_entry'
+payable_id   | INTEGER     | NOT NULL
+amount       | BIGINT      | NOT NULL
+
+Table constraints / indexes:
+  CHECK ck_alloc_amount_positive: amount > 0
+  CHECK ck_alloc_payable_type: payable_type IN ('purchase_entry', 'truck_trip', 'labour_work', 'bag_supply', 'bilty_brokerage')
+  INDEX ix_alloc_payable (payable_type, payable_id)
+
+==============================================================================
+
+TABLE: receipts
+---------------------------------------------------------------------------------
+column        | type                     | constraints
+---------------------------------------------------------------------------------
+id            | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+industry_id   | INTEGER                  | NOT NULL, FOREIGN KEY -> industries.id
+amount        | BIGINT                   | NOT NULL
+receipt_date  | DATE                     | NOT NULL
+business_year | VARCHAR(7)               | NOT NULL
+method        | VARCHAR(10)              | NOT NULL
+reference_no  | VARCHAR(60)              | -
+payer_name    | VARCHAR(200)             | -
+note          | TEXT                     | -
+created_by    | INTEGER                  | FOREIGN KEY -> users.id
+created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_receipts_method: method IN ('cash', 'cheque', 'upi', 'bank')
+  CHECK ck_receipts_amount: amount > 0
+  INDEX ix_receipts_business_year (business_year)
+  INDEX ix_receipts_industry_id (industry_id)
+
+==============================================================================
+
+TABLE: receipt_allocations
+-----------------------------------------------------------
+column     | type    | constraints
+-----------------------------------------------------------
+id         | INTEGER | PRIMARY KEY, AUTO INCREMENT
+receipt_id | INTEGER | NOT NULL, FOREIGN KEY -> receipts.id
+bilty_id   | INTEGER | NOT NULL, FOREIGN KEY -> bilties.id
+amount     | BIGINT  | NOT NULL
+
+Table constraints / indexes:
+  CHECK ck_receipt_alloc_amount: amount > 0
+  INDEX ix_receipt_alloc_bilty (bilty_id)
+
+==============================================================================

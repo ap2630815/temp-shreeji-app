@@ -1,14 +1,15 @@
 from datetime import date
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models import BusinessYear
 
 
 class YearLockedError(Exception):
+    """The date is outside the current business year, so the year is closed for new or changed entries."""
+
     def __init__(self, label: str):
         self.label = label
-        super().__init__(f"Business year {label} is locked")
+        super().__init__(f"Business year {label} is closed")
 
 
 def business_year_of(d: date) -> str:
@@ -22,9 +23,27 @@ def year_bounds(label: str) -> tuple[date, date]:
     return date(start, 10, 1), date(start + 1, 9, 30)
 
 
+def current_year_label() -> str:
+    return business_year_of(date.today())
+
+
 async def assert_year_open(db: AsyncSession, d: date) -> str:
+    """Only the current business year accepts entries; every earlier year is closed automatically on 1 October.
+    `db` is unused (kept so call sites stay unchanged)."""
     label = business_year_of(d)
-    row = await db.get(BusinessYear, label)
-    if row is not None and row.is_locked:
+    if label != current_year_label():
         raise YearLockedError(label)
     return label
+
+
+def allowed_years(user, found) -> list[str]:
+    """Years a user may browse, newest first: the owner sees every year with data, others only the current one."""
+    current = current_year_label()
+    if user.role == "owner":
+        return sorted({current, *found}, reverse=True)
+    return [current]
+
+
+def require_year_visible(user, label: str) -> None:
+    if user.role != "owner" and label != current_year_label():
+        raise HTTPException(403, detail="Only the owner can view past business years")

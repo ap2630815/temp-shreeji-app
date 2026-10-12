@@ -15,22 +15,22 @@ from app.services import payables as pay_svc
 from app.services import receivables as rec_svc
 from app.services.payables import PARTIES
 from app.services.stock import stock_by_commencing
-from app.services.years import business_year_of, year_bounds
+from app.services.years import allowed_years, current_year_label, year_bounds
 
 router = APIRouter(prefix="/reports")
 
 
-async def _years(db: AsyncSession) -> list[str]:
-    found = {business_year_of(today())}
+async def _years(db: AsyncSession, user: User) -> list[str]:
+    found: set[str] = set()
     for model in (Commencing, TruckTrip, Payment, Receipt):
         found |= set((await db.scalars(select(model.business_year).distinct())).all())
-    return sorted(found, reverse=True)
+    return allowed_years(user, found)
 
 
 @router.get("/year", response_class=HTMLResponse)
 async def year_report(request: Request, year: str = "", user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
-    years = await _years(db)
-    year = year if year in years else business_year_of(today())
+    years = await _years(db, user)
+    year = year if year in years else current_year_label()
     start, end = year_bounds(year)
     now = today()
 

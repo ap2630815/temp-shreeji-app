@@ -6,7 +6,7 @@
   <h1 class="text-xl font-semibold flex-1">{{ t('Labour work', 'મજૂર કામ') }}</h1>
   <form method="get" class="flex items-center gap-2">
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
-    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Locked', 'લૉક') }}</span>{% endif %}
+    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>
   <a href="/dues?type=labour" class="btn btn-sm">{{ t('Pay labour', 'મજૂરને ચુકવણી') }}</a>
   <a href="/labour-work/new" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>

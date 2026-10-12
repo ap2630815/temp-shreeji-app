@@ -64,8 +64,8 @@ def _upi():
     return _mobile("upi_number", "UPI number (if different from mobile)", "UPI નંબર (મોબાઇલથી અલગ હોય તો)", required=False)
 
 
-def _name_pair(en="Name", gu="નામ", name="name", required=True):
-    return [F(name, en, gu, required=required), F(f"{name}_gu", f"{en} (Gujarati)", f"{gu} (ગુજરાતી)")]
+def _name_pair(en="Name", gu="નામ", name="name", required=True, max_length=200):
+    return [F(name, en, gu, required=required, max_length=max_length), F(f"{name}_gu", f"{en} (Gujarati)", f"{gu} (ગુજરાતી)", max_length=max_length)]
 
 
 SPECS: dict[str, Spec] = {}
@@ -78,18 +78,18 @@ def _add(spec: Spec):
 _add(Spec(
     slug="farmers", model=models.Farmer, label=("Farmer", "ખેડૂત"),
     fields=(
-        *_name_pair("Full name (surname, name, father, grandfather)", "પૂરું નામ (અટક, નામ, પિતા, દાદા)"),
-        F("head_of_family", "Head of family (verify before payment)", "કુટુંબના વડા (ચુકવણી પહેલાં ચકાસો)"),
+        *_name_pair("Full name (surname, name, father, grandfather)", "પૂરું નામ (અટક, નામ, પિતા, દાદા)", max_length=120),
+        F("head_of_family", "Head of family (verify before payment)", "કુટુંબના વડા (ચુકવણી પહેલાં ચકાસો)", max_length=60),
         _mobile("mobile", "Mobile", "મોબાઇલ"),
-        F("email", "Email", "ઈમેલ", kind="email", pattern=EMAIL, hint=("name@example.com", "name@example.com"), max_length=254),
-        F("village", "Village", "ગામ", required=True, max_length=100),
-        F("village_gu", "Village (Gujarati)", "ગામ (ગુજરાતી)", max_length=100),
+        F("email", "Email", "ઈમેલ", kind="email", pattern=EMAIL, hint=("name@example.com", "name@example.com"), max_length=60),
+        F("village", "Village", "ગામ", required=True, max_length=30),
+        F("village_gu", "Village (Gujarati)", "ગામ (ગુજરાતી)", max_length=30),
         F("house", "House / address", "ઘર / સરનામું", kind="textarea"),
         _upi(),
         F("bank_account_number", "Bank account number", "બેંક ખાતા નંબર", kind="tel", pattern=BANK_ACCOUNT,
           hint=("9–18 digits", "૯–૧૮ અંક"), max_length=18),
-        F("bank_name", "Bank name", "બેંકનું નામ", max_length=100),
-        F("bank_branch", "Branch name", "શાખાનું નામ", max_length=100),
+        F("bank_name", "Bank name", "બેંકનું નામ", max_length=30),
+        F("bank_branch", "Branch name", "શાખાનું નામ", max_length=30),
         F("ifsc_code", "IFSC code", "IFSC કોડ", pattern=IFSC, hint=("e.g. SBIN0001234", "દા.ત. SBIN0001234"),
           max_length=11, normalize="upper"),
         F("description", "Private note (owner only)", "ખાનગી નોંધ (ફક્ત માલિક)", kind="textarea", owner_only=True),
@@ -102,10 +102,10 @@ _add(Spec(
 _add(Spec(
     slug="bag-suppliers", model=models.BagSupplier, label=("Bag Supplier", "બારદાન સપ્લાયર"),
     fields=(
-        *_name_pair("Full name (surname, name, father)", "પૂરું નામ (અટક, નામ, પિતા)"),
-        F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=100),
+        *_name_pair("Full name (surname, name, father)", "પૂરું નામ (અટક, નામ, પિતા)", max_length=120),
+        F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=30),
         _mobile("mobile", "Mobile", "મોબાઇલ"),
-        F("email", "Email", "ઈમેલ", kind="email", pattern=EMAIL, hint=("name@example.com", "name@example.com"), max_length=254),
+        F("email", "Email", "ઈમેલ", kind="email", pattern=EMAIL, hint=("name@example.com", "name@example.com"), max_length=60),
         _upi(),
     ),
     list_columns=("name", "pet_name", "mobile"),
@@ -115,10 +115,10 @@ _add(Spec(
 _add(Spec(
     slug="labour", model=models.LabourGroup, label=("Labour Group", "મજૂર જૂથ"),
     fields=(
-        *_name_pair("Leader name (surname, name, father)", "મુકાદમનું નામ (અટક, નામ, પિતા)"),
+        *_name_pair("Leader name (surname, name, father)", "મુકાદમનું નામ (અટક, નામ, પિતા)", max_length=120),
         _mobile("mobile", "Mobile", "મોબાઇલ"),
-        F("group_name", "Group name", "જૂથનું નામ", required=True, max_length=100),
-        F("group_name_gu", "Group name (Gujarati)", "જૂથનું નામ (ગુજરાતી)", max_length=100),
+        F("group_name", "Group name", "જૂથનું નામ", required=True, max_length=30),
+        F("group_name_gu", "Group name (Gujarati)", "જૂથનું નામ (ગુજરાતી)", max_length=30),
     ),
     list_columns=("group_name", "name", "mobile"),
     search_columns=("name", "name_gu", "group_name", "group_name_gu", "mobile"),
@@ -128,11 +128,11 @@ _add(Spec(
 _add(Spec(
     slug="transporters", model=models.Transporter, label=("Transport", "ટ્રાન્સપોર્ટ"),
     fields=(
-        F("name", "Transport name", "ટ્રાન્સપોર્ટનું નામ", required=True),
-        F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=100),
-        F("location", "Location", "સ્થળ", required=True, max_length=100),
-        F("owner_name", "Owner name (surname, name, father)", "માલિકનું નામ (અટક, નામ, પિતા)", required=True),
-        F("owner_name_gu", "Owner name (Gujarati)", "માલિકનું નામ (ગુજરાતી)"),
+        F("name", "Transport name", "ટ્રાન્સપોર્ટનું નામ", required=True, max_length=120),
+        F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=30),
+        F("location", "Location", "સ્થળ", required=True, max_length=60),
+        F("owner_name", "Owner name (surname, name, father)", "માલિકનું નામ (અટક, નામ, પિતા)", required=True, max_length=120),
+        F("owner_name_gu", "Owner name (Gujarati)", "માલિકનું નામ (ગુજરાતી)", max_length=120),
         _mobile("mobile", "Mobile", "મોબાઇલ"),
         _upi(),
     ),
@@ -145,9 +145,9 @@ _add(Spec(
     fields=(
         F("truck_number", "Truck number", "ટ્રક નંબર", required=True, pattern=TRUCK_NO,
           hint=("e.g. GJ03AB1234", "દા.ત. GJ03AB1234"), max_length=10, normalize="truck_no"),
-        F("owner_name", "Owner name (surname, name, father)", "માલિકનું નામ (અટક, નામ, પિતા)", required=True),
+        F("owner_name", "Owner name (surname, name, father)", "માલિકનું નામ (અટક, નામ, પિતા)", required=True, max_length=120),
         _mobile("owner_mobile", "Owner mobile", "માલિકનો મોબાઇલ"),
-        F("driver_name", "Driver name (surname, name, father)", "ડ્રાઇવરનું નામ (અટક, નામ, પિતા)", required=True),
+        F("driver_name", "Driver name (surname, name, father)", "ડ્રાઇવરનું નામ (અટક, નામ, પિતા)", required=True, max_length=120),
         _mobile("driver_mobile", "Driver mobile", "ડ્રાઇવરનો મોબાઇલ"),
         _upi(),
         F("description", "Description", "વર્ણન", kind="textarea"),
@@ -160,13 +160,13 @@ _add(Spec(
 _add(Spec(
     slug="industries", model=models.Industry, label=("Industry", "ઉદ્યોગ"),
     fields=(
-        *_name_pair("Industry name", "ઉદ્યોગનું નામ"),
-        F("owner_name", "Owner name", "માલિકનું નામ", required=True),
+        *_name_pair("Industry name", "ઉદ્યોગનું નામ", max_length=120),
+        F("owner_name", "Owner name", "માલિકનું નામ", required=True, max_length=120),
         _mobile("owner_mobile", "Owner mobile", "માલિકનો મોબાઇલ"),
-        F("supervisor_name", "Supervisor name", "સુપરવાઇઝરનું નામ", required=True),
+        F("supervisor_name", "Supervisor name", "સુપરવાઇઝરનું નામ", required=True, max_length=120),
         _mobile("supervisor_mobile", "Supervisor mobile", "સુપરવાઇઝરનો મોબાઇલ"),
-        F("product", "Product", "ઉત્પાદન", required=True, max_length=100),
-        F("location", "Location", "સ્થળ", required=True, max_length=100),
+        F("product", "Product", "ઉત્પાદન", required=True, max_length=60),
+        F("location", "Location", "સ્થળ", required=True, max_length=120),
         F("required_quality", "Required quality", "જરૂરી ગુણવત્તા", kind="textarea"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ),
@@ -177,7 +177,7 @@ _add(Spec(
 _add(Spec(
     slug="brokers", model=models.Broker, label=("Broker", "દલાલ"),
     fields=(
-        *_name_pair("Broker name", "દલાલનું નામ"),
+        *_name_pair("Broker name", "દલાલનું નામ", max_length=120),
         _mobile("mobile", "Mobile", "મોબાઇલ"),
         F("brokerage_per_truck", "Brokerage per truck (₹)", "ટ્રક દીઠ દલાલી (₹)", kind="int", required=True),
         _upi(),
@@ -189,7 +189,7 @@ _add(Spec(
 _add(Spec(
     slug="grains", model=models.Grain, label=("Grain", "અનાજ"),
     fields=(
-        *_name_pair("Grain name", "અનાજનું નામ"),
+        *_name_pair("Grain name", "અનાજનું નામ", max_length=30),
         F("default_net_weight", "Net bag weight (kg)", "બેગનું ચોખ્ખું વજન (કિલો)", kind="choice", required=True,
           choices=(35, 50, 70, 100)),
         F("default_terms", "Default terms & conditions (clean, moisture, variety…)",

@@ -17,7 +17,7 @@ from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
 from app.models import (
-    Bilty, BusinessYear, Broker, Commencing, Grain, Industry, LabourGroup, Transporter, TruckLoadLine, TruckTrip, Truck, User,
+    Bilty, Broker, Commencing, Grain, Industry, LabourGroup, Transporter, TruckLoadLine, TruckTrip, Truck, User,
 )
 from app.models.sales import _ceil_div, freight_amount
 from app.services import audit
@@ -25,7 +25,7 @@ from app.services.locks import advisory_lock
 from app.services.payables import paid_for
 from app.services.receivables import received_map
 from app.services.stock import stock_by_commencing
-from app.services.years import YearLockedError, assert_year_open, business_year_of
+from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible
 
 router = APIRouter(prefix="/trips")
 
@@ -192,9 +192,8 @@ def _below_paid(paid: int, new_amount: int, what: tuple[str, str]) -> tuple[str,
     return None
 
 
-async def _years_with_trips(db: AsyncSession) -> list[str]:
-    rows = (await db.scalars(select(TruckTrip.business_year).distinct())).all()
-    return sorted({business_year_of(today()), *rows}, reverse=True)
+async def _years_with_trips(db: AsyncSession, user: User) -> list[str]:
+    return allowed_years(user, (await db.scalars(select(TruckTrip.business_year).distinct())).all())
 
 
 # ================================================================== list
@@ -203,15 +202,14 @@ async def _years_with_trips(db: AsyncSession) -> list[str]:
 async def list_page(
     request: Request, year: str = "", grain_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
-    years = await _years_with_trips(db)
-    year = year if year in years else business_year_of(today())
+    years = await _years_with_trips(db, user)
+    year = year if year in years else current_year_label()
     stmt = select(TruckTrip).where(TruckTrip.business_year == year)
     if grain_id:
         stmt = stmt.where(TruckTrip.grain_id == grain_id)
     trips = list((await db.scalars(stmt.order_by(TruckTrip.trip_date.desc(), TruckTrip.id.desc()))).unique().all())
-    locked = await db.get(BusinessYear, year)
     return render_with_csrf(request, csrf, "trip_list.html", user=user, trips=trips, grain_id=grain_id, year=year, years=years,
-                            year_locked=bool(locked and locked.is_locked), warn_pct=SHORT_WARN_PCT)
+                            year_locked=year != current_year_label(), warn_pct=SHORT_WARN_PCT)
 
 
 # ================================================================== trip create / edit
@@ -301,6 +299,7 @@ async def _save_trip(request: Request, trip: TruckTrip | None, user: User, db: A
 @router.get("/{trip_id}", response_class=HTMLResponse)
 async def detail_page(request: Request, trip_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     trip = await _get_trip(db, trip_id)
+    require_year_visible(user, trip.business_year)
     bilty = trip.bilty
     line_form = form_context(fields=await line_fields(db, trip), values={}, errors={}, action=f"/trips/{trip.id}/lines", heading=("Add load", "લોડ ઉમેરો"), back_url=f"/trips/{trip.id}")
     ctx = dict(

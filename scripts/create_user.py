@@ -3,6 +3,8 @@ import asyncio
 import getpass
 import sys
 
+from sqlalchemy.exc import DBAPIError
+
 from app.core.db import SessionLocal
 from app.core.security import hash_password
 from app.models import User
@@ -12,7 +14,10 @@ async def main(username: str, role: str) -> None:
     password = getpass.getpass("Password: ")
     async with SessionLocal() as db:
         db.add(User(username=username, role=role, password_hash=hash_password(password)))
-        await db.commit()
+        try:
+            await db.commit()
+        except DBAPIError as exc:  # IntegrityError is a subclass
+            sys.exit(f"Cannot create user (limit: 1 owner, 2 accountants; unique username): {exc.orig}")
 
 
 if __name__ == "__main__":

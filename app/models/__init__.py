@@ -21,7 +21,6 @@ from app.models.sales import (
 from app.models.user import User
 from app.models.village import (
     AuditLog,
-    BusinessYear,
     Commencing,
     Payment,
     PaymentAllocation,
@@ -38,7 +37,6 @@ __all__ = [
     "TruckTrip",
     "AuditLog",
     "Base",
-    "BusinessYear",
     "Commencing",
     "Payment",
     "PaymentAllocation",

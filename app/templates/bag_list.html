@@ -7,7 +7,7 @@
   <form method="get" class="flex items-center gap-2">
     <input type="hidden" name="view" value="{{ view }}">
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
-    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Locked', 'લૉક') }}</span>{% endif %}
+    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>
   <span class="badge badge-lg">{{ total_units }} {{ t('bags', 'બેગ') }} · {{ total_amount | inr }}</span>
   <a href="/dues?type=bag_supplier" class="btn btn-sm">{{ t('Pay suppliers', 'સપ્લાયરને ચુકવણી') }}</a>

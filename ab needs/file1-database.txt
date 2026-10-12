@@ -1,0 +1,80 @@
+SYSTEM TABLES (users, audit trail, business-year rule) + index of every table
+Structure only - no data rows.
+==============================================================================
+
+ALL TABLES AND WHERE THEY ARE DESCRIBED:
+  file-master.txt: farmers, bag_suppliers, labour_groups, transporters, trucks, industries, brokers, grains
+  file-form.txt: commencings, purchase_entries, truck_trips, truck_load_lines, bilties, labour_work, bag_supplies
+  file-ledger.txt: payments, payment_allocations, receipts, receipt_allocations
+  file-database.txt: users, audit_log, alembic_version  (+ the business-year rule below; there is no business_years table)
+
+==============================================================================
+
+TABLE: users
+----------------------------------------------------------------------
+column        | type                     | constraints
+----------------------------------------------------------------------
+id            | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+username      | VARCHAR(30)              | NOT NULL, UNIQUE
+password_hash | VARCHAR(255)             | NOT NULL
+role          | VARCHAR(15)              | NOT NULL
+is_active     | BOOLEAN                  | NOT NULL, DEFAULT True
+created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_users_role: role IN ('owner', 'accountant')
+  UNIQUE INDEX uq_users_single_owner ON (role) WHERE role = 'owner'
+      -> at most 1 owner
+  TRIGGER trg_users_max_accountants (BEFORE INSERT OR UPDATE OF role, function check_max_accountants)
+      -> at most 2 accountants (counts active and inactive users)
+
+==============================================================================
+
+BUSINESS YEAR RULE (no table - derived from the date)
+----------------------------------------------------------------------
+A business year runs 1 October to 30 September and is labelled by its two
+years, e.g. 2025-26 = 2025-10-01 .. 2026-09-30.
+
+Every dated record stores its year in a business_year VARCHAR(7) column:
+  commencings, truck_trips, bilties, labour_work, bag_supplies (file-form.txt)
+  payments, receipts (file-ledger.txt)
+  (purchase_entries are tied to their commencing and are grouped by entry_date.)
+
+Rules enforced by the application (app/services/years.py):
+  1. Entering or changing a record, payment or receipt is only allowed when
+     its date falls inside the CURRENT business year. A date in any past or
+     future year is rejected, and a record already stored in a past year can
+     no longer be edited.
+  2. A year closes automatically on 1 October; nobody locks or unlocks it.
+     The old business_years lock table was dropped (migration b7d3f0a91c42).
+  3. Only the owner can view past business years (lists, detail pages, year
+     report, /years). Accountants only see the current year.
+  4. Each year's data stays in the same tables, told apart by business_year.
+
+==============================================================================
+
+TABLE: audit_log
+-------------------------------------------------------------------
+column     | type                     | constraints
+-------------------------------------------------------------------
+id         | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+at         | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+user_id    | INTEGER                  | FOREIGN KEY -> users.id
+username   | VARCHAR(30)              | NOT NULL
+action     | VARCHAR(15)              | NOT NULL
+table_name | VARCHAR(30)              | NOT NULL
+record_id  | INTEGER                  | -
+changes    | JSONB                    | -
+
+==============================================================================
+
+TABLE: alembic_version
+----------------------------------------------------------------------
+column      | type                     | constraints
+----------------------------------------------------------------------
+version_num | VARCHAR(32)              | PRIMARY KEY (constraint alembic_version_pkc)
+
+Not a business table. Alembic (the migration tool) keeps exactly one row here:
+the id of the latest migration applied to this database. Do not edit by hand.
+
+==============================================================================

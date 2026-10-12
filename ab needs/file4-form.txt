@@ -1,0 +1,183 @@
+FORM TABLES (records entered through the data-entry forms)
+Structure only - no data rows.
+==============================================================================
+
+TABLE: commencings
+-------------------------------------------------------------------------------
+column          | type                     | constraints
+-------------------------------------------------------------------------------
+id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+business_year   | VARCHAR(7)               | NOT NULL
+commencing_date | DATE                     | NOT NULL
+village         | VARCHAR(100)             | NOT NULL
+grain_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> grains.id
+rate_per_20kg   | INTEGER                  | NOT NULL
+net_weight      | INTEGER                  | NOT NULL
+pay_after_days  | INTEGER                  | NOT NULL
+terms           | TEXT                     | -
+description     | TEXT                     | -
+created_by      | INTEGER                  | FOREIGN KEY -> users.id
+created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_commencings_net_weight: net_weight IN (35, 50, 70, 100)
+  CHECK ck_commencings_rate_positive: rate_per_20kg > 0
+  CHECK ck_commencings_pay_after: pay_after_days >= 0
+  INDEX ix_commencings_business_year (business_year)
+
+==============================================================================
+
+TABLE: purchase_entries
+--------------------------------------------------------------------------------------
+column          | type                     | constraints
+--------------------------------------------------------------------------------------
+id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+commencing_id   | INTEGER                  | NOT NULL, FOREIGN KEY -> commencings.id
+farmer_id       | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
+labour_group_id | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
+entry_date      | DATE                     | NOT NULL
+filled_bags     | INTEGER                  | NOT NULL
+extra_kilos     | INTEGER                  | NOT NULL, DEFAULT 0
+raw_weight      | INTEGER                  | -
+payable_amount  | BIGINT                   | NOT NULL
+borrowing       | BIGINT                   | NOT NULL, DEFAULT 0
+due_date        | DATE                     | NOT NULL
+description     | TEXT                     | -
+created_by      | INTEGER                  | FOREIGN KEY -> users.id
+created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_entries_kilos: extra_kilos >= 0
+  CHECK ck_entries_borrowing: borrowing >= 0
+  CHECK ck_entries_bags: filled_bags >= 0
+  CHECK ck_entries_borrowing_le_payable: borrowing <= payable_amount
+  CHECK ck_entries_raw_weight: raw_weight IS NULL OR raw_weight >= 0
+  INDEX ix_entries_commencing (commencing_id)
+  INDEX ix_entries_farmer (farmer_id)
+
+==============================================================================
+
+TABLE: truck_trips
+--------------------------------------------------------------------------------------
+column          | type                     | constraints
+--------------------------------------------------------------------------------------
+id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+business_year   | VARCHAR(7)               | NOT NULL
+trip_date       | DATE                     | NOT NULL
+truck_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> trucks.id
+transport_id    | INTEGER                  | NOT NULL, FOREIGN KEY -> transporters.id
+labour_group_id | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
+industry_id     | INTEGER                  | NOT NULL, FOREIGN KEY -> industries.id
+grain_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> grains.id
+rent_per_ton    | INTEGER                  | NOT NULL, DEFAULT 0
+rent_per_bag    | INTEGER                  | NOT NULL, DEFAULT 0
+advance_amount  | BIGINT                   | NOT NULL, DEFAULT 0
+other_deduction | BIGINT                   | NOT NULL, DEFAULT 0
+description     | TEXT                     | -
+created_by      | INTEGER                  | FOREIGN KEY -> users.id
+created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_trips_amounts_nonneg: advance_amount >= 0 AND other_deduction >= 0
+  CHECK ck_trips_rent_nonneg: rent_per_ton >= 0 AND rent_per_bag >= 0
+  INDEX ix_truck_trips_business_year (business_year)
+
+==============================================================================
+
+TABLE: truck_load_lines
+-----------------------------------------------------------------
+column        | type    | constraints
+-----------------------------------------------------------------
+id            | INTEGER | PRIMARY KEY, AUTO INCREMENT
+trip_id       | INTEGER | NOT NULL, FOREIGN KEY -> truck_trips.id
+commencing_id | INTEGER | NOT NULL, FOREIGN KEY -> commencings.id
+bags          | INTEGER | NOT NULL
+
+Table constraints / indexes:
+  CHECK ck_load_lines_bags: bags > 0
+  INDEX ix_truck_load_lines_trip_id (trip_id)
+  INDEX ix_load_lines_commencing (commencing_id)
+
+==============================================================================
+
+TABLE: bilties
+--------------------------------------------------------------------------------------------------
+column                | type                     | constraints
+--------------------------------------------------------------------------------------------------
+id                    | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+trip_id               | INTEGER                  | NOT NULL, UNIQUE, FOREIGN KEY -> truck_trips.id
+business_year         | VARCHAR(7)               | NOT NULL
+bilty_date            | DATE                     | NOT NULL
+bill_number           | INTEGER                  | NOT NULL
+broker_id             | INTEGER                  | NOT NULL, FOREIGN KEY -> brokers.id
+grain_rate            | INTEGER                  | NOT NULL
+rate_unit_kg          | INTEGER                  | NOT NULL, DEFAULT 20
+rate_change           | INTEGER                  | NOT NULL, DEFAULT 0
+brokerage_amount      | INTEGER                  | NOT NULL, DEFAULT 0
+merchant_total_weight | INTEGER                  | NOT NULL
+merchant_tare_weight  | INTEGER                  | NOT NULL
+industry_total_weight | INTEGER                  | -
+industry_tare_weight  | INTEGER                  | -
+description           | TEXT                     | -
+created_by            | INTEGER                  | FOREIGN KEY -> users.id
+created_at            | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_bilties_rate_change: grain_rate - rate_change >= 0
+  CHECK ck_bilties_merchant_weights: merchant_total_weight > merchant_tare_weight AND merchant_tare_weight >= 0
+  CHECK ck_bilties_industry_weights: (industry_total_weight IS NULL AND industry_tare_weight IS NULL) OR (industry_total_weight > industry_tare_weight AND industry_tare_weight >= 0)
+  CHECK ck_bilties_rate: grain_rate > 0 AND rate_unit_kg > 0
+  CHECK ck_bilties_brokerage: brokerage_amount >= 0
+  CHECK ck_bilties_bill_number: bill_number > 0
+  UNIQUE (business_year, bill_number)
+  INDEX ix_bilties_business_year (business_year)
+
+==============================================================================
+
+TABLE: labour_work
+---------------------------------------------------------------------------------------
+column           | type                     | constraints
+---------------------------------------------------------------------------------------
+id               | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+labour_group_id  | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
+work_date        | DATE                     | NOT NULL
+business_year    | VARCHAR(7)               | NOT NULL
+payable_amount   | BIGINT                   | NOT NULL, DEFAULT 0
+borrowing_amount | BIGINT                   | NOT NULL, DEFAULT 0
+petrol           | BIGINT                   | NOT NULL, DEFAULT 0
+meal             | BIGINT                   | NOT NULL, DEFAULT 0
+description      | TEXT                     | -
+created_by       | INTEGER                  | FOREIGN KEY -> users.id
+created_at       | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_labour_borrowing_le_payable: borrowing_amount <= payable_amount
+  CHECK ck_labour_nonneg: payable_amount >= 0 AND borrowing_amount >= 0 AND petrol >= 0 AND meal >= 0
+  INDEX ix_labour_work_business_year (business_year)
+  INDEX ix_labour_work_labour_group_id (labour_group_id)
+
+==============================================================================
+
+TABLE: bag_supplies
+-------------------------------------------------------------------------------------
+column         | type                     | constraints
+-------------------------------------------------------------------------------------
+id             | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+supplier_id    | INTEGER                  | NOT NULL, FOREIGN KEY -> bag_suppliers.id
+farmer_id      | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
+supply_date    | DATE                     | NOT NULL
+business_year  | VARCHAR(7)               | NOT NULL
+rate           | INTEGER                  | NOT NULL
+units          | INTEGER                  | NOT NULL
+payable_amount | BIGINT                   | NOT NULL
+description    | TEXT                     | -
+created_by     | INTEGER                  | FOREIGN KEY -> users.id
+created_at     | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_bag_supplies_positive: rate > 0 AND units > 0
+  INDEX ix_bag_supplies_farmer_id (farmer_id)
+  INDEX ix_bag_supplies_business_year (business_year)
+  INDEX ix_bag_supplies_supplier_id (supplier_id)
+
+==============================================================================

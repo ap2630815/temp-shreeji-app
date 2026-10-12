@@ -1,17 +1,24 @@
-from sqlalchemy import Boolean, CheckConstraint, String
+from sqlalchemy import Boolean, CheckConstraint, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
 
 
 class User(TimestampMixin, Base):
-    """Only two roles may log in: the business owner and the accountant."""
+    """Only two roles may log in: the business owner (max 1) and the accountant (max 2).
+
+    Owner limit: partial unique index. Accountant limit: DB trigger `trg_users_max_accountants`
+    (see migration a1c0de5e7b21), since an index cannot cap a count at 2.
+    """
 
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("role IN ('owner', 'accountant')", name="ck_users_role"),)
+    __table_args__ = (
+        CheckConstraint("role IN ('owner', 'accountant')", name="ck_users_role"),
+        Index("uq_users_single_owner", "role", unique=True, postgresql_where=text("role = 'owner'")),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(String(50), unique=True)
+    username: Mapped[str] = mapped_column(String(30), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(20))
+    role: Mapped[str] = mapped_column(String(15))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

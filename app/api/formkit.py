@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import Request
 
 from app.api.masters_config import F
+from app.services.years import current_year_label
 
 
 def today() -> date:
@@ -43,4 +44,7 @@ def form_context(*, fields: list[F], values: dict, errors: dict, action: str, he
 
 
 GENERIC_ERROR = ("Could not save, please check the values", "સાચવી શકાયું નહીં, કૃપા કરીને કિંમતો તપાસો")
-YEAR_LOCKED = lambda label: (f"Business year {label} is locked", f"વ્યવસાય વર્ષ {label} લૉક છે")  # noqa: E731
+YEAR_LOCKED = lambda label: (  # noqa: E731
+    f"Date is in business year {label}, which is closed. Use a date in {current_year_label()} (Oct-Sep)",
+    f"તારીખ વ્યવસાય વર્ષ {label} માં છે, જે બંધ છે. {current_year_label()} (ઓક્ટો-સપ્ટે) ની તારીખ વાપરો",
+)

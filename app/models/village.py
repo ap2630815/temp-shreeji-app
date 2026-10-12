@@ -7,7 +7,6 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
-    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -23,17 +22,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 from app.models.masters import Farmer, Grain, LabourGroup
-
-
-class BusinessYear(Base):
-    """A row exists only once a year has been locked/unlocked; no row means open. Label e.g. '2025-26' (Oct-Sep)."""
-
-    __tablename__ = "business_years"
-
-    label: Mapped[str] = mapped_column(String(7), primary_key=True)
-    is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
-    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    changed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class Commencing(TimestampMixin, Base):
@@ -154,8 +142,8 @@ class AuditLog(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
-    username: Mapped[str] = mapped_column(String(50))
-    action: Mapped[str] = mapped_column(String(20))
-    table_name: Mapped[str] = mapped_column(String(50))
+    username: Mapped[str] = mapped_column(String(30))
+    action: Mapped[str] = mapped_column(String(15))
+    table_name: Mapped[str] = mapped_column(String(30))
     record_id: Mapped[int | None] = mapped_column(Integer)
     changes: Mapped[dict | None] = mapped_column(JSONB)

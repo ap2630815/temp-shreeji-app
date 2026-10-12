@@ -25,19 +25,19 @@ class Farmer(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(200))  # surname person father grandfather
-    name_gu: Mapped[str | None] = mapped_column(String(200))
-    head_of_family: Mapped[str | None] = mapped_column(String(200))  # verify with before payment
+    name: Mapped[str] = mapped_column(String(120))  # surname person father grandfather
+    name_gu: Mapped[str | None] = mapped_column(String(120))
+    head_of_family: Mapped[str | None] = mapped_column(String(60))  # verify with before payment
     mobile: Mapped[str] = mapped_column(String(10), unique=True)
-    email: Mapped[str | None] = mapped_column(String(254), unique=True)
-    village: Mapped[str] = mapped_column(String(100))
-    village_gu: Mapped[str | None] = mapped_column(String(100))
+    email: Mapped[str | None] = mapped_column(String(60), unique=True)
+    village: Mapped[str] = mapped_column(String(30))
+    village_gu: Mapped[str | None] = mapped_column(String(30))
     house: Mapped[str | None] = mapped_column(Text)
     upi_number: Mapped[str | None] = mapped_column(String(10), unique=True)
     bank_account_number: Mapped[str | None] = mapped_column(String(30), unique=True)
-    bank_name: Mapped[str | None] = mapped_column(String(100))
-    bank_branch: Mapped[str | None] = mapped_column(String(100))
-    ifsc_code: Mapped[str | None] = mapped_column(String(11))
+    bank_name: Mapped[str | None] = mapped_column(String(30))
+    bank_branch: Mapped[str | None] = mapped_column(String(30))
+    ifsc_code: Mapped[str | None] = mapped_column(String(15))
     description: Mapped[str | None] = mapped_column(Text)  # owner-only
     public_figure: Mapped[str | None] = mapped_column(Text)
 
@@ -50,11 +50,11 @@ class BagSupplier(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(200))
-    name_gu: Mapped[str | None] = mapped_column(String(200))
-    pet_name: Mapped[str] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(120))
+    name_gu: Mapped[str | None] = mapped_column(String(120))
+    pet_name: Mapped[str] = mapped_column(String(30))
     mobile: Mapped[str] = mapped_column(String(10), unique=True)
-    email: Mapped[str | None] = mapped_column(String(254), unique=True)
+    email: Mapped[str | None] = mapped_column(String(60), unique=True)
     upi_number: Mapped[str | None] = mapped_column(String(10), unique=True)
 
 
@@ -63,11 +63,11 @@ class LabourGroup(TimestampMixin, Base):
     __table_args__ = (_mobile_check("mobile"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(200))  # group leader
-    name_gu: Mapped[str | None] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(String(120))  # group leader
+    name_gu: Mapped[str | None] = mapped_column(String(120))
     mobile: Mapped[str] = mapped_column(String(10), unique=True)
-    group_name: Mapped[str] = mapped_column(String(100))
-    group_name_gu: Mapped[str | None] = mapped_column(String(100))
+    group_name: Mapped[str] = mapped_column(String(30))
+    group_name_gu: Mapped[str | None] = mapped_column(String(30))
 
 
 class Transporter(TimestampMixin, Base):
@@ -78,11 +78,11 @@ class Transporter(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(200), unique=True)
-    pet_name: Mapped[str] = mapped_column(String(100), unique=True)
-    location: Mapped[str] = mapped_column(String(100))
-    owner_name: Mapped[str] = mapped_column(String(200))
-    owner_name_gu: Mapped[str | None] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    pet_name: Mapped[str] = mapped_column(String(30), unique=True)
+    location: Mapped[str] = mapped_column(String(60))
+    owner_name: Mapped[str] = mapped_column(String(120))
+    owner_name_gu: Mapped[str | None] = mapped_column(String(120))
     mobile: Mapped[str] = mapped_column(String(10), unique=True)
     upi_number: Mapped[str | None] = mapped_column(String(10), unique=True)
 
@@ -97,10 +97,10 @@ class Truck(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    truck_number: Mapped[str] = mapped_column(String(10), unique=True)  # GJ03AB1234, no spaces
-    owner_name: Mapped[str] = mapped_column(String(200))
+    truck_number: Mapped[str] = mapped_column(String(13), unique=True)  # GJ03AB1234, no spaces
+    owner_name: Mapped[str] = mapped_column(String(120))
     owner_mobile: Mapped[str] = mapped_column(String(10))
-    driver_name: Mapped[str] = mapped_column(String(200))
+    driver_name: Mapped[str] = mapped_column(String(120))
     driver_mobile: Mapped[str] = mapped_column(String(10))
     upi_number: Mapped[str | None] = mapped_column(String(10))
     description: Mapped[str | None] = mapped_column(Text)
@@ -114,14 +114,14 @@ class Industry(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(200), unique=True)
-    name_gu: Mapped[str | None] = mapped_column(String(200))
-    owner_name: Mapped[str] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    name_gu: Mapped[str | None] = mapped_column(String(120))
+    owner_name: Mapped[str] = mapped_column(String(120))
     owner_mobile: Mapped[str] = mapped_column(String(10))
-    supervisor_name: Mapped[str] = mapped_column(String(200))
+    supervisor_name: Mapped[str] = mapped_column(String(120))
     supervisor_mobile: Mapped[str] = mapped_column(String(10))
-    product: Mapped[str] = mapped_column(String(100))
-    location: Mapped[str] = mapped_column(String(100))
+    product: Mapped[str] = mapped_column(String(60))
+    location: Mapped[str] = mapped_column(String(120))
     required_quality: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
 
@@ -135,8 +135,8 @@ class Broker(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(200), unique=True)
-    name_gu: Mapped[str | None] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    name_gu: Mapped[str | None] = mapped_column(String(120))
     mobile: Mapped[str] = mapped_column(String(10), unique=True)
     brokerage_per_truck: Mapped[int] = mapped_column(Integer)  # rupees, fixed per truck
     upi_number: Mapped[str | None] = mapped_column(String(10), unique=True)
@@ -151,7 +151,7 @@ class Grain(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True)
-    name_gu: Mapped[str | None] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(30), unique=True)
+    name_gu: Mapped[str | None] = mapped_column(String(30))
     default_net_weight: Mapped[int] = mapped_column(Integer)  # kg per bag
     default_terms: Mapped[str | None] = mapped_column(Text)  # clean, moisture, variety, ...

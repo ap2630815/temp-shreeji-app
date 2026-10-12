@@ -17,11 +17,11 @@ from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, lock, norm
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
-from app.models import BusinessYear, Commencing, Farmer, Grain, LabourGroup, PurchaseEntry, User
+from app.models import Commencing, Farmer, Grain, LabourGroup, PurchaseEntry, User
 from app.services import audit
 from app.services.ledger import commencing_entries, entry_views, paid_for_entry, totals
 from app.services.money import payable_amount
-from app.services.years import YearLockedError, assert_year_open, business_year_of
+from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible
 
 router = APIRouter(prefix="/commencings")
 
@@ -130,9 +130,8 @@ async def _get_commencing(db: AsyncSession, commencing_id: int) -> Commencing:
     return c
 
 
-async def _years_with_data(db: AsyncSession) -> list[str]:
-    rows = (await db.scalars(select(Commencing.business_year).distinct())).all()
-    return sorted({business_year_of(today()), *rows}, reverse=True)
+async def _years_with_data(db: AsyncSession, user: User) -> list[str]:
+    return allowed_years(user, (await db.scalars(select(Commencing.business_year).distinct())).all())
 
 
 # ---------------------------------------------------------------- list
@@ -141,8 +140,8 @@ async def _years_with_data(db: AsyncSession) -> list[str]:
 async def list_page(
     request: Request, year: str = "", grain_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
-    years = await _years_with_data(db)
-    year = year if year in years else business_year_of(today())
+    years = await _years_with_data(db, user)
+    year = year if year in years else current_year_label()
     stmt = select(Commencing).where(Commencing.business_year == year)
     if grain_id:
         stmt = stmt.where(Commencing.grain_id == grain_id)
@@ -155,9 +154,8 @@ async def list_page(
         per[v.entry.commencing_id].append(v)
     now = today()
     rows = [(c, totals(per[c.id], now)) for c in commencings]
-    locked = await db.get(BusinessYear, year)
     return render_with_csrf(
-        request, csrf, "commencing_list.html", user=user, rows=rows, grain_id=grain_id, year=year, years=years, year_locked=bool(locked and locked.is_locked)
+        request, csrf, "commencing_list.html", user=user, rows=rows, grain_id=grain_id, year=year, years=years, year_locked=year != current_year_label()
     )
 
 
@@ -291,6 +289,7 @@ async def detail_page(
     request: Request, commencing_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
     c = await _get_commencing(db, commencing_id)
+    require_year_visible(user, c.business_year)
     views = await commencing_entries(db, c.id)
     now = today()
     return render_with_csrf(request, csrf, "commencing_detail.html", user=user, c=c, views=views, totals=totals(views, now), today=now)

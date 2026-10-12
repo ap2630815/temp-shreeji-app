@@ -17,6 +17,7 @@
         {% set cur_year = year if (year is defined and year) else default_year_label() %}
         {% set ys = year_span(cur_year) %}
         {% set year_opts = years if (years is defined and years) else year_choices() %}
+        {% if user.role != 'owner' %}{% set year_opts = [default_year_label()] %}{% endif %}
         <form method="get" class="relative px-2 rounded-btn hover:bg-base-200 cursor-pointer">
           {% for k, v in request.query_params.multi_items() if k != 'year' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
           <div class="font-bold flex flex-col items-center text-center leading-tight pointer-events-none"><span>{{ ys[0] }} <span class="text-xs opacity-60">▾</span></span><span>{{ ys[1] }}</span></div>
@@ -33,9 +34,9 @@
     <div class="px-3 pt-2">
       <form method="get" class="flex flex-wrap items-center gap-3 bg-base-100 border border-base-300 rounded-box px-4 py-2">
         {% for k, v in request.query_params.multi_items() if k != 'grain_id' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-        <select name="grain_id" aria-label="Grain" class="select select-bordered select-sm min-w-48" onchange="this.form.submit()">
-          <option value="">{{ L['grain'][0] }} {{ L['grain'][1] }}</option>
-          {% for g in request.state.grains %}<option value="{{ g.id }}" {{ 'selected' if request.query_params.get('grain_id') == g.id|string }}>{{ g.name }} {{ g.name_gu }}</option>{% endfor %}
+        <select name="grain_id" aria-label="Grain" class="select select-bordered select-sm w-auto min-w-0 toolbar-select" onchange="this.form.submit()">
+          <option value="">{{ L['grain'][0] }}&nbsp;&nbsp;&nbsp;{{ L['grain'][1] }}</option>
+          {% for g in request.state.grains %}<option value="{{ g.id }}" {{ 'selected' if request.query_params.get('grain_id') == g.id|string }}>{{ g.name }}&nbsp;&nbsp;&nbsp;{{ g.name_gu }}</option>{% endfor %}
         </select>
       </form>
     </div>

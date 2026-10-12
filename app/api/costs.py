@@ -16,19 +16,18 @@ from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
-from app.models import BagSupplier, BagSupply, BusinessYear, Farmer, LabourGroup, LabourWork, User
+from app.models import BagSupplier, BagSupply, Farmer, LabourGroup, LabourWork, User
 from app.services import audit
 from app.services.payables import load_payables, paid_for
-from app.services.years import YearLockedError, assert_year_open, business_year_of
+from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label
 
 router = APIRouter()
 INT_MAX = 100_000_000
 Money = Annotated[int, Field(ge=0, le=INT_MAX)]
 
 
-async def _years(db: AsyncSession, model) -> list[str]:
-    rows = (await db.scalars(select(model.business_year).distinct())).all()
-    return sorted({business_year_of(today()), *rows}, reverse=True)
+async def _years(db: AsyncSession, model, user: User) -> list[str]:
+    return allowed_years(user, (await db.scalars(select(model.business_year).distinct())).all())
 
 
 # ================================================================== labour work
@@ -68,12 +67,11 @@ def labour_snapshot(w: LabourWork) -> dict:
 
 @router.get("/labour-work", response_class=HTMLResponse)
 async def labour_list(request: Request, year: str = "", user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
-    years = await _years(db, LabourWork)
-    year = year if year in years else business_year_of(today())
+    years = await _years(db, LabourWork, user)
+    year = year if year in years else current_year_label()
     rows = list((await db.scalars(select(LabourWork).where(LabourWork.business_year == year).order_by(LabourWork.work_date.desc(), LabourWork.id.desc()))).unique().all())
     paid = {p.payable_id: p.paid for p in await load_payables(db, "labour")}
-    locked = await db.get(BusinessYear, year)
-    return render_with_csrf(request, csrf, "labour_list.html", user=user, rows=rows, paid=paid, year=year, years=years, year_locked=bool(locked and locked.is_locked))
+    return render_with_csrf(request, csrf, "labour_list.html", user=user, rows=rows, paid=paid, year=year, years=years, year_locked=year != current_year_label())
 
 
 @router.get("/labour-work/new", response_class=HTMLResponse)
@@ -187,8 +185,8 @@ def bag_snapshot(b: BagSupply) -> dict:
 
 @router.get("/bag-supplies", response_class=HTMLResponse)
 async def bag_list(request: Request, year: str = "", view: str = "supplies", user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
-    years = await _years(db, BagSupply)
-    year = year if year in years else business_year_of(today())
+    years = await _years(db, BagSupply, user)
+    year = year if year in years else current_year_label()
     rows = list((await db.scalars(select(BagSupply).where(BagSupply.business_year == year).order_by(BagSupply.supply_date.desc(), BagSupply.id.desc()))).unique().all())
     paid = {p.payable_id: p.paid for p in await load_payables(db, "bag_supplier")}
     storage: dict[int, dict] = {}
@@ -197,10 +195,9 @@ async def bag_list(request: Request, year: str = "", view: str = "supplies", use
         s["units"] += r.units
         s["amount"] += r.payable_amount
         s["suppliers"].add(r.supplier.pet_name)
-    locked = await db.get(BusinessYear, year)
     return render_with_csrf(request, csrf, "bag_list.html", user=user, rows=rows, paid=paid, year=year, years=years, view=view,
                             storage=sorted(storage.values(), key=lambda s: (s["farmer"].village, s["farmer"].name)),
-                            total_units=sum(r.units for r in rows), total_amount=sum(r.payable_amount for r in rows), year_locked=bool(locked and locked.is_locked))
+                            total_units=sum(r.units for r in rows), total_amount=sum(r.payable_amount for r in rows), year_locked=year != current_year_label())
 
 
 @router.get("/bag-supplies/new", response_class=HTMLResponse)

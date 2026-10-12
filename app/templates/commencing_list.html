@@ -9,7 +9,7 @@
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
       {% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
     </select>
-    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Locked', 'લૉક') }}</span>{% endif %}
+    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>
   <a href="/commencings/new" class="btn btn-primary btn-sm">+ {{ t('New', 'નવું') }}</a>
 </div>
