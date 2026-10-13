@@ -188,7 +188,6 @@ id             | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 supplier_id    | INTEGER                  | NOT NULL, FOREIGN KEY -> bag_suppliers.id
 farmer_id      | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
 supply_date    | DATE                     | NOT NULL
-
 rate_per_bag   | INTEGER                  | NOT NULL
 no_of_units    | INTEGER                  | NOT NULL
 payable_amount | BIGINT                   | NOT NULL
