@@ -13,7 +13,7 @@ amount          | BIGINT                   | NOT NULL
 payment_date    | DATE                     | NOT NULL
 business_year   | VARCHAR(7)               | NOT NULL
 method          | VARCHAR(10)              | NOT NULL
-receiver_name   | VARCHAR(200)             | NOT NULL
+receiver_name   | VARCHAR(120)             | NOT NULL
 receiver_mobile | VARCHAR(10)              | NOT NULL
 reference_no    | VARCHAR(60)              | -
 note            | TEXT                     | -
@@ -42,7 +42,7 @@ amount       | BIGINT      | NOT NULL
 
 Table constraints / indexes:
   CHECK ck_alloc_amount_positive: amount > 0
-  CHECK ck_alloc_payable_type: payable_type IN ('purchase_entry', 'truck_trip', 'labour_work', 'bag_supply', 'bilty_brokerage')
+  CHECK ck_alloc_payable_type: payable_type IN ('purchase_farmer_entries', 'truck_trips', 'labour_work', 'bag_supplies', 'brokerages')
   INDEX ix_alloc_payable (payable_type, payable_id)
 
 ==============================================================================
@@ -58,7 +58,7 @@ receipt_date  | DATE                     | NOT NULL
 business_year | VARCHAR(7)               | NOT NULL
 method        | VARCHAR(10)              | NOT NULL
 reference_no  | VARCHAR(60)              | -
-payer_name    | VARCHAR(200)             | -
+payer_name    | VARCHAR(120)             | -
 note          | TEXT                     | -
 created_by    | INTEGER                  | FOREIGN KEY -> users.id
 created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()

@@ -63,9 +63,9 @@ description       | TEXT                     | -
 created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_products_brokerage_nonneg: brokerage_per_bag >= 0 
+  CHECK ck_brokerages_brokerage_nonneg: brokerage_per_bag >= 0 
   INDEX ix_brokerages_broker_id (broker_id)
-  INDEX ix_products_product_id (product_id)
+  INDEX ix_brokerages_product_id (product_id)
 
 ==============================================================================
 
@@ -85,7 +85,7 @@ description     | TEXT                     | -
 created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  INDEX ix_labour_groups_labour_group_id (labour_group_id)
-  INDEX ix_products_product_id (product_id)
+  INDEX ix_labour_group_wages_labour_group_id (labour_group_id)
+  INDEX ix_labour_group_wages_product_id (product_id)
 
 ==============================================================================

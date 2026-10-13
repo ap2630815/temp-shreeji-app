@@ -1,0 +1,17 @@
+just for understanding, of core bussiness rules,   
+
+
+
+same brokers can work for multiple products, 
+same labour_groups can work for multiple products
+
+---------------------------------------------------------------
+purchase_farmer_entries.total_available_bags = purchase_farmer_entries.no_of_filled_bags + purchase_farmer_entries.no_of_handful_bags  
+
+truck_load_lines.total_remaining_bags = purchase_farmer_entries.total_available_bags (DEFAULT)
+truck_load_lines.total_remaining_bags = truck_load_lines.total_remaining_bags - truck_load_lines.no_of_loaded_bags 
+
+bilties.total_bags_in_truck = sum of truck_load_lines.no_of_loaded_bags, for particular (trip_id, purchase_farmer_entry_id) combination 
+
+
+

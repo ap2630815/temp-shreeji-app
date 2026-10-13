@@ -49,17 +49,17 @@ created_by           | INTEGER                  | FOREIGN KEY -> users.id
 created_at           | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_purchase_from_farmer_entries_extra_kilos: extra_kilos >= 0
-  CHECK ck_purchase_from_farmer_entries_no_of_filled_bags: no_of_filled_bags >= 0
-  CHECK ck_purchase_from_farmer_entries_payable_amount: payable_amount >= 0
-  CHECK ck_purchase_from_farmer_entries_borrowed_amount: borrowed_amount >= 0
-  CHECK ck_purchase_from_farmer_entries_borrowed_amount_le_payable_amount: borrowed_amount <= payable_amount
-  CHECK ck_purchase_from_farmer_entries_raw_weight: raw_weight IS NULL OR raw_weight >= 0
-  CHECK ck_purchase_from_farmer_entries_no_of_handful_bags: no_of_handful_bags >= 0
-  CHECK ck_purchase_from_farmer_entries_total_available_bags: total_available_bags >= 0
-  INDEX ix_purchase_from_farmer_entries_commencing_id (commencing_id)
-  INDEX ix_purchase_from_farmer_entries_farmer_id (farmer_id)
-  INDEX ix_purchase_from_farmer_entries_labour_group_id (labour_group_id)
+  CHECK ck_purchase_farmer_entries_extra_kilos: extra_kilos >= 0
+  CHECK ck_purchase_farmer_entries_no_of_filled_bags: no_of_filled_bags >= 0
+  CHECK ck_purchase_farmer_entries_payable_amount: payable_amount >= 0
+  CHECK ck_purchase_farmer_entries_borrowed_amount: borrowed_amount >= 0
+  CHECK ck_purchase_farmer_entries_borrowed_amount_le_payable_amount: borrowed_amount <= payable_amount
+  CHECK ck_purchase_farmer_entries_raw_weight: raw_weight IS NULL OR raw_weight >= 0
+  CHECK ck_purchase_farmer_entries_no_of_handful_bags: no_of_handful_bags >= 0
+  CHECK ck_purchase_farmer_entries_total_available_bags: total_available_bags >= 0
+  INDEX ix_purchase_farmer_entries_commencing_id (commencing_id)
+  INDEX ix_purchase_farmer_entries_farmer_id (farmer_id)
+  INDEX ix_purchase_farmer_entries_labour_group_id (labour_group_id)
 
 ==============================================================================
 
@@ -73,17 +73,18 @@ brokerage_id                    | INTEGER                  | NOT NULL, FOREIGN K
 industry_id                     | INTEGER                  | NOT NULL, FOREIGN KEY -> industries.id
 product_id                      | INTEGER                  | NOT NULL, FOREIGN KEY -> products.id
 product_rate_per_booking_weight | INTEGER                  | NOT NULL
-truck_size                      | NUMBER                   | NOT NULL
+truck_size                      | INTEGER                   | NOT NULL
 percentage_deduction            | FLOAT                    | -
 description                     | TEXT                     | -
 created_by                      | INTEGER                  | FOREIGN KEY -> users.id
 created_at                      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  INDEX ix_brokerages_brokerage_id (brokerage_id)
-  INDEX ix_industries_industry_id (industry_id)
-  INDEX ix_products_product_id (product_id)
+  INDEX ix_broker_bookings_brokerage_id (brokerage_id)
+  INDEX ix_broker_bookings_industry_id (industry_id)
+  INDEX ix_broker_bookings_product_id (product_id)
   CHECK ck_broker_bookings_truck_size: truck_size IN (10, 15, 20, 25, 30, 35)
+  CHECK ck_broker_bookings_percentage_deduction: percentage_deduction IN [0,5]
 
 ==============================================================================
 
@@ -107,9 +108,10 @@ created_by        | INTEGER                  | FOREIGN KEY -> users.id
 created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_trips_amounts_nonneg: advance_amount >= 0 AND other_deduction >= 0
-  CHECK ck_trips_rent_nonneg: rent_per_ton >= 0 AND rent_per_bag >= 0
+  CHECK ck_truck_trips_amount_nonneg: advance_amount >= 0 AND other_payable >= 0 AND other_deduction >= 0
+  CHECK ck_truck_trips_rent_nonneg: rent_per_ton >= 0 AND rent_per_bag >= 0
   INDEX ix_truck_trips_broker_booking_id (broker_booking_id)
+
 ==============================================================================
 
 TABLE: truck_load_lines
@@ -123,7 +125,8 @@ no_of_loaded_bags        | INTEGER | NOT NULL
 total_remaining_bags     | INTEGER | NOT NULL
 
 Table constraints / indexes:
-  CHECK ck_load_lines_bags: bags > 0
+  CHECK ck_truck_load_lines_no_of_loaded_bags: no_of_loaded_bags > 0
+  CHECK ck_truck_load_lines_total_remaining_bags: total_remaining_bags <= total_available_bags
   INDEX ix_truck_load_lines_trip_id (trip_id)
   INDEX ix_truck_load_lines_purchase_farmer_entry_id (purchase_farmer_entry_id)
 
@@ -174,8 +177,8 @@ created_by       | INTEGER                  | FOREIGN KEY -> users.id
 created_at       | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_labour_borrowing_le_payable: borrowing_amount <= payable_amount
-  CHECK ck_labour_nonneg: payable_amount >= 0 AND borrowing_amount >= 0 AND petrol >= 0 AND meal >= 0
+  CHECK ck_labour_work_borrowing_le_payable: borrowing_amount <= payable_amount
+  CHECK ck_labour_work_amount_nonneg: payable_amount >= 0 AND borrowing_amount >= 0 AND petrol >= 0 AND meal >= 0
   INDEX ix_labour_work_labour_group_id (labour_group_id)
 
 ==============================================================================
@@ -201,3 +204,4 @@ Table constraints / indexes:
   INDEX ix_bag_supplies_supplier_id (supplier_id)
 
 ==============================================================================
+

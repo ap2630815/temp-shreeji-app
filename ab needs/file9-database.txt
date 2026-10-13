@@ -3,10 +3,11 @@ Structure only - no data rows.
 ==============================================================================
 
 ALL TABLES AND WHERE THEY ARE DESCRIBED:
-  file-master.txt: farmers, bag_suppliers, labour_groups, transporters, trucks, industries, brokers, grains
-  file-form.txt: commencings, purchase_entries, truck_trips, truck_load_lines, bilties, labour_work, bag_supplies
-  file-ledger.txt: payments, payment_allocations, receipts, receipt_allocations
-  file-database.txt: users, audit_log, alembic_version  (+ the business-year rule below; there is no business_years table)
+  file1-master1.txt: bag_suppliers, transporters, trucks, industries, brokers, villages, labour_groups, grains
+  file2-master2.txt: farmers, labours
+  file4-transactional.txt: commencings, purchase_entries, truck_trips, truck_load_lines, bilties, labour_work, bag_supplies
+  file5-payment-ledger.txt: payments, payment_allocations, receipts, receipt_allocations
+  file9-database.txt: users, audit_log, alembic_version  (+ the business-year rule below; there is no business_years table)
 
 ==============================================================================
 
@@ -36,8 +37,8 @@ A business year runs 1 October to 30 September and is labelled by its two
 years, e.g. 2025-26 = 2025-10-01 .. 2026-09-30.
 
 Every dated record stores its year in a business_year VARCHAR(7) column:
-  commencings, truck_trips, bilties, labour_work, bag_supplies (file-form.txt)
-  payments, receipts (file-ledger.txt)
+  commencings, truck_trips, bilties, labour_work, bag_supplies (file4-transactional.txt)
+  payments, receipts (file5-payment-ledger.txt)
   (purchase_entries are tied to their commencing and are grouped by entry_date.)
 
 Rules enforced by the application (app/services/years.py):
