@@ -1,69 +1,23 @@
 MASTER TABLES (reference data set up once and reused)
 Structure only - no data rows.
-==============================================================================
-
-TABLE: farmers
-----------------------------------------------------------------------------
-column              | type                     | constraints
-----------------------------------------------------------------------------
-id                  | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name                | VARCHAR(120)             | NOT NULL
-name_gu             | VARCHAR(120)             | -
-head_of_family      | VARCHAR(60)              | -
-mobile              | VARCHAR(10)              | NOT NULL, UNIQUE
-email               | VARCHAR(60)              | UNIQUE
-village             | VARCHAR(30)              | NOT NULL
-village_gu          | VARCHAR(30)              | -
-house               | TEXT                     | -
-upi_number          | VARCHAR(10)              | UNIQUE
-bank_account_number | VARCHAR(30)              | UNIQUE
-bank_name           | VARCHAR(30)              | -
-bank_branch         | VARCHAR(30)              | -
-ifsc_code           | VARCHAR(15)              | -
-public_figure       | TEXT                     | -
-description         | TEXT                     | -
-created_at          | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
-
-Table constraints / indexes:
-  CHECK ck_mobile_10_digits: mobile ~ '^[0-9]{10}$'
-  CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
 
 ==============================================================================
 
 TABLE: bag_suppliers
 -------------------------------------------------------------------
-column     | type                     | constraints
+column      | type                     | constraints
 -------------------------------------------------------------------
-id         | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name       | VARCHAR(120)             | NOT NULL
-name_gu    | VARCHAR(120)             | -
-pet_name   | VARCHAR(30)              | NOT NULL
-mobile     | VARCHAR(10)              | NOT NULL, UNIQUE
-upi_number | VARCHAR(10)              | UNIQUE
-description| TEXT                     | -
-created_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+name        | VARCHAR(120)             | NOT NULL
+name_gu     | VARCHAR(120)             | -
+pet_name    | VARCHAR(30)              | NOT NULL
+mobile      | VARCHAR(10)              | NOT NULL, UNIQUE
+upi_number  | VARCHAR(10)              | UNIQUE
+description | TEXT                     | -
+created_at  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
-  CHECK ck_mobile_10_digits: mobile ~ '^[0-9]{10}$'
-
-==============================================================================
-
-TABLE: labour_groups
-----------------------------------------------------------------------
-column        | type                     | constraints
-----------------------------------------------------------------------
-id            | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name          | VARCHAR(120)             | NOT NULL
-name_gu       | VARCHAR(120)             | -
-group_name    | VARCHAR(30)              | NOT NULL
-group_name_gu | VARCHAR(30)              | -
-mobile        | VARCHAR(10)              | NOT NULL, UNIQUE
-upi_number    | VARCHAR(10)              | UNIQUE
-description   | TEXT                     | -
-created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
-
-Table constraints / indexes:
   CHECK ck_mobile_10_digits: mobile ~ '^[0-9]{10}$'
 
 ==============================================================================
@@ -113,20 +67,20 @@ Table constraints / indexes:
 
 TABLE: industries
 --------------------------------------------------------------------------
-column            | type                     | constraints
+column              | type                     | constraints
 --------------------------------------------------------------------------
-id                | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name              | VARCHAR(120)             | NOT NULL, UNIQUE
-name_gu           | VARCHAR(120)             | -
-owner_name        | VARCHAR(120)             | NOT NULL
-owner_mobile      | VARCHAR(10)              | NOT NULL
-supervisor_name   | VARCHAR(120)             | NOT NULL
-supervisor_mobile | VARCHAR(10)              | NOT NULL
-product           | VARCHAR(60)              | NOT NULL
-location          | VARCHAR(120)             | NOT NULL
-quality_demand    | TEXT                     | -
-description       | TEXT                     | -
-created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id                  | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+name                | VARCHAR(120)             | NOT NULL, UNIQUE
+name_gu             | VARCHAR(120)             | -
+owner_name          | VARCHAR(120)             | NOT NULL
+owner_mobile        | VARCHAR(10)              | NOT NULL
+supervisor_name     | VARCHAR(120)             | NOT NULL
+supervisor_mobile   | VARCHAR(10)              | NOT NULL
+product             | VARCHAR(60)              | NOT NULL
+location            | VARCHAR(120)             | NOT NULL
+quality_expectation | TEXT                     | -
+description         | TEXT                     | -
+created_at          | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_owner_mobile_10_digits: owner_mobile ~ '^[0-9]{10}$'
@@ -152,21 +106,50 @@ Table constraints / indexes:
 
 ==============================================================================
 
-TABLE: grains
----------------------------------------------------------------------------
-column             | type                     | constraints
----------------------------------------------------------------------------
-id                 | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name               | VARCHAR(30)              | NOT NULL, UNIQUE
-name_gu            | VARCHAR(30)              | -
-default_net_weight | INTEGER                  | NOT NULL
-default_terms      | TEXT                     | -
-brokerage_per_truck| INTEGER                  | NOT NULL
-created_at         | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+TABLE: villages
+----------------------------------------------------------------------
+column          | type                     | constraints
+----------------------------------------------------------------------
+id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+village_name    | VARCHAR(30)              | NOT NULL, UNIQUE
+village_name_gu | VARCHAR(30)              | -
+description     | TEXT                     | -
+created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_grains_net_weight: default_net_weight IN (35, 50, 70, 100)
-  CHECK ck_brokers_brokerage_nonneg: brokerage_per_truck >= 0 
+
+==============================================================================
+
+TABLE: labour_groups
+----------------------------------------------------------------------
+column        | type                     | constraints
+----------------------------------------------------------------------
+id            | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+group_name    | VARCHAR(30)              | NOT NULL, UNIQUE
+group_name_gu | VARCHAR(30)              | -
+description   | TEXT                     | -
+created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+
+==============================================================================
+
+TABLE: products
+---------------------------------------------------------------------------
+column         | type                     | constraints
+---------------------------------------------------------------------------
+id             | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+name           | VARCHAR(30)              | NOT NULL, UNIQUE
+name_gu        | VARCHAR(30)              | -
+net_bag_weight | INTEGER                  | NOT NULL
+booking_weight | INTEGER                  | NOT NULL
+product_terms  | TEXT                     | -
+description    | TEXT                     | -
+created_at     | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_products_net_bag_weight: net_bag_weight IN (35, 50, 70, 100)
+  CHECK ck_products_booking_weight: booking_weight IN (20, 100)
 
 ==============================================================================
 

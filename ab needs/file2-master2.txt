@@ -1,0 +1,91 @@
+MASTER TABLES (reference data set up once and reused)
+Structure only - no data rows.
+
+==============================================================================
+
+TABLE: farmers
+----------------------------------------------------------------------------
+column              | type                     | constraints
+----------------------------------------------------------------------------
+id                  | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+name                | VARCHAR(120)             | NOT NULL
+name_gu             | VARCHAR(120)             | -
+head_of_family      | VARCHAR(60)              | -
+mobile              | VARCHAR(10)              | NOT NULL, UNIQUE
+email               | VARCHAR(60)              | UNIQUE
+village_id          | INTEGER                  | NOT NULL, FOREIGN KEY -> villages.id
+house               | TEXT                     | -
+upi_number          | VARCHAR(10)              | UNIQUE
+bank_account_number | VARCHAR(30)              | UNIQUE
+bank_name           | VARCHAR(30)              | -
+bank_branch         | VARCHAR(30)              | -
+ifsc_code           | VARCHAR(15)              | -
+public_figure       | TEXT                     | -
+description         | TEXT                     | -
+created_at          | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_mobile_10_digits: mobile ~ '^[0-9]{10}$'
+  CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
+  INDEX ix_farmers_village_id (village_id)
+
+==============================================================================
+
+TABLE: labours
+----------------------------------------------------------------------
+column          | type                     | constraints
+----------------------------------------------------------------------
+id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+name            | VARCHAR(120)             | NOT NULL
+name_gu         | VARCHAR(120)             | -
+labour_group_id | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
+mobile          | VARCHAR(10)              | NOT NULL, UNIQUE
+upi_number      | VARCHAR(10)              | UNIQUE
+description     | TEXT                     | -
+created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_mobile_10_digits: mobile ~ '^[0-9]{10}$'
+  CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
+  INDEX ix_labours_labour_group_id (labour_group_id)
+
+==============================================================================
+
+TABLE: brokerages
+----------------------------------------------------------------------
+column            | type                     | constraints
+----------------------------------------------------------------------
+id                | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+broker_id         | INTEGER                  | NOT NULL, FOREIGN KEY -> brokers.id
+product_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> products.id
+brokerage_per_bag | INTEGER                  | NOT NULL
+description       | TEXT                     | -
+created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_products_brokerage_nonneg: brokerage_per_bag >= 0 
+  INDEX ix_brokerages_broker_id (broker_id)
+  INDEX ix_products_product_id (product_id)
+
+==============================================================================
+
+TABLE: labour_group_wages
+----------------------------------------------------------------------
+column          | type                     | constraints
+----------------------------------------------------------------------
+id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+labour_group_id | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
+product_id      | INTEGER                  | NOT NULL, FOREIGN KEY -> products.id
+weighing_rate   | INTEGER                  | NOT NULL
+loading_rate    | INTEGER                  | NOT NULL
+pulling_rate    | INTEGER                  | NOT NULL
+mixing_rate     | INTEGER                  | NOT NULL
+other_expenses  | INTEGER                  | -
+description     | TEXT                     | -
+created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  INDEX ix_labour_groups_labour_group_id (labour_group_id)
+  INDEX ix_products_product_id (product_id)
+
+==============================================================================
