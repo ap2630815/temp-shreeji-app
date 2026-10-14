@@ -3,9 +3,9 @@ Structure only - no data rows.
 ==============================================================================
 
 ALL TABLES AND WHERE THEY ARE DESCRIBED:
-  file1-master1.txt: bag_suppliers, transporters, trucks, industries, brokers, villages, labour_groups, grains
-  file2-master2.txt: farmers, labours
-  file4-transactional.txt: commencings, purchase_entries, truck_trips, truck_load_lines, bilties, labour_work, bag_supplies
+  file1-master1.txt: bag_suppliers, transporters, trucks, industries, brokers, villages, labour_groups, products, 
+  file2-master2.txt: farmers, labours, labour_group_wages, brokerages, 
+  file4-transactional.txt: commencings, purchase_farmer_entries, broker_bookings, truck_trips, truck_load_lines, bilties, labour_work, bag_supplies, 
   file5-payment-ledger.txt: payments, payment_allocations, receipts, receipt_allocations
   file9-database.txt: users, audit_log, alembic_version  (+ the business-year rule below; there is no business_years table)
 

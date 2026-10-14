@@ -39,11 +39,11 @@ extra_kilos          | INTEGER                  | NOT NULL, DEFAULT 0
 payable_amount       | BIGINT                   | NOT NULL
 borrowed_amount      | BIGINT                   | NOT NULL, DEFAULT 0
 due_date             | DATE                     | NOT NULL
-raw_weight           | INTEGER                  | -
+expected_raw_weight  | INTEGER                  | -
 product_quality_code | TEXT                     | -
 product_store_at     | TEXT                     | -
-no_of_handful_bags   | INTEGER                  | -
-total_available_bags | INTEGER                  | -
+no_of_handful_bags   | INTEGER                  | NOT NULL, DEFAULT 0
+total_available_bags | INTEGER                  | NOT NULL, DEFAULT 0
 description          | TEXT                     | -
 created_by           | INTEGER                  | FOREIGN KEY -> users.id
 created_at           | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
@@ -71,9 +71,8 @@ id                              | INTEGER                  | PRIMARY KEY, AUTO I
 booking_date                    | DATE                     | NOT NULL
 brokerage_id                    | INTEGER                  | NOT NULL, FOREIGN KEY -> brokerages.id
 industry_id                     | INTEGER                  | NOT NULL, FOREIGN KEY -> industries.id
-product_id                      | INTEGER                  | NOT NULL, FOREIGN KEY -> products.id
 product_rate_per_booking_weight | INTEGER                  | NOT NULL
-truck_size                      | INTEGER                   | NOT NULL
+truck_size                      | INTEGER                  | NOT NULL
 percentage_deduction            | FLOAT                    | -
 description                     | TEXT                     | -
 created_by                      | INTEGER                  | FOREIGN KEY -> users.id
@@ -82,9 +81,8 @@ created_at                      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT n
 Table constraints / indexes:
   INDEX ix_broker_bookings_brokerage_id (brokerage_id)
   INDEX ix_broker_bookings_industry_id (industry_id)
-  INDEX ix_broker_bookings_product_id (product_id)
   CHECK ck_broker_bookings_truck_size: truck_size IN (10, 15, 20, 25, 30, 35)
-  CHECK ck_broker_bookings_percentage_deduction: percentage_deduction IN [0,5]
+  CHECK ck_broker_bookings_percentage_deduction: percentage_deduction IS NULL OR percentage_deduction BETWEEN 0 AND 5
 
 ==============================================================================
 
@@ -109,7 +107,7 @@ created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_truck_trips_amount_nonneg: advance_amount >= 0 AND other_payable >= 0 AND other_deduction >= 0
-  CHECK ck_truck_trips_rent_nonneg: rent_per_ton >= 0 AND rent_per_bag >= 0
+  CHECK ck_truck_trips_rent_nonneg: (rent_per_ton > 0 AND rent_per_bag = 0) OR (rent_per_ton = 0 AND rent_per_bag > 0)
   INDEX ix_truck_trips_broker_booking_id (broker_booking_id)
 
 ==============================================================================
@@ -127,8 +125,8 @@ total_remaining_bags     | INTEGER | NOT NULL
 Table constraints / indexes:
   CHECK ck_truck_load_lines_no_of_loaded_bags: no_of_loaded_bags > 0
   CHECK ck_truck_load_lines_total_remaining_bags: total_remaining_bags <= total_available_bags
-  INDEX ix_truck_load_lines_trip_id (trip_id)
   INDEX ix_truck_load_lines_purchase_farmer_entry_id (purchase_farmer_entry_id)
+  UNIQUE uq_truck_load_lines_trip_entry (trip_id, purchase_farmer_entry_id)
 
 ==============================================================================
 
@@ -142,7 +140,6 @@ bill_number           | INTEGER                  | NOT NULL
 truck_trip_id         | INTEGER                  | NOT NULL, UNIQUE, FOREIGN KEY -> truck_trips.id
 total_bags_in_truck   | INTEGER                  | NOT NULL
 any_rate_change       | INTEGER                  | NOT NULL, DEFAULT 0
-brokerage_amount      | INTEGER                  | NOT NULL, DEFAULT 0
 merchant_total_weight | INTEGER                  | NOT NULL
 merchant_tare_weight  | INTEGER                  | NOT NULL
 industry_total_weight | INTEGER                  | -
@@ -157,8 +154,7 @@ Table constraints / indexes:
   CHECK ck_bilties_industry_weights: (industry_total_weight IS NULL AND industry_tare_weight IS NULL) OR (industry_total_weight > industry_tare_weight AND industry_tare_weight >= 0)
   CHECK ck_bilties_bill_number: bill_number > 0
   UNIQUE (business_year, bill_number)
-  INDEX ix_bilties_business_year (business_year)
-
+  
 ==============================================================================
 
 TABLE: labour_work
@@ -192,7 +188,7 @@ supplier_id    | INTEGER                  | NOT NULL, FOREIGN KEY -> bag_supplie
 farmer_id      | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
 supply_date    | DATE                     | NOT NULL
 rate_per_bag   | INTEGER                  | NOT NULL
-no_of_units    | INTEGER                  | NOT NULL
+no_of_bags     | INTEGER                  | NOT NULL
 payable_amount | BIGINT                   | NOT NULL
 description    | TEXT                     | -
 created_by     | INTEGER                  | FOREIGN KEY -> users.id

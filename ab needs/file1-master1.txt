@@ -24,18 +24,18 @@ Table constraints / indexes:
 
 TABLE: transporters
 ----------------------------------------------------------------------
-column        | type                     | constraints
+column           | type                     | constraints
 ----------------------------------------------------------------------
-id            | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name          | VARCHAR(120)             | NOT NULL, UNIQUE
-pet_name      | VARCHAR(30)              | NOT NULL, UNIQUE
-location      | VARCHAR(60)              | NOT NULL
-owner_name    | VARCHAR(120)             | NOT NULL
-owner_name_gu | VARCHAR(120)             | -
-mobile        | VARCHAR(10)              | NOT NULL, UNIQUE
-upi_number    | VARCHAR(10)              | UNIQUE
-description   | TEXT                     | -
-created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id               | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+transporter_name | VARCHAR(120)             | NOT NULL, UNIQUE
+pet_name         | VARCHAR(30)              | NOT NULL, UNIQUE
+location         | VARCHAR(60)              | NOT NULL
+owner_name       | VARCHAR(120)             | NOT NULL
+owner_name_gu    | VARCHAR(120)             | -
+mobile           | VARCHAR(10)              | NOT NULL, UNIQUE
+upi_number       | VARCHAR(10)              | UNIQUE
+description      | TEXT                     | -
+created_at       | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
@@ -45,42 +45,42 @@ Table constraints / indexes:
 
 TABLE: trucks
 ----------------------------------------------------------------------
-column        | type                     | constraints
+column             | type                     | constraints
 ----------------------------------------------------------------------
-id            | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-truck_number  | VARCHAR(13)              | NOT NULL, UNIQUE
-owner_name    | VARCHAR(120)             | NOT NULL
-owner_mobile  | VARCHAR(10)              | NOT NULL
-driver_name   | VARCHAR(120)             | NOT NULL
-driver_mobile | VARCHAR(10)              | NOT NULL
-upi_number    | VARCHAR(10)              | -
-description   | TEXT                     | -
-created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id                 | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+truck_number       | VARCHAR(13)              | NOT NULL, UNIQUE
+truck_owner_name   | VARCHAR(120)             | NOT NULL
+truck_owner_mobile | VARCHAR(10)              | NOT NULL
+driver_name        | VARCHAR(120)             | NOT NULL
+driver_mobile      | VARCHAR(10)              | NOT NULL
+upi_number         | VARCHAR(10)              | -
+description        | TEXT                     | -
+created_at         | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
   CHECK ck_trucks_number_format: truck_number ~ '^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$'
-  CHECK ck_owner_mobile_10_digits: owner_mobile ~ '^[0-9]{10}$'
+  CHECK ck_truck_owner_mobile_10_digits: owner_mobile ~ '^[0-9]{10}$'
   CHECK ck_driver_mobile_10_digits: driver_mobile ~ '^[0-9]{10}$'
 
 ==============================================================================
 
 TABLE: industries
 --------------------------------------------------------------------------
-column              | type                     | constraints
+column                | type                     | constraints
 --------------------------------------------------------------------------
-id                  | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name                | VARCHAR(120)             | NOT NULL, UNIQUE
-name_gu             | VARCHAR(120)             | -
-owner_name          | VARCHAR(120)             | NOT NULL
-owner_mobile        | VARCHAR(10)              | NOT NULL
-supervisor_name     | VARCHAR(120)             | NOT NULL
-supervisor_mobile   | VARCHAR(10)              | NOT NULL
-product             | VARCHAR(60)              | NOT NULL
-location            | VARCHAR(120)             | NOT NULL
-quality_expectation | TEXT                     | -
-description         | TEXT                     | -
-created_at          | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id                    | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+industrialist_name    | VARCHAR(120)             | NOT NULL, UNIQUE
+industrialist_name_gu | VARCHAR(120)             | -
+owner_name            | VARCHAR(120)             | NOT NULL
+owner_mobile          | VARCHAR(10)              | NOT NULL
+supervisor_name       | VARCHAR(120)             | NOT NULL
+supervisor_mobile     | VARCHAR(10)              | NOT NULL
+product               | VARCHAR(60)              | NOT NULL
+location              | VARCHAR(120)             | NOT NULL
+quality_expectation   | TEXT                     | -
+description           | TEXT                     | -
+created_at            | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_owner_mobile_10_digits: owner_mobile ~ '^[0-9]{10}$'
@@ -93,8 +93,8 @@ TABLE: brokers
 column              | type                     | constraints
 ----------------------------------------------------------------------------
 id                  | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name                | VARCHAR(120)             | NOT NULL, UNIQUE
-name_gu             | VARCHAR(120)             | -
+broker_name         | VARCHAR(120)             | NOT NULL, UNIQUE
+broker_name_gu      | VARCHAR(120)             | -
 mobile              | VARCHAR(10)              | NOT NULL, UNIQUE
 upi_number          | VARCHAR(10)              | UNIQUE
 description         | TEXT                     | -
@@ -136,16 +136,16 @@ Table constraints / indexes:
 
 TABLE: products
 ---------------------------------------------------------------------------
-column         | type                     | constraints
+column          | type                     | constraints
 ---------------------------------------------------------------------------
-id             | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name           | VARCHAR(30)              | NOT NULL, UNIQUE
-name_gu        | VARCHAR(30)              | -
-net_bag_weight | INTEGER                  | NOT NULL
-booking_weight | INTEGER                  | NOT NULL
-product_terms  | TEXT                     | -
-description    | TEXT                     | -
-created_at     | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+product_name    | VARCHAR(30)              | NOT NULL, UNIQUE
+product_name_gu | VARCHAR(30)              | -
+net_bag_weight  | INTEGER                  | NOT NULL
+booking_weight  | INTEGER                  | NOT NULL
+product_terms   | TEXT                     | -
+description     | TEXT                     | -
+created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_products_net_bag_weight: net_bag_weight IN (35, 50, 70, 100)

@@ -8,8 +8,8 @@ TABLE: farmers
 column              | type                     | constraints
 ----------------------------------------------------------------------------
 id                  | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name                | VARCHAR(120)             | NOT NULL
-name_gu             | VARCHAR(120)             | -
+farmer_name         | VARCHAR(120)             | NOT NULL
+farmer_name_gu      | VARCHAR(120)             | -
 head_of_family      | VARCHAR(60)              | -
 mobile              | VARCHAR(10)              | NOT NULL, UNIQUE
 email               | VARCHAR(60)              | UNIQUE
@@ -28,6 +28,7 @@ Table constraints / indexes:
   CHECK ck_mobile_10_digits: mobile ~ '^[0-9]{10}$'
   CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
   INDEX ix_farmers_village_id (village_id)
+  UNIQUE (name, village_id, mobile)
 
 ==============================================================================
 
@@ -36,8 +37,8 @@ TABLE: labours
 column          | type                     | constraints
 ----------------------------------------------------------------------
 id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-name            | VARCHAR(120)             | NOT NULL
-name_gu         | VARCHAR(120)             | -
+labour_name     | VARCHAR(120)             | NOT NULL
+labour_name_gu  | VARCHAR(120)             | -
 labour_group_id | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
 mobile          | VARCHAR(10)              | NOT NULL, UNIQUE
 upi_number      | VARCHAR(10)              | UNIQUE
@@ -48,24 +49,6 @@ Table constraints / indexes:
   CHECK ck_mobile_10_digits: mobile ~ '^[0-9]{10}$'
   CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
   INDEX ix_labours_labour_group_id (labour_group_id)
-
-==============================================================================
-
-TABLE: brokerages
-----------------------------------------------------------------------
-column            | type                     | constraints
-----------------------------------------------------------------------
-id                | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-broker_id         | INTEGER                  | NOT NULL, FOREIGN KEY -> brokers.id
-product_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> products.id
-brokerage_per_bag | INTEGER                  | NOT NULL
-description       | TEXT                     | -
-created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
-
-Table constraints / indexes:
-  CHECK ck_brokerages_brokerage_nonneg: brokerage_per_bag >= 0 
-  INDEX ix_brokerages_broker_id (broker_id)
-  INDEX ix_brokerages_product_id (product_id)
 
 ==============================================================================
 
@@ -85,7 +68,26 @@ description     | TEXT                     | -
 created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  INDEX ix_labour_group_wages_labour_group_id (labour_group_id)
+  CHECK ck_labour_group_wages_rate_nonneg: weighing_rate >= 0 AND loading_rate >= 0 AND pulling_rate >= 0 AND mixing_rate >= 0
   INDEX ix_labour_group_wages_product_id (product_id)
+  UNIQUE uq_labour_group_wages_group_product (labour_group_id, product_id)
+
+==============================================================================
+
+TABLE: brokerages
+----------------------------------------------------------------------
+column            | type                     | constraints
+----------------------------------------------------------------------
+id                | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+broker_id         | INTEGER                  | NOT NULL, FOREIGN KEY -> brokers.id
+product_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> products.id
+brokerage_per_bag | INTEGER                  | NOT NULL
+description       | TEXT                     | -
+created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_brokerages_brokerage_nonneg: brokerage_per_bag >= 0 
+  INDEX ix_brokerages_product_id (product_id)
+  UNIQUE uq_brokerages_broker_product (broker_id, product_id)
 
 ==============================================================================

@@ -24,7 +24,7 @@ Table constraints / indexes:
   CHECK ck_payments_amount_positive: amount > 0
   CHECK ck_payments_method: method IN ('cash', 'cheque', 'upi', 'bank')
   CHECK ck_payments_receiver_mobile: receiver_mobile ~ '^[0-9]{10}$'
-  CHECK ck_payments_party_type: party_type IN ('farmer', 'transporter', 'labour', 'bag_supplier', 'broker')
+  CHECK ck_payments_party_type: party_type IN ('farmer', 'truck_trip', 'labour', 'bag_supplier', 'broker')
   INDEX ix_payments_business_year (business_year)
   INDEX ix_payments_party (party_type, party_id)
 
@@ -36,7 +36,7 @@ column       | type        | constraints
 -----------------------------------------------------------------
 id           | INTEGER     | PRIMARY KEY, AUTO INCREMENT
 payment_id   | INTEGER     | NOT NULL, FOREIGN KEY -> payments.id
-payable_type | VARCHAR(20) | NOT NULL, DEFAULT 'purchase_entry'
+payable_type | VARCHAR(30) | NOT NULL, DEFAULT 'purchase_farmer_entries'
 payable_id   | INTEGER     | NOT NULL
 amount       | BIGINT      | NOT NULL
 
