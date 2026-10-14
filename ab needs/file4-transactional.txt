@@ -60,7 +60,7 @@ Table constraints / indexes:
   CHECK ck_purchase_farmer_entries_payable_amount: payable_amount >= 0
   CHECK ck_purchase_farmer_entries_borrowed_amount: borrowed_amount >= 0
   CHECK ck_purchase_farmer_entries_borrowed_amount_le_payable_amount: borrowed_amount <= payable_amount
-  CHECK ck_purchase_farmer_entries_expected_raw_weight: expected_raw_weight IS NULL OR expected_raw_weight >= 0
+  CHECK ck_purchase_farmer_entries_expected_raw_weight_per_bag: expected_raw_weight_per_bag IS NULL OR expected_raw_weight_per_bag >= 0
   CHECK ck_purchase_farmer_entries_no_of_handful_bags: no_of_handful_bags >= 0
   CHECK ck_purchase_farmer_entries_total_available_bags: total_available_bags >= 0
   INDEX ix_purchase_farmer_entries_purchase_info_id (purchase_info_id)
@@ -167,7 +167,7 @@ Table constraints / indexes:
   CHECK ck_bilties_merchant_weights: merchant_total_weight > merchant_tare_weight AND merchant_tare_weight >= 0
   CHECK ck_bilties_industry_weights: (industry_total_weight IS NULL AND industry_tare_weight IS NULL) OR (industry_total_weight > industry_tare_weight AND industry_tare_weight >= 0)
   CHECK ck_bilties_bill_number: bill_number > 0
-  UNIQUE (business_year, bill_number)
+  UNIQUE uq_bilties_year_bill (business_year, bill_number)
   
 ==============================================================================
 

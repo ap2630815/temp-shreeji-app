@@ -43,4 +43,4 @@ LABELS: dict[str, tuple[str, str]] = {
 
 def bilingual(key: str) -> str:
     en, gu = LABELS[key]
-    return f"{en} / {gu}"
+    return f"{en}  {gu}"
