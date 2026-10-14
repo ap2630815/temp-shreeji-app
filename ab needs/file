@@ -1,55 +1,61 @@
----------------------------------------------------------------
-just for understanding, of core bussiness rules,   
----------------------------------------------------------------
-
-
----------------------------------------------------------------
----------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+just for understanding of core bussiness rules,   
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
----------------------------------------------------------------
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+(handle by app logic)
+
+
 purchase_farmer_entries.total_available_bags = purchase_farmer_entries.no_of_filled_bags + purchase_farmer_entries.no_of_handful_bags  
 
+total_remaining_bags <= total_available_bags
 if purchase_farmer_entry_id does not exist in truck_load_lines ledger 
-then truck_load_lines.total_remaining_bags = purchase_farmer_entries.total_available_bags AND truck_load_lines.no_of_loaded_bags = 0 (initialize automatically as purchase_farmer_entries selectes) 
+then truck_load_lines.total_remaining_bags = purchase_farmer_entries.total_available_bags AND truck_load_lines.no_of_loaded_bags is (initialize automatically as purchase_farmer_entries selected from dropdown in UI) 
 truck_load_lines.total_remaining_bags = truck_load_lines.total_remaining_bags - truck_load_lines.no_of_loaded_bags
  
 bilties.total_bags_in_truck = sum of truck_load_lines.no_of_loaded_bags, for particular trip_id from different purchase_farmer_entry_id
 
-expected_total_loaded_weight = sum of all unique (trip_id, purchase_farmer_entry_id) {(no_of_loaded_bags * expected_raw_weight)}
+expected_total_loaded_weight = sum of all unique (trip_id, purchase_farmer_entry_id) {(no_of_loaded_bags * expected_raw_weight_per_bag)}
 difference_in_loading_weight = (merchant_total_weight - merchant_tare_weight) - expected_total_loaded_weight
 average_per_bag_difference = (difference_in_loading_weight / total_bags_in_truck)
 difference_in_delivering_weight = (industry_total_weight - industry_tare_weight) - (merchant_total_weight - merchant_tare_weight)
 total_weight_difference = (industry_total_weight - merchant_total_weight)
 tare_weight_difference = (industry_tare_weight - merchant_tare_weight)
 
----------------------------------------------------------------
-remaining_amount ?,  farmer', 'truck_trip', 'labour_group', 'bag_supplier', 'broker'
----------------------------------------------------------------
-payable_amount = { ( (no_of_filled_bags * net_bag_weight ) + extra_kilos) / 20 } * product_rate_per_20kg
-purchase_farmer_entries, farmer_total_amount = payable_amount - borrowed_amount
-purchase_farmer_entries, sum of payments.amount for farmer_id == farmer_total_amount
+payments.status: status IN ('partial', 'final', 'complete'), partial, last partial is called final, full for payment in signle time 
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+'farmer', 'truck', 'labour_group', 'bag_supplier', 'broker' are the party_type in payments table, and their respective id is party_id in payments table.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+payable_amount = { ( (no_of_filled_bags * net_bag_weight ) + extra_kilos) / 20 } * grain_rate_per_20kg
+farmer_total_amount = payable_amount - borrowed_amount
+sum of payments.amount for (party_type = farmer, party_id = farmers.id) should not exceed (farmer_total_amount)
 
 trip_total = { ( (industry_total_weight - industry_tare_weight) / 1000 ) * truck_trips.rent_per_ton } + { truck_trips.rent_per_bag * bilties.total_bags_in_truck }
-truck_trips, truck_trip_total_amount = trip_total - advance_amount + other_payable - other_deduction
-truck_trips, sum of payments.amount for trip_id == truck_trip_total_amount
+truck_trip_total_amount = trip_total - advance_amount + other_payable - other_deduction
+sum of payments.amount for (party_type = truck, party_id = trucks.id) should not exceed sum of truck_trip_total_amount over all truck_trips of that truck (paid to the truck owner; payment_allocations.payable_id = truck_trips.id)
 
 payable_amount =(weighing_rate * total_available_bags) + (loading_rate * total_bags_in_truck) + (pulling_rate * total_pulled_bags) + (mixing_rate * total_mixed_bags) + (other_expenses)
-labour_groups, labour_group_total_amount = payable_amount - borrowing_amount
-labour_groups, sum of payments.amount for labour_group_id == labour_group_total_amount
+labour_group_total_amount = payable_amount - borrowing_amount
+sum of payments.amount for (party_type = labour_group, party_id = labour_groups.id) should not exceed (labour_group_total_amount)
 business_expense_labour_day = petrol + meal
 
 payable_amount = no_of_bags * rate_per_bag 
-bag_supplies, bag_supply_total_amount = payable_amount
-bag_supplies, sum of payments.amount for bag_supplier_id == bag_supply_total_amount
+bag_supply_total_amount = payable_amount
+sum of payments.amount for (party_type = bag_supplier, party_id = bag_suppliers.id) should not exceed (bag_supply_total_amount)
 
 brokerage_amount = total_bags_in_truck * brokerage_per_bag 
-bilties, broker_total_amount = brokerage_amount
-bilties, sum of payments.amount for broker_id == broker_total_amount
+broker_total_amount = brokerage_amount
+sum of payments.amount for (party_type = broker, party_id = brokers.id) should not exceed (broker_total_amount)
 
-receivable_amount = ( (industry_total_weight - industry_tare_weight) / booking_weight ) * (product_rate_per_booking_weight - any_rate_change) * (1 - (percentage_deduction/100))
-bilties, industry_total_amount = receivable_amount
-bilties, sum of payments.amount for broker_id == broker_total_amount
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+receivable_amount = ( (industry_total_weight - industry_tare_weight) / booking_weight ) * (grain_rate_per_booking_weight - any_rate_change)
+receivable_after_percentage_deduction = receivable_amount * (1 - (percentage_deduction/100))
+
 

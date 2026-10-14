@@ -3,9 +3,9 @@ Structure only - no data rows.
 ==============================================================================
 
 ALL TABLES AND WHERE THEY ARE DESCRIBED:
-  file1-master1.txt: bag_suppliers, transporters, trucks, industries, brokers, villages, labour_groups, products, 
+  file1-master1.txt: bag_suppliers, transporters, trucks, industries, brokers, villages, labour_groups, grains, 
   file2-master2.txt: farmers, labours, labour_group_wages, brokerages, 
-  file4-transactional.txt: commencings, purchase_farmer_entries, broker_bookings, truck_trips, truck_load_lines, bilties, labour_work, bag_supplies, 
+  file4-transactional.txt: purchase_info, purchase_farmer_entries, broker_bookings, truck_trips, truck_load_lines, bilties, labour_work, bag_supplies, 
   file5-payment-ledger.txt: payments, payment_allocations, receipts, receipt_allocations
   file9-database.txt: users, audit_log, alembic_version  (+ the business-year rule below; there is no business_years table)
 
@@ -37,9 +37,10 @@ A business year runs 1 October to 30 September and is labelled by its two
 years, e.g. 2025-26 = 2025-10-01 .. 2026-09-30.
 
 Every dated record stores its year in a business_year VARCHAR(7) column:
-  commencings, truck_trips, bilties, labour_work, bag_supplies (file4-transactional.txt)
+  purchase_info, purchase_farmer_entries, broker_bookings, truck_trips, bilties, labour_work, bag_supplies, (file4-transactional.txt)
   payments, receipts (file5-payment-ledger.txt)
-  (purchase_entries are tied to their commencing and are grouped by entry_date.)
+  (truck_load_lines, payment_allocations and receipt_allocations have no date of their own;
+   they belong to the year of their parent truck_trips / payments / receipts row.)
 
 Rules enforced by the application (app/services/years.py):
   1. Entering or changing a record, payment or receipt is only allowed when
@@ -51,6 +52,13 @@ Rules enforced by the application (app/services/years.py):
   3. Only the owner can view past business years (lists, detail pages, year
      report, /years). Accountants only see the current year.
   4. Each year's data stays in the same tables, told apart by business_year.
+  5. business_year is never typed by the user. The application sets it from the
+     record's own date (purchase_info_date, purchase_entry_date, booking_date,
+     trip_date, bilty_date, work_date, supply_date, payment_date, receipt_date):
+     start year = date.year if date.month >= 10 else date.year - 1,
+     label = start year + "-" + last two digits of (start year + 1).
+     e.g. 2026-09-30 -> 2025-26, 2026-10-01 -> 2026-27.
+     Its format is also enforced by a CHECK on every table that has the column.
 
 ==============================================================================
 

@@ -2,62 +2,68 @@ FORM TABLES (records entered through the data-entry forms)
 Structure only - no data rows.
 ==============================================================================
 
-TABLE: commencings
+TABLE: purchase_info
 -------------------------------------------------------------------------------
 column                | type                     | constraints
 -------------------------------------------------------------------------------
 id                    | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-commencing_date       | DATE                     | NOT NULL
+purchase_info_date    | DATE                     | NOT NULL
 village_id            | INTEGER                  | NOT NULL, FOREIGN KEY -> villages.id
-product_id            | INTEGER                  | NOT NULL, FOREIGN KEY -> products.id
-product_rate_per_20kg | INTEGER                  | NOT NULL
+grain_id              | INTEGER                  | NOT NULL, FOREIGN KEY -> grains.id
+grain_rate_per_20kg   | INTEGER                  | NOT NULL
 pay_after_no_of_days  | INTEGER                  | NOT NULL
-commencing_terms      | TEXT                     | -
+purchase_info_terms   | TEXT                     | -
+business_year         | VARCHAR(7)               | NOT NULL
 description           | TEXT                     | -
 created_by            | INTEGER                  | FOREIGN KEY -> users.id
 created_at            | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_commencings_rate_positive: product_rate_per_20kg > 0
-  CHECK ck_commencings_pay_after: pay_after_no_of_days >= 0
-  INDEX ix_commencings_village_id (village_id)
-  INDEX ix_commencings_product_id (product_id)
+  CHECK ck_purchase_info_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_purchase_info_business_year (business_year)
+  CHECK ck_purchase_info_rate_positive: grain_rate_per_20kg > 0
+  CHECK ck_purchase_info_pay_after: pay_after_no_of_days >= 0
+  INDEX ix_purchase_info_village_id (village_id)
+  INDEX ix_purchase_info_grain_id (grain_id)
 
 ==============================================================================
 
 TABLE: purchase_farmer_entries
 --------------------------------------------------------------------------------------
-column               | type                     | constraints
+column                      | type                     | constraints
 --------------------------------------------------------------------------------------
-id                   | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-purchase_entry_date  | DATE                     | NOT NULL
-commencing_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> commencings.id
-farmer_id            | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
-labour_group_id      | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
-no_of_filled_bags    | INTEGER                  | NOT NULL
-extra_kilos          | INTEGER                  | NOT NULL, DEFAULT 0
-payable_amount       | BIGINT                   | NOT NULL
-borrowed_amount      | BIGINT                   | NOT NULL, DEFAULT 0
-due_date             | DATE                     | NOT NULL
-expected_raw_weight  | INTEGER                  | -
-product_quality_code | TEXT                     | -
-product_store_at     | TEXT                     | -
-no_of_handful_bags   | INTEGER                  | NOT NULL, DEFAULT 0
-total_available_bags | INTEGER                  | NOT NULL, DEFAULT 0
-description          | TEXT                     | -
-created_by           | INTEGER                  | FOREIGN KEY -> users.id
-created_at           | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id                          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+purchase_entry_date         | DATE                     | NOT NULL
+purchase_info_id            | INTEGER                  | NOT NULL, FOREIGN KEY -> purchase_info.id
+farmer_id                   | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
+labour_group_id             | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
+no_of_filled_bags           | INTEGER                  | NOT NULL
+extra_kilos                 | INTEGER                  | NOT NULL, DEFAULT 0
+payable_amount              | BIGINT                   | NOT NULL
+borrowed_amount             | BIGINT                   | NOT NULL, DEFAULT 0
+due_date                    | DATE                     | NOT NULL
+expected_raw_weight_per_bag | INTEGER                  | -
+grain_quality_code          | TEXT                     | -
+grain_store_at              | TEXT                     | -
+no_of_handful_bags          | INTEGER                  | NOT NULL, DEFAULT 0
+total_available_bags        | INTEGER                  | NOT NULL, DEFAULT 0
+business_year               | VARCHAR(7)               | NOT NULL
+description                 | TEXT                     | -
+created_by                  | INTEGER                  | FOREIGN KEY -> users.id
+created_at                  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
+  CHECK ck_purchase_farmer_entries_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_purchase_farmer_entries_business_year (business_year)
   CHECK ck_purchase_farmer_entries_extra_kilos: extra_kilos >= 0
   CHECK ck_purchase_farmer_entries_no_of_filled_bags: no_of_filled_bags >= 0
   CHECK ck_purchase_farmer_entries_payable_amount: payable_amount >= 0
   CHECK ck_purchase_farmer_entries_borrowed_amount: borrowed_amount >= 0
   CHECK ck_purchase_farmer_entries_borrowed_amount_le_payable_amount: borrowed_amount <= payable_amount
-  CHECK ck_purchase_farmer_entries_raw_weight: raw_weight IS NULL OR raw_weight >= 0
+  CHECK ck_purchase_farmer_entries_expected_raw_weight: expected_raw_weight IS NULL OR expected_raw_weight >= 0
   CHECK ck_purchase_farmer_entries_no_of_handful_bags: no_of_handful_bags >= 0
   CHECK ck_purchase_farmer_entries_total_available_bags: total_available_bags >= 0
-  INDEX ix_purchase_farmer_entries_commencing_id (commencing_id)
+  INDEX ix_purchase_farmer_entries_purchase_info_id (purchase_info_id)
   INDEX ix_purchase_farmer_entries_farmer_id (farmer_id)
   INDEX ix_purchase_farmer_entries_labour_group_id (labour_group_id)
 
@@ -69,9 +75,10 @@ column                          | type                     | constraints
 --------------------------------------------------------------------------------------
 id                              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 booking_date                    | DATE                     | NOT NULL
+business_year                   | VARCHAR(7)               | NOT NULL
 brokerage_id                    | INTEGER                  | NOT NULL, FOREIGN KEY -> brokerages.id
 industry_id                     | INTEGER                  | NOT NULL, FOREIGN KEY -> industries.id
-product_rate_per_booking_weight | INTEGER                  | NOT NULL
+grain_rate_per_booking_weight   | INTEGER                  | NOT NULL
 truck_size                      | INTEGER                  | NOT NULL
 percentage_deduction            | FLOAT                    | -
 description                     | TEXT                     | -
@@ -79,6 +86,8 @@ created_by                      | INTEGER                  | FOREIGN KEY -> user
 created_at                      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
+  CHECK ck_broker_bookings_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_broker_bookings_business_year (business_year)
   INDEX ix_broker_bookings_brokerage_id (brokerage_id)
   INDEX ix_broker_bookings_industry_id (industry_id)
   CHECK ck_broker_bookings_truck_size: truck_size IN (10, 15, 20, 25, 30, 35)
@@ -94,18 +103,21 @@ id                | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 trip_date         | DATE                     | NOT NULL
 broker_booking_id | INTEGER                  | NOT NULL, FOREIGN KEY -> broker_bookings.id
 truck_id          | INTEGER                  | NOT NULL, FOREIGN KEY -> trucks.id
-transport_id      | INTEGER                  | NOT NULL, FOREIGN KEY -> transporters.id
+transporter_id    | INTEGER                  | NOT NULL, FOREIGN KEY -> transporters.id
 labour_group_id   | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
 rent_per_ton      | INTEGER                  | NOT NULL, DEFAULT 0
 rent_per_bag      | INTEGER                  | NOT NULL, DEFAULT 0
 advance_amount    | BIGINT                   | NOT NULL, DEFAULT 0
 other_payable     | BIGINT                   | NOT NULL, DEFAULT 0
 other_deduction   | BIGINT                   | NOT NULL, DEFAULT 0
+business_year     | VARCHAR(7)               | NOT NULL
 description       | TEXT                     | -
 created_by        | INTEGER                  | FOREIGN KEY -> users.id
 created_at        | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
+  CHECK ck_truck_trips_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_truck_trips_business_year (business_year)
   CHECK ck_truck_trips_amount_nonneg: advance_amount >= 0 AND other_payable >= 0 AND other_deduction >= 0
   CHECK ck_truck_trips_rent_nonneg: (rent_per_ton > 0 AND rent_per_bag = 0) OR (rent_per_ton = 0 AND rent_per_bag > 0)
   INDEX ix_truck_trips_broker_booking_id (broker_booking_id)
@@ -124,7 +136,7 @@ total_remaining_bags     | INTEGER | NOT NULL
 
 Table constraints / indexes:
   CHECK ck_truck_load_lines_no_of_loaded_bags: no_of_loaded_bags > 0
-  CHECK ck_truck_load_lines_total_remaining_bags: total_remaining_bags <= total_available_bags
+  CHECK ck_truck_load_lines_total_remaining_bags: total_remaining_bags >= 0
   INDEX ix_truck_load_lines_purchase_farmer_entry_id (purchase_farmer_entry_id)
   UNIQUE uq_truck_load_lines_trip_entry (trip_id, purchase_farmer_entry_id)
 
@@ -150,6 +162,8 @@ created_by            | INTEGER                  | FOREIGN KEY -> users.id
 created_at            | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
+  CHECK ck_bilties_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_bilties_business_year (business_year)
   CHECK ck_bilties_merchant_weights: merchant_total_weight > merchant_tare_weight AND merchant_tare_weight >= 0
   CHECK ck_bilties_industry_weights: (industry_total_weight IS NULL AND industry_tare_weight IS NULL) OR (industry_total_weight > industry_tare_weight AND industry_tare_weight >= 0)
   CHECK ck_bilties_bill_number: bill_number > 0
@@ -168,11 +182,14 @@ payable_amount   | BIGINT                   | NOT NULL, DEFAULT 0
 borrowing_amount | BIGINT                   | NOT NULL, DEFAULT 0
 petrol           | BIGINT                   | NOT NULL, DEFAULT 0
 meal             | BIGINT                   | NOT NULL, DEFAULT 0
+business_year    | VARCHAR(7)               | NOT NULL
 description      | TEXT                     | -
 created_by       | INTEGER                  | FOREIGN KEY -> users.id
 created_at       | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
+  CHECK ck_labour_work_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_labour_work_business_year (business_year)
   CHECK ck_labour_work_borrowing_le_payable: borrowing_amount <= payable_amount
   CHECK ck_labour_work_amount_nonneg: payable_amount >= 0 AND borrowing_amount >= 0 AND petrol >= 0 AND meal >= 0
   INDEX ix_labour_work_labour_group_id (labour_group_id)
@@ -187,15 +204,18 @@ id             | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 supplier_id    | INTEGER                  | NOT NULL, FOREIGN KEY -> bag_suppliers.id
 farmer_id      | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
 supply_date    | DATE                     | NOT NULL
+payable_amount | BIGINT                   | NOT NULL
 rate_per_bag   | INTEGER                  | NOT NULL
 no_of_bags     | INTEGER                  | NOT NULL
-payable_amount | BIGINT                   | NOT NULL
+business_year  | VARCHAR(7)               | NOT NULL
 description    | TEXT                     | -
 created_by     | INTEGER                  | FOREIGN KEY -> users.id
 created_at     | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_bag_supplies_positive: rate_per_bag > 0 AND no_of_units > 0
+  CHECK ck_bag_supplies_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_bag_supplies_business_year (business_year)
+  CHECK ck_bag_supplies_positive: rate_per_bag > 0 AND no_of_bags > 0
   INDEX ix_bag_supplies_farmer_id (farmer_id)
   INDEX ix_bag_supplies_supplier_id (supplier_id)
 

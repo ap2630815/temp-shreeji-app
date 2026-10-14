@@ -10,7 +10,7 @@ column      | type                     | constraints
 id          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 name        | VARCHAR(120)             | NOT NULL
 name_gu     | VARCHAR(120)             | -
-pet_name    | VARCHAR(30)              | NOT NULL
+pet_name    | VARCHAR(30)              | NOT NULL, UNIQUE
 mobile      | VARCHAR(10)              | NOT NULL, UNIQUE
 upi_number  | VARCHAR(10)              | UNIQUE
 description | TEXT                     | -
@@ -60,7 +60,7 @@ created_at         | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 Table constraints / indexes:
   CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
   CHECK ck_trucks_number_format: truck_number ~ '^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$'
-  CHECK ck_truck_owner_mobile_10_digits: owner_mobile ~ '^[0-9]{10}$'
+  CHECK ck_truck_owner_mobile_10_digits: truck_owner_mobile ~ '^[0-9]{10}$'
   CHECK ck_driver_mobile_10_digits: driver_mobile ~ '^[0-9]{10}$'
 
 ==============================================================================
@@ -76,7 +76,7 @@ owner_name            | VARCHAR(120)             | NOT NULL
 owner_mobile          | VARCHAR(10)              | NOT NULL
 supervisor_name       | VARCHAR(120)             | NOT NULL
 supervisor_mobile     | VARCHAR(10)              | NOT NULL
-product               | VARCHAR(60)              | NOT NULL
+grain                 | VARCHAR(60)              | NOT NULL
 location              | VARCHAR(120)             | NOT NULL
 quality_expectation   | TEXT                     | -
 description           | TEXT                     | -
@@ -134,22 +134,22 @@ Table constraints / indexes:
 
 ==============================================================================
 
-TABLE: products
+TABLE: grains
 ---------------------------------------------------------------------------
 column          | type                     | constraints
 ---------------------------------------------------------------------------
 id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-product_name    | VARCHAR(30)              | NOT NULL, UNIQUE
-product_name_gu | VARCHAR(30)              | -
+grain_name      | VARCHAR(30)              | NOT NULL, UNIQUE
+grain_name_gu   | VARCHAR(30)              | -
 net_bag_weight  | INTEGER                  | NOT NULL
 booking_weight  | INTEGER                  | NOT NULL
-product_terms   | TEXT                     | -
+grain_terms     | TEXT                     | -
 description     | TEXT                     | -
 created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_products_net_bag_weight: net_bag_weight IN (35, 50, 70, 100)
-  CHECK ck_products_booking_weight: booking_weight IN (20, 100)
+  CHECK ck_grains_net_bag_weight: net_bag_weight IN (35, 50, 70, 100)
+  CHECK ck_grains_booking_weight: booking_weight IN (20, 100)
 
 ==============================================================================
 

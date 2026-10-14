@@ -16,7 +16,8 @@ method          | VARCHAR(10)              | NOT NULL
 receiver_name   | VARCHAR(120)             | NOT NULL
 receiver_mobile | VARCHAR(10)              | NOT NULL
 reference_no    | VARCHAR(60)              | -
-note            | TEXT                     | -
+status          | VARCHAR(10)              | NOT NULL
+description     | TEXT                     | -
 created_by      | INTEGER                  | FOREIGN KEY -> users.id
 created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
@@ -24,25 +25,27 @@ Table constraints / indexes:
   CHECK ck_payments_amount_positive: amount > 0
   CHECK ck_payments_method: method IN ('cash', 'cheque', 'upi', 'bank')
   CHECK ck_payments_receiver_mobile: receiver_mobile ~ '^[0-9]{10}$'
-  CHECK ck_payments_party_type: party_type IN ('farmer', 'truck_trip', 'labour', 'bag_supplier', 'broker')
+  CHECK ck_payments_party_type: party_type IN ('farmer', 'truck', 'labour_group', 'bag_supplier', 'broker')
+  CHECK ck_payments_status: status IN ('partial', 'final', 'complete')
+  CHECK ck_payments_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
   INDEX ix_payments_business_year (business_year)
   INDEX ix_payments_party (party_type, party_id)
 
 ==============================================================================
-
+ 
 TABLE: payment_allocations
 -----------------------------------------------------------------
 column       | type        | constraints
 -----------------------------------------------------------------
 id           | INTEGER     | PRIMARY KEY, AUTO INCREMENT
 payment_id   | INTEGER     | NOT NULL, FOREIGN KEY -> payments.id
-payable_type | VARCHAR(30) | NOT NULL, DEFAULT 'purchase_farmer_entries'
+payable_type | VARCHAR(15) | NOT NULL, DEFAULT 'farmer'
 payable_id   | INTEGER     | NOT NULL
 amount       | BIGINT      | NOT NULL
 
 Table constraints / indexes:
   CHECK ck_alloc_amount_positive: amount > 0
-  CHECK ck_alloc_payable_type: payable_type IN ('purchase_farmer_entries', 'truck_trips', 'labour_work', 'bag_supplies', 'brokerages')
+  CHECK ck_alloc_payable_type: payable_type IN ('farmer', 'truck', 'labour_group', 'bag_supplier', 'broker')
   INDEX ix_alloc_payable (payable_type, payable_id)
 
 ==============================================================================
@@ -59,13 +62,14 @@ business_year | VARCHAR(7)               | NOT NULL
 method        | VARCHAR(10)              | NOT NULL
 reference_no  | VARCHAR(60)              | -
 payer_name    | VARCHAR(120)             | -
-note          | TEXT                     | -
+description   | TEXT                     | -
 created_by    | INTEGER                  | FOREIGN KEY -> users.id
 created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_receipts_method: method IN ('cash', 'cheque', 'upi', 'bank')
   CHECK ck_receipts_amount: amount > 0
+  CHECK ck_receipts_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
   INDEX ix_receipts_business_year (business_year)
   INDEX ix_receipts_industry_id (industry_id)
 
