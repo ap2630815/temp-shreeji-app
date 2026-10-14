@@ -16,13 +16,14 @@ from sqlalchemy import delete, select
 
 from app.core.db import SessionLocal, engine
 from app.models import (
-    AuditLog, BagSupplier, BagSupply, Bilty, Broker, Commencing, Farmer, Grain, Industry, LabourGroup, LabourWork, Payment,
-    PaymentAllocation, PurchaseEntry, Receipt, ReceiptAllocation, Transporter, Truck, TruckLoadLine, TruckTrip, User,
+    AuditLog, BagSupplier, BagSupply, Bilty, Broker, BrokerBooking, Brokerage, Farmer, Grain, Industry, Labour, LabourGroup, LabourGroupWage,
+    LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry, PurchaseInfo, Receipt, ReceiptAllocation, Transporter, Truck, TruckLoadLine,
+    TruckTrip, User, Village,
 )
 from app.services import audit
 from app.services import payables as pay_svc
 from app.services import receivables as rec_svc
-from app.services.money import payable_amount
+from app.services.money import payable_amount, total_available_bags
 from app.services.years import business_year_of
 
 IDS_FILE = Path(__file__).with_name(".demo_ids.json")
@@ -79,67 +80,94 @@ async def seed() -> None:
             sys.exit("Create an owner user first (scripts.create_user).")
 
         # ---- masters
-        farmers = [Farmer(name=n, name_gu=g, mobile=mobile(1, i), village=VILLAGES[i % 3][0], village_gu=VILLAGES[i % 3][1],
+        villages = [Village(village_name=n, village_name_gu=g) for n, g in VILLAGES]
+        grains = [Grain(grain_name=n, grain_name_gu=g, net_bag_weight=w, booking_weight=20 if i % 3 else 100, grain_terms=t) for i, (n, g, w, _, t) in enumerate(GRAINS)]
+        labour = [LabourGroup(group_name=gn, group_name_gu=gg) for gn, gg, _ in LABOUR]
+        db.add_all(villages + grains + labour)
+        await db.flush()
+        farmers = [Farmer(farmer_name=n, farmer_name_gu=g, mobile=mobile(1, i), village_id=villages[i % 3].id,
                           head_of_family=(FARMERS[(i + 3) % N][0] if i % 4 == 0 else None), upi_number=mobile(1, i) if i % 2 == 0 else None,
                           house=f"Near {['school', 'temple', 'panchayat', 'water tank'][i % 4]}", bank_name="State Bank of India" if i % 3 == 0 else None)
                    for i, (n, g) in enumerate(FARMERS)]
         suppliers = [BagSupplier(name=o, pet_name=p, mobile=mobile(2, i), upi_number=mobile(2, i)) for i, (p, o) in enumerate(BAG_SUPPLIERS)]
-        labour = [LabourGroup(name=ld, mobile=mobile(3, i), group_name=gn, group_name_gu=gg) for i, (gn, gg, ld) in enumerate(LABOUR)]
-        transporters = [Transporter(name=n, pet_name=p, location=loc, owner_name=f"{p} Owner", mobile=mobile(4, i)) for i, (n, p, loc) in enumerate(TRANSPORTERS)]
-        trucks = [Truck(truck_number=tn, owner_name=f"{TRANSPORTERS[i][1]} Owner", owner_mobile=mobile(5, i), driver_name=f"Driver {i + 1} {['Ahir', 'Rabari', 'Kathi', 'Bharwad'][i % 4]}",
+        transporters = [Transporter(transporter_name=n, pet_name=p, location=loc, owner_name=f"{p} Owner", mobile=mobile(4, i)) for i, (n, p, loc) in enumerate(TRANSPORTERS)]
+        trucks = [Truck(truck_number=tn, truck_owner_name=f"{TRANSPORTERS[i][1]} Owner", truck_owner_mobile=mobile(5, i), driver_name=f"Driver {i + 1} {['Ahir', 'Rabari', 'Kathi', 'Bharwad'][i % 4]}",
                         driver_mobile=mobile(6, i)) for i, tn in enumerate(TRUCKS)]
-        industries = [Industry(name=n, name_gu=g, owner_name=f"{n.split()[0]} Owner", owner_mobile=mobile(7, i), supervisor_name=f"Supervisor {i + 1}", supervisor_mobile=mobile(8, i),
-                               product=p, location=loc, required_quality="FAQ grade, moisture below 12%") for i, (n, g, p, loc) in enumerate(INDUSTRIES)]
-        brokers = [Broker(name=n, name_gu=g, mobile=mobile(9, i), brokerage_per_truck=1000 + 100 * (i % 6) * 2, upi_number=mobile(9, i)) for i, (n, g) in enumerate(BROKERS)]
-        grains = [Grain(name=n, name_gu=g, default_net_weight=w, default_terms=t) for n, g, w, _, t in GRAINS]
-        masters = dict(farmers=farmers, bag_suppliers=suppliers, labour_groups=labour, transporters=transporters, trucks=trucks, industries=industries, brokers=brokers, grains=grains)
-        for rows in masters.values():
-            db.add_all(rows)
+        industries = [Industry(industrialist_name=n, industrialist_name_gu=g, owner_name=f"{n.split()[0]} Owner", owner_mobile=mobile(7, i), supervisor_name=f"Supervisor {i + 1}",
+                               supervisor_mobile=mobile(8, i), grain=p, location=loc, quality_expectation="FAQ grade, moisture below 12%") for i, (n, g, p, loc) in enumerate(INDUSTRIES)]
+        brokers = [Broker(broker_name=n, broker_name_gu=g, mobile=mobile(9, i), upi_number=mobile(9, i)) for i, (n, g) in enumerate(BROKERS)]
+        db.add_all(farmers + suppliers + transporters + trucks + industries + brokers)
         await db.flush()
+        labours = [Labour(labour_name=ld, labour_group_id=labour[i].id, mobile=mobile(3, i)) for i, (_, _, ld) in enumerate(LABOUR)]
+        brokerages = [Brokerage(broker_id=brokers[i].id, grain_id=grains[i].id, brokerage_per_bag=rng.randint(2, 8), description="Demo brokerage") for i in range(N)]
+        wages = [LabourGroupWage(labour_group_id=labour[i].id, grain_id=grains[i].id, weighing_rate=rng.randint(1, 3), loading_rate=rng.randint(2, 5),
+                                 pulling_rate=rng.randint(1, 4), mixing_rate=rng.randint(1, 3), other_expenses=rng.choice([None, 0, 200]), description="Demo wages") for i in range(N)]
+        db.add_all(labours + brokerages + wages)
+        await db.flush()
+        masters = dict(villages=villages, grains=grains, labour_groups=labour, farmers=farmers, bag_suppliers=suppliers, transporters=transporters, trucks=trucks,
+                       industries=industries, brokers=brokers, labours=labours, brokerages=brokerages, labour_group_wages=wages)
         for name, rows in masters.items():
             ids[name] = [r.id for r in rows]
 
-        # ---- commencings: one village deal per grain
+        # ---- purchase_info: one village deal per grain
         day = lambda back: TODAY - timedelta(days=back)  # noqa: E731
-        commencings = []
+        infos = []
         for i, g in enumerate(grains):
-            c = Commencing(business_year=business_year_of(day(5 - i % 5)), commencing_date=day(5 - i % 5), village=VILLAGES[i % 3][0], grain_id=g.id,
-                           rate_per_20kg=GRAINS[i][3], net_weight=g.default_net_weight, pay_after_days=[7, 10, 15, 20][i % 4], terms=g.default_terms,
-                           description="Demo commencing", created_by=user.id)
-            commencings.append(c)
-        db.add_all(commencings)
+            d = day(5 - i % 5)
+            infos.append(PurchaseInfo(purchase_info_date=d, business_year=business_year_of(d), village_id=villages[i % 3].id, grain_id=g.id, grain_rate_per_20kg=GRAINS[i][3],
+                                      pay_after_no_of_days=[7, 10, 15, 20][i % 4], purchase_info_terms=g.grain_terms, description="Demo purchase", created_by=user.id))
+        db.add_all(infos)
         await db.flush()
-        ids["commencings"] = [c.id for c in commencings]
-        for c in commencings:
-            stamp(db, user, "commencings", c)
+        ids["purchase_info"] = [p.id for p in infos]
+        for p in infos:
+            stamp(db, user, "purchase_info", p)
 
-        # ---- farmer weighing entries: one per commencing
+        # ---- farmer weighing entries: one per purchase_info
         entries = []
-        for i, c in enumerate(commencings):
-            bags, kilos = rng.randint(120, 400), rng.choice([0, 0, rng.randint(5, c.net_weight - 1)])
-            amount = payable_amount(bags, kilos, c.net_weight, c.rate_per_20kg)
+        for i, p in enumerate(infos):
+            net = grains[i].net_bag_weight
+            bags, kilos, handful = rng.randint(120, 400), rng.choice([0, 0, rng.randint(5, net - 1)]), rng.choice([0, 0, 3, 5])
+            amount = payable_amount(bags, kilos, net, p.grain_rate_per_20kg)
             borrowing = rng.choice([0, 0, 500, 1000, 2000]) if amount > 3000 else 0
-            entries.append(PurchaseEntry(
-                commencing_id=c.id, farmer_id=farmers[i].id, labour_group_id=labour[i].id, entry_date=c.commencing_date, filled_bags=bags, extra_kilos=kilos,
-                raw_weight=bags * c.net_weight + kilos + rng.randint(20, 90), payable_amount=amount, borrowing=borrowing,
-                due_date=c.commencing_date + timedelta(days=c.pay_after_days), description=rng.choice([None, None, "2 quality grains", "warning: moisture"]), created_by=user.id))
+            entries.append(PurchaseFarmerEntry(
+                purchase_entry_date=p.purchase_info_date, business_year=p.business_year, purchase_info_id=p.id, farmer_id=farmers[i].id, labour_group_id=labour[i].id,
+                no_of_filled_bags=bags, extra_kilos=kilos, no_of_handful_bags=handful, total_available_bags=total_available_bags(bags, handful),
+                payable_amount=amount, borrowed_amount=borrowing, due_date=p.purchase_info_date + timedelta(days=p.pay_after_no_of_days),
+                expected_raw_weight_per_bag=net + rng.randint(0, 2), grain_quality_code=rng.choice([None, "A", "B"]), grain_store_at=rng.choice([None, "Farmer's shed", "Godown"]),
+                description=rng.choice([None, None, "2 quality grains", "warning: moisture"]), created_by=user.id))
         db.add_all(entries)
         await db.flush()
-        ids["purchase_entries"] = [e.id for e in entries]
+        ids["purchase_farmer_entries"] = [e.id for e in entries]
         for e in entries:
-            stamp(db, user, "purchase_entries", e)
+            stamp(db, user, "purchase_farmer_entries", e)
 
-        # ---- truck trips: each loads 80% of its commencing's bags
+        # ---- broker bookings: one per brokerage, each for one of the first 5 industries
+        bookings = []
+        for i, br in enumerate(brokerages):
+            d = day(4 - i % 4)
+            bookings.append(BrokerBooking(booking_date=d, business_year=business_year_of(d), brokerage_id=br.id, industry_id=industries[i % 5].id,
+                                          grain_rate_per_booking_weight=-(-int(GRAINS[i][3] * 1.08) // 10) * 10 * (5 if grains[i].booking_weight == 100 else 1),
+                                          truck_size=[10, 15, 20, 25, 30][i % 5], percentage_deduction=rng.choice([None, 0.5, 1, 2]), description="Demo booking", created_by=user.id))
+        db.add_all(bookings)
+        await db.flush()
+        ids["broker_bookings"] = [b.id for b in bookings]
+        for b in bookings:
+            stamp(db, user, "broker_bookings", b)
+
+        # ---- truck trips: one per booking, each loads 80% of the entry of the same grain
         trips, lines = [], []
-        for i, c in enumerate(commencings):
+        for i, bk in enumerate(bookings):
             d = day(3 - i % 3)
-            trips.append(TruckTrip(business_year=business_year_of(d), trip_date=d, truck_id=trucks[i].id, transport_id=transporters[i].id, labour_group_id=labour[(i + 1) % N].id,
-                                   industry_id=industries[i % 5].id, grain_id=c.grain_id, rent_per_ton=rng.randrange(700, 1300, 50), rent_per_bag=rng.randint(15, 30),
-                                   advance_amount=rng.choice([0, 500, 1000, 2000]), other_deduction=0, description="Demo trip", created_by=user.id))
+            per_ton = i % 2 == 0
+            trips.append(TruckTrip(trip_date=d, business_year=business_year_of(d), broker_booking_id=bk.id, truck_id=trucks[i].id, transporter_id=transporters[i].id,
+                                   labour_group_id=labour[(i + 1) % N].id, rent_per_ton=rng.randrange(700, 1300, 50) if per_ton else 0,
+                                   rent_per_bag=0 if per_ton else rng.randint(15, 30), advance_amount=rng.choice([0, 500, 1000, 2000]),
+                                   other_payable=rng.choice([0, 0, 300]), other_deduction=0, description="Demo trip", created_by=user.id))
         db.add_all(trips)
         await db.flush()
         for i, t in enumerate(trips):
-            lines.append(TruckLoadLine(trip_id=t.id, commencing_id=commencings[i].id, bags=int(entries[i].filled_bags * 0.8)))
+            bags = int(entries[i].total_available_bags * 0.8)
+            lines.append(TruckLoadLine(trip_id=t.id, purchase_farmer_entry_id=entries[i].id, no_of_loaded_bags=bags, total_remaining_bags=entries[i].total_available_bags - bags))
         db.add_all(lines)
         await db.flush()
         ids["truck_trips"], ids["truck_load_lines"] = [t.id for t in trips], [ln.id for ln in lines]
@@ -149,16 +177,15 @@ async def seed() -> None:
         # ---- bilty: 7 weighed by the industry, 3 still awaiting the industry weight
         bilties = []
         for i, t in enumerate(trips):
-            c, bags = commencings[i], lines[i].bags
-            m_net = bags * c.net_weight + rng.randint(0, 40)
+            bags = lines[i].no_of_loaded_bags
+            m_net = bags * grains[i].net_bag_weight + rng.randint(0, 40)
             m_tare = rng.randrange(9000, 11000, 10)
             i_net = i_tare = None
             if i < 7:
                 i_net = m_net - int(m_net * rng.uniform(0.0, 0.008))
                 i_tare = m_tare + rng.randint(-20, 20)
             bilties.append(Bilty(
-                trip_id=t.id, business_year=t.business_year, bilty_date=t.trip_date, bill_number=201 + i, broker_id=brokers[i].id,
-                grain_rate=-(-int(c.rate_per_20kg * 1.08) // 10) * 10, rate_unit_kg=20, rate_change=rng.choice([0, 0, 0, 5]), brokerage_amount=brokers[i].brokerage_per_truck,
+                truck_trip_id=t.id, business_year=t.business_year, bilty_date=t.trip_date, bill_number=201 + i, total_bags_in_truck=bags, any_rate_change=rng.choice([0, 0, 0, 5]),
                 merchant_total_weight=m_net + m_tare, merchant_tare_weight=m_tare,
                 industry_total_weight=None if i_net is None else i_net + i_tare, industry_tare_weight=i_tare,
                 description="Demo bilty" if i < 7 else "Demo bilty - industry weight awaited", created_by=user.id))
@@ -171,14 +198,14 @@ async def seed() -> None:
         # ---- labour work and bag supplies
         work = []
         for i in range(N):
-            wages = rng.randrange(3000, 9000, 100)
+            w = rng.randrange(3000, 9000, 100)
             borrow = rng.choice([0, 0, 500, 1000])
-            work.append(LabourWork(labour_group_id=labour[i].id, work_date=day(5 - i % 5), business_year=business_year_of(day(5 - i % 5)), payable_amount=wages,
-                                   borrowing_amount=min(borrow, wages), petrol=rng.choice([0, 200, 300, 500]), meal=rng.choice([0, 150, 250]), description="Demo labour work", created_by=user.id))
-        bags = [BagSupply(supplier_id=suppliers[i].id, farmer_id=farmers[i].id, supply_date=day(6), business_year=business_year_of(day(6)), rate=rng.randint(12, 25),
-                          units=rng.randrange(200, 600, 50), description="Demo bag supply", created_by=user.id) for i in range(N)]
+            work.append(LabourWork(labour_group_id=labour[i].id, work_date=day(5 - i % 5), business_year=business_year_of(day(5 - i % 5)), payable_amount=w,
+                                   borrowing_amount=min(borrow, w), petrol=rng.choice([0, 200, 300, 500]), meal=rng.choice([0, 150, 250]), description="Demo labour work", created_by=user.id))
+        bags = [BagSupply(supplier_id=suppliers[i].id, farmer_id=farmers[i].id, supply_date=day(6), business_year=business_year_of(day(6)), rate_per_bag=rng.randint(12, 25),
+                          no_of_bags=rng.randrange(200, 600, 50), payable_amount=0, description="Demo bag supply", created_by=user.id) for i in range(N)]
         for b in bags:
-            b.payable_amount = b.rate * b.units
+            b.payable_amount = b.rate_per_bag * b.no_of_bags
         db.add_all(work + bags)
         await db.flush()
         ids["labour_work"], ids["bag_supplies"] = [w.id for w in work], [b.id for b in bags]
@@ -197,20 +224,20 @@ async def seed() -> None:
                 break
             v = views[k % len(views)]
             ind = v.bilty.trip.industry
-            due = sum(x.due for x in views if x.bilty.trip.industry_id == ind.id)
+            due = sum(x.due for x in views if x.bilty.trip.industry.id == ind.id)
             amount = min(due, max(10000, round(due * rng.choice([0.25, 0.4, 0.5]), -3)))
             method, tag = methods[k % 3]
             r = await rec_svc.record_receipt(db, user, ind.id, dict(
                 receipt_date=day(rng.randint(0, 2)), amount=amount, method=method, reference_no=None if method == "cash" else f"{tag}{rng.randint(100000, 999999)}",
-                payer_name=ind.owner_name, note="Demo receipt"))
+                payer_name=ind.owner_name, description="Demo receipt"))
             await db.commit()
             receipt_ids.append(r.id)
             k += 1
         ids["receipts"] = receipt_ids
 
-        # ---- payments (money out): 4 farmers, 3 transporters, 1 broker, 1 labour, 1 bag supplier
-        plan = [("farmer", farmers[i].id) for i in range(4)] + [("transporter", transporters[i].id) for i in (0, 1, 2)] + \
-               [("broker", brokers[0].id), ("labour", labour[0].id), ("bag_supplier", suppliers[0].id)]
+        # ---- payments (money out): 4 farmers, 3 truck owners, 1 broker, 1 labour group, 1 bag supplier
+        plan = [("farmer", farmers[i].id) for i in range(4)] + [("truck", trucks[i].id) for i in (0, 1, 2)] + \
+               [("broker", brokers[0].id), ("labour_group", labour[0].id), ("bag_supplier", suppliers[0].id)]
         payment_ids = []
         for n, (ptype, pid) in enumerate(plan):
             rows = [p for p in await pay_svc.load_payables(db, ptype, pid) if p.due > 0]
@@ -220,10 +247,11 @@ async def seed() -> None:
             amount = min(due, max(500, round(due * rng.choice([0.3, 0.5, 0.6]), -2)))
             party = await pay_svc.get_party(db, ptype, pid)
             rname, rmobile = pay_svc.PARTIES[ptype].receiver(party)
+            rmobile = rmobile or mobile(3, n)  # labour groups have no mobile of their own
             method = ["cash", "upi", "bank"][n % 3]
             p = await pay_svc.record_payment(db, user, ptype, pid, dict(
                 payment_date=day(rng.randint(0, 2)), amount=amount, method=method, receiver_name=rname, receiver_mobile=rmobile,
-                reference_no=None if method == "cash" else f"REF{rng.randint(100000, 999999)}", note="Demo payment"))
+                reference_no=None if method == "cash" else f"REF{rng.randint(100000, 999999)}", description="Demo payment"))
             await db.commit()
             payment_ids.append(p.id)
         ids["payments"] = payment_ids
@@ -245,13 +273,14 @@ async def remove() -> None:
         await db.execute(delete(Payment).where(Payment.id.in_(pay_ids)))
         await db.execute(delete(ReceiptAllocation).where(ReceiptAllocation.receipt_id.in_(rec_ids)))
         await db.execute(delete(Receipt).where(Receipt.id.in_(rec_ids)))
-        for model, key in ((Bilty, "bilties"), (TruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BagSupply, "bag_supplies"), (LabourWork, "labour_work"),
-                           (PurchaseEntry, "purchase_entries"), (Commencing, "commencings"), (Farmer, "farmers"), (BagSupplier, "bag_suppliers"), (LabourGroup, "labour_groups"),
-                           (Transporter, "transporters"), (Truck, "trucks"), (Industry, "industries"), (Broker, "brokers"), (Grain, "grains")):
+        for model, key in ((Bilty, "bilties"), (TruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BrokerBooking, "broker_bookings"),
+                           (BagSupply, "bag_supplies"), (LabourWork, "labour_work"), (PurchaseFarmerEntry, "purchase_farmer_entries"), (PurchaseInfo, "purchase_info"),
+                           (LabourGroupWage, "labour_group_wages"), (Brokerage, "brokerages"), (Labour, "labours"), (Farmer, "farmers"), (BagSupplier, "bag_suppliers"),
+                           (LabourGroup, "labour_groups"), (Transporter, "transporters"), (Truck, "trucks"), (Industry, "industries"), (Broker, "brokers"),
+                           (Grain, "grains"), (Village, "villages")):
             await db.execute(delete(model).where(model.id.in_(ids.get(key, []))))
-        for table, key in (("commencings", "commencings"), ("purchase_entries", "purchase_entries"), ("truck_trips", "truck_trips"), ("bilties", "bilties"),
-                           ("labour_work", "labour_work"), ("bag_supplies", "bag_supplies"), ("payments", "payments"), ("receipts", "receipts")):
-            await db.execute(delete(AuditLog).where(AuditLog.table_name == table, AuditLog.record_id.in_(ids.get(key, []))))
+        for table in ("purchase_info", "purchase_farmer_entries", "broker_bookings", "truck_trips", "bilties", "labour_work", "bag_supplies", "payments", "receipts"):
+            await db.execute(delete(AuditLog).where(AuditLog.table_name == table, AuditLog.record_id.in_(ids.get(table, []))))
         await db.commit()
     IDS_FILE.unlink()
     await engine.dispose()

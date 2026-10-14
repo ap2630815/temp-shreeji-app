@@ -7,7 +7,7 @@
   <div style="text-align:right">{{ t('Date', 'તારીખ') }}: {{ today }}</div>
 </div>
 <div class="meta">
-  <div>{{ t('Industry', 'ઉદ્યોગ') }}: <b>{{ industry.name }}</b>{% if industry.name_gu %} <span class="gu">({{ industry.name_gu }})</span>{% endif %}</div>
+  <div>{{ t('Industry', 'ઉદ્યોગ') }}: <b>{{ industry.industrialist_name }}</b>{% if industry.industrialist_name_gu %} <span class="gu">({{ industry.industrialist_name_gu }})</span>{% endif %}</div>
   <div>{{ t('Location', 'સ્થળ') }}: {{ industry.location }}</div>
   <div>{{ t('Owner', 'માલિક') }}: {{ industry.owner_name }} ({{ industry.owner_mobile }})</div>
   <div>{{ t('Supervisor', 'સુપરવાઇઝર') }}: {{ industry.supervisor_name }} ({{ industry.supervisor_mobile }})</div>
@@ -27,11 +27,11 @@
   <tbody>
   {% for v in views %}{% set b = v.bilty %}
     <tr>
-      <td>{{ b.bilty_date }}</td><td>{{ b.bill_number }}</td><td>{{ b.trip.truck.truck_number }}</td><td>{{ b.trip.grain.name }}</td>
+      <td>{{ b.bilty_date }}</td><td>{{ b.bill_number }}</td><td>{{ b.trip.truck.truck_number }}</td><td>{{ b.trip.grain.grain_name }}</td>
       <td class="n">{{ '{:,}'.format(b.merchant_net_weight) }}</td>
       <td class="n">{{ '{:,}'.format(b.industry_net_weight) if b.industry_net_weight is not none else '—' }}</td>
       <td class="n">{{ b.percentage_difference if b.percentage_difference is not none else '' }}</td>
-      <td class="n">{{ b.effective_rate }}/{{ b.rate_unit_kg }}kg</td>
+      <td class="n">{{ b.effective_rate }}/{{ b.booking_weight }}kg</td>
       <td class="n">{{ v.receivable | inr if v.receivable is not none else '—' }}</td>
       <td class="n">{{ v.received | inr }}</td>
       <td class="n"><b>{{ v.due | inr if v.due is not none else '—' }}</b></td>

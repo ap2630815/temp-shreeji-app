@@ -8,14 +8,38 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.masters_config import DUPLICATE_MSG, SPECS, Spec, normalize, validate
+from dataclasses import replace
+
+from app.api.masters_config import DUPLICATE_MSG, F, SPECS, Spec, normalize, validate
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
-from app.models import User
+from app.models import Broker, Grain, LabourGroup, User, Village
 
 router = APIRouter(prefix="/masters")
 
 LIST_LIMIT = 300
+
+# kind="fk" fields: source key -> (model, order-by column, label)
+FK_SOURCES = {
+    "village": (Village, Village.village_name, lambda r: r.village_name),
+    "labour_group": (LabourGroup, LabourGroup.group_name, lambda r: r.group_name),
+    "grain": (Grain, Grain.grain_name, lambda r: r.grain_name),
+    "broker": (Broker, Broker.broker_name, lambda r: r.broker_name),
+}
+
+
+async def _fields(spec: Spec, db: AsyncSession, is_owner: bool) -> list[F]:
+    """The spec's fields for this user, with every fk field turned into a select over its master rows."""
+    out: list[F] = []
+    for f in spec.fields:
+        if f.owner_only and not is_owner:
+            continue
+        if f.kind == "fk":
+            model, order, label = FK_SOURCES[f.fk]
+            rows = (await db.scalars(select(model).order_by(order))).unique().all()
+            f = replace(f, kind="select", options=tuple((str(r.id), label(r)) for r in rows))
+        out.append(f)
+    return out
 
 
 def _spec(slug: str) -> Spec:
@@ -25,12 +49,12 @@ def _spec(slug: str) -> Spec:
     return spec
 
 
-def _form_ctx(spec: Spec, user: User, values: dict, errors: dict, obj_id: int | None, is_owner: bool | None = None):
+async def _form_ctx(spec: Spec, user: User, values: dict, errors: dict, obj_id: int | None, db: AsyncSession, is_owner: bool | None = None):
     # is_owner may be passed in because a rollback expires `user` and its attributes can no longer be read
     if is_owner is None:
         is_owner = user.role == "owner"
     action = f"/masters/{spec.slug}" + (f"/{obj_id}" if obj_id else "")
-    fields = [f for f in spec.fields if not f.owner_only or is_owner]
+    fields = await _fields(spec, db, is_owner)
     verb = ("Edit", "સુધારો") if obj_id else ("Add", "ઉમેરો")
     heading = (f"{verb[0]}: {spec.label[0]}", f"{verb[1]}: {spec.label[1]}")
     return dict(spec=spec, user=user, fields=fields, values=values, errors=errors, action=action, obj_id=obj_id,
@@ -64,9 +88,11 @@ async def list_page(
 
 
 @router.get("/{slug}/new", response_class=HTMLResponse)
-async def new_page(request: Request, slug: str, user: User = Depends(current_user), csrf: CsrfProtect = Depends()):
+async def new_page(
+    request: Request, slug: str, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
+):
     spec = _spec(slug)
-    return render_with_csrf(request, csrf, "master_form_page.html", **_form_ctx(spec, user, {}, {}, None))
+    return render_with_csrf(request, csrf, "master_form_page.html", **await _form_ctx(spec, user, {}, {}, None, db))
 
 
 @router.get("/{slug}/{obj_id}/edit", response_class=HTMLResponse)
@@ -82,7 +108,7 @@ async def edit_page(
     obj = await db.get(spec.model, obj_id)
     if obj is None:
         raise HTTPException(404)
-    return render_with_csrf(request, csrf, "master_form_page.html", **_form_ctx(spec, user, _values_of(spec, obj), {}, obj_id))
+    return render_with_csrf(request, csrf, "master_form_page.html", **await _form_ctx(spec, user, _values_of(spec, obj), {}, obj_id, db))
 
 
 async def _save(request: Request, slug: str, obj_id: int | None, user: User, csrf: CsrfProtect, db: AsyncSession):
@@ -121,7 +147,7 @@ async def _save(request: Request, slug: str, obj_id: int | None, user: User, csr
             return Response(status_code=204, headers={"HX-Redirect": f"/masters/{slug}"})
 
     # htmx does not swap 4xx, so the re-rendered form (with errors) is returned with 200
-    return render(request, "partials/master_form.html", **_form_ctx(spec, user, raw, errors, obj_id, is_owner))
+    return render(request, "partials/master_form.html", **await _form_ctx(spec, user, raw, errors, obj_id, db, is_owner))
 
 
 @router.post("/{slug}", response_class=HTMLResponse)

@@ -1,4 +1,4 @@
-"""One payment engine for every party we pay: farmers, transporters, labour groups, bag suppliers, brokers.
+"""One payment engine for every party we pay: farmers, trucks (owners), labour groups, bag suppliers, brokers.
 
 Each party type exposes a list of Payable rows (what we owe and when). A payment is spread over them oldest-first and
 recorded as allocations, so paid / due / status are always derived, never stored."""
@@ -16,12 +16,14 @@ from app.models import (
     BagSupply,
     Bilty,
     Broker,
+    BrokerBooking,
+    Brokerage,
     Farmer,
     LabourGroup,
     LabourWork,
     Payment,
     PaymentAllocation,
-    Transporter,
+    Truck,
     TruckTrip,
     User,
 )
@@ -33,19 +35,27 @@ from app.services.years import assert_year_open
 
 @dataclass(frozen=True)
 class PartySpec:
+    """party_type doubles as payment_allocations.payable_type (file5): farmer, truck, labour_group, bag_supplier, broker."""
+
     label: tuple[str, str]
     model: type
-    payable_type: str
     name: Callable[[Any], str]
+    name_gu: Callable[[Any], str | None]
+    mobile: Callable[[Any], str]
     receiver: Callable[[Any], tuple[str, str]]  # default (name, mobile) of whoever collects the money
 
 
 PARTIES: dict[str, PartySpec] = {
-    "farmer": PartySpec(("Farmer", "ખેડૂત"), Farmer, "purchase_entry", lambda p: p.name, lambda p: (p.head_of_family or p.name, p.mobile)),
-    "transporter": PartySpec(("Transport", "ટ્રાન્સપોર્ટ"), Transporter, "truck_trip", lambda p: p.pet_name, lambda p: (p.owner_name, p.mobile)),
-    "labour": PartySpec(("Labour", "મજૂર"), LabourGroup, "labour_work", lambda p: p.group_name, lambda p: (p.name, p.mobile)),
-    "bag_supplier": PartySpec(("Bag supplier", "બારદાન સપ્લાયર"), BagSupplier, "bag_supply", lambda p: p.pet_name, lambda p: (p.name, p.mobile)),
-    "broker": PartySpec(("Broker", "દલાલ"), Broker, "bilty_brokerage", lambda p: p.name, lambda p: (p.name, p.mobile)),
+    "farmer": PartySpec(("Farmer", "ખેડૂત"), Farmer, lambda p: p.farmer_name, lambda p: p.farmer_name_gu, lambda p: p.mobile,
+                        lambda p: (p.head_of_family or p.farmer_name, p.mobile)),
+    "truck": PartySpec(("Truck", "ટ્રક"), Truck, lambda p: p.truck_number, lambda p: None, lambda p: p.truck_owner_mobile,
+                       lambda p: (p.truck_owner_name, p.truck_owner_mobile)),  # paid to the truck owner
+    "labour_group": PartySpec(("Labour", "મજૂર"), LabourGroup, lambda p: p.group_name, lambda p: p.group_name_gu, lambda p: "",
+                              lambda p: (p.group_name, "")),
+    "bag_supplier": PartySpec(("Bag supplier", "બારદાન સપ્લાયર"), BagSupplier, lambda p: p.pet_name, lambda p: p.name_gu, lambda p: p.mobile,
+                              lambda p: (p.name, p.mobile)),
+    "broker": PartySpec(("Broker", "દલાલ"), Broker, lambda p: p.broker_name, lambda p: p.broker_name_gu, lambda p: p.mobile,
+                        lambda p: (p.broker_name, p.mobile)),
 }
 
 
@@ -99,25 +109,24 @@ async def _paid_map(db: AsyncSession, payable_type: str, ids: list[int]) -> dict
 
 async def load_payables(db: AsyncSession, party_type: str, party_id: int | None = None) -> list[Payable]:
     """Everything we owe (or have owed) to one party, or to all parties of a type when party_id is None."""
-    spec = PARTIES[party_type]
-    pt = spec.payable_type
+    pt = party_type  # allocation payable_type
     out: list[Payable] = []
 
     if party_type == "farmer":
         for v in await entry_views(db, farmer_id=party_id):
             e = v.entry
-            out.append(Payable(pt, e.id, party_type, e.farmer_id, e.farmer.name, e.entry_date, e.due_date,
-                               f"{e.commencing.village} · {e.commencing.grain.name}, {e.filled_bags} bags", e.net_payable, v.paid))
-    elif party_type == "transporter":
+            out.append(Payable(pt, e.id, party_type, e.farmer_id, e.farmer.farmer_name, e.purchase_entry_date, e.due_date,
+                               f"{e.purchase_info.village.village_name} · {e.purchase_info.grain.grain_name}, {e.no_of_filled_bags} bags", e.net_payable, v.paid))
+    elif party_type == "truck":
         stmt = select(TruckTrip).order_by(TruckTrip.trip_date, TruckTrip.id)
         if party_id:
-            stmt = stmt.where(TruckTrip.transport_id == party_id)
+            stmt = stmt.where(TruckTrip.truck_id == party_id)
         trips = list((await db.scalars(stmt)).unique().all())
         paid = await _paid_map(db, pt, [t.id for t in trips])
         for t in trips:
-            out.append(Payable(pt, t.id, party_type, t.transport_id, t.transport.pet_name, t.trip_date, None,
-                               f"{t.truck.truck_number} → {t.industry.name}, {t.grain.name}, {t.bags} bags", t.final_payment, paid.get(t.id, 0)))
-    elif party_type == "labour":
+            out.append(Payable(pt, t.id, party_type, t.truck_id, t.truck.truck_number, t.trip_date, None,
+                               f"{t.truck.truck_number} → {t.industry.industrialist_name}, {t.grain.grain_name}, {t.bags} bags", t.total_amount, paid.get(t.id, 0)))
+    elif party_type == "labour_group":
         stmt = select(LabourWork).order_by(LabourWork.work_date, LabourWork.id)
         if party_id:
             stmt = stmt.where(LabourWork.labour_group_id == party_id)
@@ -134,16 +143,23 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         paid = await _paid_map(db, pt, [r.id for r in rows])
         for r in rows:
             out.append(Payable(pt, r.id, party_type, r.supplier_id, r.supplier.pet_name, r.supply_date, None,
-                               f"{r.units} bags @ ₹{r.rate} to {r.farmer.name} ({r.farmer.village})", r.payable_amount, paid.get(r.id, 0)))
+                               f"{r.no_of_bags} bags @ ₹{r.rate_per_bag} to {r.farmer.farmer_name} ({r.farmer.village.village_name})", r.payable_amount, paid.get(r.id, 0)))
     elif party_type == "broker":
-        stmt = select(Bilty).order_by(Bilty.bilty_date, Bilty.id)
+        stmt = (
+            select(Bilty)
+            .join(TruckTrip, TruckTrip.id == Bilty.truck_trip_id)
+            .join(BrokerBooking, BrokerBooking.id == TruckTrip.broker_booking_id)
+            .join(Brokerage, Brokerage.id == BrokerBooking.brokerage_id)
+            .order_by(Bilty.bilty_date, Bilty.id)
+        )
         if party_id:
-            stmt = stmt.where(Bilty.broker_id == party_id)
+            stmt = stmt.where(Brokerage.broker_id == party_id)
         rows = list((await db.scalars(stmt)).unique().all())
         paid = await _paid_map(db, pt, [r.id for r in rows])
         for r in rows:
-            out.append(Payable(pt, r.id, party_type, r.broker_id, r.broker.name, r.bilty_date, None,
-                               f"Bill #{r.bill_number}, {r.trip.truck.truck_number} → {r.trip.industry.name}", r.brokerage_amount, paid.get(r.id, 0)))
+            broker = r.booking.brokerage.broker
+            out.append(Payable(pt, r.id, party_type, broker.id, broker.broker_name, r.bilty_date, None,
+                               f"Bill #{r.bill_number}, {r.trip.truck.truck_number} → {r.trip.industry.industrialist_name}", r.brokerage_amount, paid.get(r.id, 0)))
     out.sort(key=lambda p: p.sort_key)
     return out
 
@@ -173,7 +189,10 @@ async def lock_party(db: AsyncSession, party_type: str, party_id: int) -> None:
 
 
 async def record_payment(db: AsyncSession, user: User, party_type: str, party_id: int, data: dict) -> Payment:
-    """Allocate `data['amount']` oldest-first and add the payment. Raises YearLockedError or PaymentError. Caller commits."""
+    """Allocate `data['amount']` oldest-first and add the payment. Raises YearLockedError or PaymentError. Caller commits.
+
+    payments.status: 'partial' while the party still owes something afterwards; when this payment clears everything it is
+    'complete' if it is the only payment, otherwise 'final' (the last of several partial payments)."""
     year = await assert_year_open(db, data["payment_date"])
     await lock_party(db, party_type, party_id)
     payables = await load_payables(db, party_type, party_id)
@@ -182,12 +201,14 @@ async def record_payment(db: AsyncSession, user: User, party_type: str, party_id
         plan = allocate(data["amount"], [(p.payable_id, p.due) for p in payables])
     except ValueError:
         raise PaymentError("amount", (f"Exceeds the outstanding amount (₹{outstanding})", f"બાકી રકમ (₹{outstanding}) થી વધુ")) from None
-    payment = Payment(party_type=party_type, party_id=party_id, business_year=year, created_by=user.id, **data)
+    earlier = int(await db.scalar(select(func.count()).select_from(Payment).where(Payment.party_type == party_type, Payment.party_id == party_id)))
+    status = "partial" if data["amount"] < outstanding else ("final" if earlier else "complete")
+    payment = Payment(party_type=party_type, party_id=party_id, business_year=year, status=status, created_by=user.id, **data)
     db.add(payment)
     await db.flush()
-    db.add_all(PaymentAllocation(payment_id=payment.id, payable_type=PARTIES[party_type].payable_type, payable_id=pid, amount=amt) for pid, amt in plan)
+    db.add_all(PaymentAllocation(payment_id=payment.id, payable_type=party_type, payable_id=pid, amount=amt) for pid, amt in plan)
     audit.log(db, user, "create", "payments", payment.id, dict(
-        party=party_type, party_id=party_id, amount=data["amount"], method=data["method"], receiver=data["receiver_name"],
+        party=party_type, party_id=party_id, amount=data["amount"], method=data["method"], receiver=data["receiver_name"], status=status,
         allocations=[[pid, amt] for pid, amt in plan]))
     return payment
 
@@ -201,7 +222,7 @@ async def payment_lines(db: AsyncSession, payment: Payment) -> list[dict]:
     """What a payment settled, and what each of those items still owed right after it (payments up to and including it)."""
     by_id = {p.payable_id: p for p in await load_payables(db, payment.party_type, payment.party_id)}
     ids = [a.payable_id for a in payment.allocations]
-    pt = PARTIES[payment.party_type].payable_type
+    pt = payment.party_type
     rows = await db.execute(
         select(PaymentAllocation.payable_id, func.sum(PaymentAllocation.amount))
         .where(PaymentAllocation.payable_type == pt, PaymentAllocation.payable_id.in_(ids), PaymentAllocation.payment_id <= payment.id)

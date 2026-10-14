@@ -1,6 +1,6 @@
 {% for row in rows %}
 <tr>
-  {% for col in spec.list_columns %}<td>{{ row|attr(col) }}</td>{% endfor %}
+  {% for col in spec.list_columns %}<td>{{ cell(row, col) }}</td>{% endfor %}
   <td class="text-right whitespace-nowrap">
     {% if spec.slug == 'farmers' %}<a class="btn btn-ghost btn-xs" href="/farmers/{{ row.id }}/statement">{{ L['statement'][0] }} {{ L['statement'][1] }}</a>{% endif %}
     <a class="btn btn-ghost btn-xs" href="/masters/{{ spec.slug }}/{{ row.id }}/edit">{{ L['edit'][0] }} {{ L['edit'][1] }}</a>

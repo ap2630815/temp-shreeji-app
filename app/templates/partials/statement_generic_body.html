@@ -7,8 +7,8 @@
   <div style="text-align:right">{{ t('Date', 'તારીખ') }}: {{ today }}</div>
 </div>
 <div class="meta">
-  <div>{{ party_label[0] }}: <b>{{ party_name }}</b>{% if party.name_gu %} <span class="gu">({{ party.name_gu }})</span>{% endif %}</div>
-  <div>{{ t('Mobile', 'મોબાઇલ') }}: {{ party.mobile }}</div>
+  <div>{{ party_label[0] }}: <b>{{ party_name }}</b>{% if party_name_gu %} <span class="gu">({{ party_name_gu }})</span>{% endif %}</div>
+  {% if party_mobile %}<div>{{ t('Mobile', 'મોબાઇલ') }}: {{ party_mobile }}</div>{% endif %}
 </div>
 <div class="sum">
   <div>{{ t('Total', 'કુલ') }}<b>{{ totals.amount | inr }}</b></div>

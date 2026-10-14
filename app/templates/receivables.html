@@ -14,7 +14,7 @@
     <tbody>
     {% for industry, s in rows %}
       <tr>
-        <td><a class="link" href="/industries/{{ industry.id }}/account">{{ industry.name }}</a><div class="text-xs opacity-60">{{ industry.location }}</div></td>
+        <td><a class="link" href="/industries/{{ industry.id }}/account">{{ industry.industrialist_name }}</a><div class="text-xs opacity-60">{{ industry.location }}</div></td>
         <td>{{ s.trucks }}</td>
         <td>{% if s.awaiting_weight %}<span class="badge badge-warning badge-sm">{{ s.awaiting_weight }}</span>{% else %}0{% endif %}</td>
         <td>{{ '{:,}'.format(s.short_kg) }}</td>

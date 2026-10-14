@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 {% from "partials/bilabel.html" import t, th %}
-{% block title %}Commencing{% endblock %}
+{% block title %}Purchases{% endblock %}
 {% block content %}
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <h1 class="text-xl font-semibold flex-1">{{ t('Commencing', 'કમેન્સિંગ') }}</h1>
+  <h1 class="text-xl font-semibold flex-1">{{ t('Purchases', 'ખરીદી') }}</h1>
   <form method="get" class="flex items-center gap-2">
     <span class="text-sm">{{ t('Business year', 'વ્યવસાય વર્ષ') }}</span>
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
@@ -11,7 +11,7 @@
     </select>
     {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>
-  <a href="/commencings/new" class="btn btn-primary btn-sm">+ {{ t('New', 'નવું') }}</a>
+  <a href="/purchases/new" class="btn btn-primary btn-sm">+ {{ t('New', 'નવું') }}</a>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
   <table class="table table-zebra table-sm">
@@ -21,23 +21,23 @@
       {{ th('Payable', 'ચૂકવવાપાત્ર') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Due', 'બાકી') }}<th></th>
     </tr></thead>
     <tbody>
-    {% for c, tt in rows %}
+    {% for p, tt in rows %}
       <tr>
-        <td class="whitespace-nowrap">{{ c.commencing_date }}</td>
-        <td>{{ c.village }}</td>
-        <td>{{ c.grain.name }}</td>
-        <td>{{ c.rate_per_20kg | inr }}</td>
-        <td>{{ c.net_weight }}</td>
-        <td>{{ c.pay_after_days }}d</td>
+        <td class="whitespace-nowrap">{{ p.purchase_info_date }}</td>
+        <td>{{ p.village.village_name }}</td>
+        <td>{{ p.grain.grain_name }}</td>
+        <td>{{ p.grain_rate_per_20kg | inr }}</td>
+        <td>{{ p.grain.net_bag_weight }}</td>
+        <td>{{ p.pay_after_no_of_days }}d</td>
         <td>{{ tt.farmers }}</td>
         <td>{{ tt.bags }}</td>
         <td>{{ tt.net_payable | inr }}</td>
         <td>{{ tt.paid | inr }}</td>
         <td class="{{ 'text-error font-semibold' if tt.overdue }}">{{ tt.due | inr }}</td>
-        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/commencings/{{ c.id }}">{{ t('Open', 'ખોલો') }}</a></td>
+        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/purchases/{{ p.id }}">{{ t('Open', 'ખોલો') }}</a></td>
       </tr>
     {% else %}
-      <tr><td colspan="12" class="text-center opacity-60">{{ t('No commencing in this year', 'આ વર્ષમાં કોઈ કમેન્સિંગ નથી') }}</td></tr>
+      <tr><td colspan="12" class="text-center opacity-60">{{ t('No purchases in this year', 'આ વર્ષમાં કોઈ ખરીદી નથી') }}</td></tr>
     {% endfor %}
     </tbody>
   </table>

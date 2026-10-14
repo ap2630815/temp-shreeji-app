@@ -6,7 +6,7 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Bilty, Receipt, ReceiptAllocation, TruckTrip, User
+from app.models import Bilty, BrokerBooking, Receipt, ReceiptAllocation, TruckTrip, User
 from app.services import audit
 from app.services.ledger import allocate
 from app.services.locks import advisory_lock
@@ -21,7 +21,8 @@ class BiltyView:
 
     @property
     def receivable(self) -> int | None:
-        return self.bilty.receivable_amount
+        """What the industry is billed: the weight-based receivable after the booking's percentage deduction."""
+        return self.bilty.receivable_after_deduction
 
     @property
     def due(self) -> int | None:
@@ -47,9 +48,14 @@ async def received_map(db: AsyncSession, bilty_ids: list[int]) -> dict[int, int]
 
 
 async def bilty_views(db: AsyncSession, industry_id: int | None = None, business_year: str | None = None) -> list[BiltyView]:
-    stmt = select(Bilty).join(TruckTrip, TruckTrip.id == Bilty.trip_id).order_by(Bilty.bilty_date, Bilty.id)
+    stmt = (
+        select(Bilty)
+        .join(TruckTrip, TruckTrip.id == Bilty.truck_trip_id)
+        .join(BrokerBooking, BrokerBooking.id == TruckTrip.broker_booking_id)
+        .order_by(Bilty.bilty_date, Bilty.id)
+    )
     if industry_id is not None:
-        stmt = stmt.where(TruckTrip.industry_id == industry_id)
+        stmt = stmt.where(BrokerBooking.industry_id == industry_id)
     if business_year is not None:
         stmt = stmt.where(Bilty.business_year == business_year)
     bilties = list((await db.scalars(stmt)).unique().all())
@@ -65,7 +71,7 @@ def summarize(views: list[BiltyView]) -> dict[str, int]:
         billed=sum(v.receivable for v in weighed),
         received=sum(v.received for v in views),
         due=sum(max(v.due, 0) for v in weighed),
-        short_kg=sum(v.bilty.difference_net_weight or 0 for v in weighed),
+        short_kg=sum(-(v.bilty.difference_in_delivering_weight or 0) for v in weighed),
     )
 
 

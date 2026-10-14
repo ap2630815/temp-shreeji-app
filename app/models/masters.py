@@ -2,7 +2,7 @@
 they are derived from transaction/ledger rows, never stored."""
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
@@ -162,6 +162,8 @@ class Farmer(TimestampMixin, Base):
     public_figure: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
 
+    village: Mapped[Village] = relationship(lazy="joined")
+
 
 class Labour(TimestampMixin, Base):
     __tablename__ = "labours"
@@ -174,6 +176,8 @@ class Labour(TimestampMixin, Base):
     mobile: Mapped[str] = mapped_column(String(10), unique=True)
     upi_number: Mapped[str | None] = mapped_column(String(10), unique=True)
     description: Mapped[str | None] = mapped_column(Text)
+
+    labour_group: Mapped[LabourGroup] = relationship(lazy="joined")
 
 
 class LabourGroupWage(TimestampMixin, Base):
@@ -199,6 +203,9 @@ class LabourGroupWage(TimestampMixin, Base):
     other_expenses: Mapped[int | None] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
 
+    labour_group: Mapped[LabourGroup] = relationship(lazy="joined")
+    grain: Mapped[Grain] = relationship(lazy="joined")
+
 
 class Brokerage(TimestampMixin, Base):
     """What a broker earns per bag for a grain."""
@@ -215,3 +222,6 @@ class Brokerage(TimestampMixin, Base):
     grain_id: Mapped[int] = mapped_column(ForeignKey("grains.id"))
     brokerage_per_bag: Mapped[int] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
+
+    broker: Mapped[Broker] = relationship(lazy="joined")
+    grain: Mapped[Grain] = relationship(lazy="joined")

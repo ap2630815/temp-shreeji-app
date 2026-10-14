@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th, badge %}
+{% block title %}{{ p.village.village_name }}{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <a href="/purchases?year={{ p.business_year }}" class="btn btn-ghost btn-sm">←</a>
+  <h1 class="text-xl font-semibold flex-1">{{ p.village.village_name }} · {{ p.grain.grain_name }} <span class="gu text-base">{{ p.grain.grain_name_gu or '' }}</span></h1>
+  <a href="/purchases/{{ p.id }}/edit" class="btn btn-sm">{{ t('Edit', 'સુધારો') }}</a>
+  <a href="/purchases/{{ p.id }}/entries/new" class="btn btn-primary btn-sm">+ {{ t('Add farmer entry', 'ખેડૂત એન્ટ્રી ઉમેરો') }}</a>
+</div>
+
+<div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
+  <div class="stat py-2"><div class="stat-title">{{ t('Rate / 20 kg', '20 કિલો ભાવ') }}</div><div class="stat-value text-2xl">{{ p.grain_rate_per_20kg | inr }}</div>
+    <div class="stat-desc">{{ p.grain.net_bag_weight }} kg {{ t('bag', 'બેગ') }} · {{ t('pay after', 'ચુકવણી') }} {{ p.pay_after_no_of_days }} {{ t('days', 'દિવસ') }}</div></div>
+  <div class="stat py-2"><div class="stat-title">{{ t('Farmers / bags', 'ખેડૂત / બેગ') }}</div><div class="stat-value text-2xl">{{ totals.farmers }} / {{ totals.bags }}</div>
+    <div class="stat-desc">+ {{ totals.kilos }} kg {{ t('loose', 'છૂટા') }} · {{ totals.handful }} {{ t('handful', 'હેન્ડફુલ') }}</div></div>
+  <div class="stat py-2"><div class="stat-title">{{ t('Payable', 'ચૂકવવાપાત્ર') }}</div><div class="stat-value text-2xl">{{ totals.net_payable | inr }}</div>
+    <div class="stat-desc">{{ t('Paid', 'ચૂકવ્યું') }} {{ totals.paid | inr }}</div></div>
+  <div class="stat py-2"><div class="stat-title">{{ t('Due', 'બાકી') }}</div><div class="stat-value text-2xl {{ 'text-error' if totals.overdue }}">{{ totals.due | inr }}</div>
+    <div class="stat-desc">{{ t('Overdue', 'મુદત વીતી') }} {{ totals.overdue | inr }}</div></div>
+</div>
+
+<p class="text-sm mb-1">{{ t('Date', 'તારીખ') }}: {{ p.purchase_info_date }} · {{ t('Business year', 'વ્યવસાય વર્ષ') }}: {{ p.business_year }}</p>
+{% if p.purchase_info_terms %}<p class="text-sm mb-1"><b>{{ t('Terms', 'શરતો') }}:</b> {{ p.purchase_info_terms }}</p>{% endif %}
+{% if p.description %}<p class="text-sm mb-3 opacity-80">{{ p.description }}</p>{% endif %}
+
+<div class="overflow-x-auto bg-base-100 rounded-box shadow">
+  <table class="table table-zebra table-sm">
+    <thead><tr>
+      {{ th('Date', 'તારીખ') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Labour', 'મજૂર') }}{{ th('Bags', 'બેગ') }}{{ th('Handful', 'હેન્ડફુલ') }}{{ th('Kilos', 'કિલો') }}
+      {{ th('Amount', 'રકમ') }}{{ th('Borrowing', 'ઉધાર') }}{{ th('Net', 'ચોખ્ખું') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Balance', 'બાકી') }}{{ th('Due on', 'ચૂકવવાની તારીખ') }}{{ th('Status', 'સ્થિતિ') }}<th></th>
+    </tr></thead>
+    <tbody>
+    {% for v in views %}{% set e = v.entry %}
+      <tr>
+        <td class="whitespace-nowrap">{{ e.purchase_entry_date }}</td>
+        <td><a class="link" href="/farmers/{{ e.farmer_id }}/statement">{{ e.farmer.farmer_name }}</a>{% if e.description %}<div class="text-xs opacity-60">{{ e.description }}</div>{% endif %}</td>
+        <td>{{ e.labour_group.group_name }}</td>
+        <td>{{ e.no_of_filled_bags }}</td>
+        <td>{{ e.no_of_handful_bags }}</td>
+        <td>{{ e.extra_kilos }}</td>
+        <td>{{ e.payable_amount | inr }}</td>
+        <td>{{ e.borrowed_amount | inr if e.borrowed_amount else '' }}</td>
+        <td class="font-medium">{{ v.net_payable | inr }}</td>
+        <td>{{ v.paid | inr }}</td>
+        <td class="font-semibold">{{ v.due | inr }}</td>
+        <td class="whitespace-nowrap {{ 'text-error' if v.is_overdue(today) }}">{{ e.due_date }}</td>
+        <td>{{ badge(v.status, v.is_overdue(today)) }}</td>
+        <td class="text-right whitespace-nowrap">
+          <a class="btn btn-ghost btn-xs" href="/purchases/entries/{{ e.id }}/edit">{{ t('Edit', 'સુધારો') }}</a>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="14" class="text-center opacity-60">{{ t('No entries yet', 'હજી કોઈ એન્ટ્રી નથી') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -22,7 +22,7 @@
   <table class="table table-zebra table-sm">
     <thead><tr>{{ th('Village', 'ગામ') }}{{ th('Farmer (storage)', 'ખેડૂત (સંગ્રહ)') }}{{ th('Bags', 'બેગ') }}{{ th('Value', 'કિંમત') }}{{ th('Suppliers', 'સપ્લાયર') }}</tr></thead>
     <tbody>
-    {% for s in storage %}<tr><td>{{ s.farmer.village }}</td><td>{{ s.farmer.name }}</td><td>{{ s.units }}</td><td>{{ s.amount | inr }}</td><td>{{ s.suppliers | sort | join(', ') }}</td></tr>
+    {% for s in storage %}<tr><td>{{ s.farmer.village.village_name }}</td><td>{{ s.farmer.farmer_name }}</td><td>{{ s.units }}</td><td>{{ s.amount | inr }}</td><td>{{ s.suppliers | sort | join(', ') }}</td></tr>
     {% else %}<tr><td colspan="5" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>
   </table>
@@ -34,8 +34,8 @@
       <tr>
         <td class="whitespace-nowrap">{{ b.supply_date }}</td>
         <td><a class="link" href="/statements/bag_supplier/{{ b.supplier_id }}">{{ b.supplier.pet_name }}</a></td>
-        <td>{{ b.farmer.village }} — {{ b.farmer.name }}</td>
-        <td>{{ b.units }}</td><td>{{ b.rate | inr }}</td><td>{{ b.payable_amount | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (b.payable_amount - p) | inr }}</td>
+        <td>{{ b.farmer.village.village_name }} — {{ b.farmer.farmer_name }}</td>
+        <td>{{ b.no_of_bags }}</td><td>{{ b.rate_per_bag | inr }}</td><td>{{ b.payable_amount | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (b.payable_amount - p) | inr }}</td>
         <td class="text-right"><a class="btn btn-ghost btn-xs" href="/bag-supplies/{{ b.id }}/edit">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}<tr><td colspan="9" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}

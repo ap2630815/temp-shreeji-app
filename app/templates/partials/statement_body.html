@@ -7,8 +7,8 @@
   <div style="text-align:right">{{ t('Date', 'તારીખ') }}: {{ today }}</div>
 </div>
 <div class="meta">
-  <div>{{ t('Farmer', 'ખેડૂત') }}: <b>{{ farmer.name }}</b>{% if farmer.name_gu %} <span class="gu">({{ farmer.name_gu }})</span>{% endif %}</div>
-  <div>{{ t('Village', 'ગામ') }}: <b>{{ farmer.village }}</b>{% if farmer.village_gu %} <span class="gu">({{ farmer.village_gu }})</span>{% endif %}</div>
+  <div>{{ t('Farmer', 'ખેડૂત') }}: <b>{{ farmer.farmer_name }}</b>{% if farmer.farmer_name_gu %} <span class="gu">({{ farmer.farmer_name_gu }})</span>{% endif %}</div>
+  <div>{{ t('Village', 'ગામ') }}: <b>{{ farmer.village.village_name }}</b>{% if farmer.village.village_name_gu %} <span class="gu">({{ farmer.village.village_name_gu }})</span>{% endif %}</div>
   <div>{{ t('Mobile', 'મોબાઇલ') }}: {{ farmer.mobile }}</div>
   {% if farmer.head_of_family %}<div>{{ t('Head of family', 'કુટુંબના વડા') }}: {{ farmer.head_of_family }}</div>{% endif %}
 </div>
@@ -29,13 +29,13 @@
   <tbody>
   {% for v in views %}{% set e = v.entry %}
     <tr>
-      <td>{{ e.entry_date }}</td>
-      <td>{{ e.commencing.village }} · {{ e.commencing.grain.name }}</td>
-      <td class="n">{{ e.filled_bags }}</td>
-      <td class="n">{{ e.filled_bags * e.commencing.net_weight + e.extra_kilos }}</td>
-      <td class="n">{{ e.commencing.rate_per_20kg }}</td>
+      <td>{{ e.purchase_entry_date }}</td>
+      <td>{{ e.purchase_info.village.village_name }} · {{ e.purchase_info.grain.grain_name }}</td>
+      <td class="n">{{ e.no_of_filled_bags }}</td>
+      <td class="n">{{ e.total_kg }}</td>
+      <td class="n">{{ e.purchase_info.grain_rate_per_20kg }}</td>
       <td class="n">{{ e.payable_amount | inr }}</td>
-      <td class="n">{{ e.borrowing | inr if e.borrowing else '' }}</td>
+      <td class="n">{{ e.borrowed_amount | inr if e.borrowed_amount else '' }}</td>
       <td class="{{ 'over' if v.is_overdue(today) }}">{{ e.due_date }}</td>
       <td class="n">{{ v.paid | inr }}</td>
       <td class="n"><b>{{ v.due | inr }}</b></td>

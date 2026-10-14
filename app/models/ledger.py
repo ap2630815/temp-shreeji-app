@@ -3,9 +3,10 @@
 from datetime import date
 
 from sqlalchemy import BigInteger, CheckConstraint, Date, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.masters import Industry
 from app.models.transactions import BUSINESS_YEAR
 
 
@@ -39,6 +40,8 @@ class Payment(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(10))
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    allocations: Mapped[list["PaymentAllocation"]] = relationship(lazy="selectin", order_by="PaymentAllocation.id")
 
 
 class PaymentAllocation(Base):
@@ -78,6 +81,9 @@ class Receipt(TimestampMixin, Base):
     payer_name: Mapped[str | None] = mapped_column(String(120))
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    industry: Mapped[Industry] = relationship(lazy="joined")
+    allocations: Mapped[list["ReceiptAllocation"]] = relationship(lazy="selectin", order_by="ReceiptAllocation.id")
 
 
 class ReceiptAllocation(Base):

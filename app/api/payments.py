@@ -33,10 +33,10 @@ class PaymentIn(BaseModel):
     payment_date: date
     amount: Annotated[int, Field(gt=0, le=1_000_000_000)]
     method: Literal["cash", "cheque", "upi", "bank"]
-    receiver_name: Annotated[str, Field(min_length=1, max_length=200)]
+    receiver_name: Annotated[str, Field(min_length=1, max_length=120)]
     receiver_mobile: Annotated[str, Field(pattern=MOBILE)]
     reference_no: Annotated[str, Field(max_length=60)] | None = None
-    note: str | None = None
+    description: str | None = None
 
 
 def payment_fields() -> list[F]:
@@ -45,12 +45,12 @@ def payment_fields() -> list[F]:
         F("amount", "Amount (₹)", "રકમ (₹)", kind="int", required=True,
           help=("Settles the oldest dues first; partial payment is fine", "સૌથી જૂની બાકી પહેલા ચૂકવાશે; આંશિક ચુકવણી ચાલે")),
         F("method", "Method", "રીત", kind="select", required=True, options=METHOD_OPTIONS),
-        F("receiver_name", "Receiver name", "લેનારનું નામ", required=True),
+        F("receiver_name", "Receiver name", "લેનારનું નામ", required=True, max_length=120),
         F("receiver_mobile", "Receiver mobile", "લેનારનો મોબાઇલ", kind="tel", required=True, pattern=MOBILE,
           hint=("10 digits", "૧૦ અંક"), max_length=10),
         F("reference_no", "Cheque / UPI / bank reference", "ચેક / UPI બેંક રેફરન્સ", max_length=60,
           help=("Required unless cash", "રોકડ સિવાય જરૂરી")),
-        F("note", "Note", "નોંધ", kind="textarea"),
+        F("description", "Note", "નોંધ", kind="textarea"),
     ]
 
 
@@ -99,7 +99,7 @@ async def statement_data(db: AsyncSession, party_type: str, party_id: int) -> di
     rows = await pay_svc.load_payables(db, party_type, party_id)
     now = today()
     return dict(party=party, party_type=party_type, party_label=party_label(party_type), party_name=PARTIES[party_type].name(party),
-                rows=rows, payments=await pay_svc.payments_of(db, party_type, party_id), totals=pay_svc.summarize(rows, now), today=now)
+                party_name_gu=PARTIES[party_type].name_gu(party), party_mobile=PARTIES[party_type].mobile(party), rows=rows, payments=await pay_svc.payments_of(db, party_type, party_id), totals=pay_svc.summarize(rows, now), today=now)
 
 
 @router.get("/statements/{party_type}/{party_id}", response_class=HTMLResponse)
@@ -185,7 +185,8 @@ async def receipt_data(db: AsyncSession, payment_id: int) -> dict:
         raise HTTPException(404)
     party = await _party(db, payment.party_type, payment.party_id)
     return dict(payment=payment, party=party, party_type=payment.party_type, party_label=party_label(payment.party_type),
-                party_name=PARTIES[payment.party_type].name(party), lines=await pay_svc.payment_lines(db, payment))
+                party_name=PARTIES[payment.party_type].name(party), party_name_gu=PARTIES[payment.party_type].name_gu(party),
+                lines=await pay_svc.payment_lines(db, payment))
 
 
 @router.get("/payments/{payment_id}", response_class=HTMLResponse)
@@ -224,14 +225,14 @@ async def dues_page(
     if type == "farmer":
         from sqlalchemy import select
         from app.models import Farmer
-        farmers = {f.id: f for f in (await db.scalars(select(Farmer).where(Farmer.id.in_(per_party)))).all()} if per_party else {}
+        farmers = {f.id: f for f in (await db.scalars(select(Farmer).where(Farmer.id.in_(per_party)))).unique().all()} if per_party else {}
         for pid, row in per_party.items():
-            row["village"], row["mobile"] = farmers[pid].village, farmers[pid].mobile
+            row["village"], row["mobile"] = farmers[pid].village.village_name, farmers[pid].mobile
         villages = sorted({r["village"] for r in per_party.values()})
     else:
         for pid, row in per_party.items():
             party = await pay_svc.get_party(db, type, pid)
-            row["village"], row["mobile"] = "", party.mobile
+            row["village"], row["mobile"] = "", PARTIES[type].mobile(party)
     rows = [r for r in per_party.values() if not village or r["village"] == village]
     rows.sort(key=lambda r: (-r["overdue"], r["earliest"], r["name"]))
     summary = dict(due=sum(r["due"] for r in rows), overdue=sum(r["overdue"] for r in rows))

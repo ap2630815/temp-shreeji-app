@@ -7,15 +7,15 @@
   <div style="text-align:right">{{ t('Receipt no.', 'રસીદ નં.') }} <b>#{{ payment.id }}</b><br>{{ t('Date', 'તારીખ') }}: {{ payment.payment_date }}</div>
 </div>
 <div class="meta">
-  <div>{{ t('Paid to', 'ચૂકવ્યા') }} ({{ party_label[0]}} <span class="gu">{{ party_label[1] }}</span>): <b>{{ party_name }}</b>{% if party.name_gu %} <span class="gu">({{ party.name_gu }})</span>{% endif %}</div>
-  <div>{% if party_type == 'farmer' %}{{ t('Village', 'ગામ') }}: <b>{{ party.village }}</b>{% endif %}</div>
+  <div>{{ t('Paid to', 'ચૂકવ્યા') }} ({{ party_label[0]}} <span class="gu">{{ party_label[1] }}</span>): <b>{{ party_name }}</b>{% if party_name_gu %} <span class="gu">({{ party_name_gu }})</span>{% endif %}</div>
+  <div>{% if party_type == 'farmer' %}{{ t('Village', 'ગામ') }}: <b>{{ party.village.village_name }}</b>{% endif %}</div>
   <div>{{ t('Received by', 'લેનાર') }}: <b>{{ payment.receiver_name }}</b></div>
   <div>{{ t('Receiver mobile', 'લેનારનો મોબાઇલ') }}: {{ payment.receiver_mobile }}</div>
   <div>{{ t('Method', 'રીત') }}: <b>{{ payment.method | upper }}</b></div>
   <div>{{ t('Reference', 'રેફરન્સ') }}: {{ payment.reference_no or '—' }}</div>
 </div>
 <div class="sum"><div>{{ t('Amount paid', 'ચૂકવેલી રકમ') }}<b class="big">{{ payment.amount | inr }}</b></div></div>
-{% if payment.note %}<div>{{ t('Note', 'નોંધ') }}: {{ payment.note }}</div>{% endif %}
+{% if payment.description %}<div>{{ t('Note', 'નોંધ') }}: {{ payment.description }}</div>{% endif %}
 
 <h2>{{ t('Settled against', 'આની સામે ચૂકવ્યા') }}</h2>
 <table>

@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_csrf_protect import CsrfProtect
 from fastapi_csrf_protect.exceptions import CsrfProtectError
 
-from app.api import account, auth, costs, masters, payments, receivables, reports, trips, village, years
+from app.api import account, auth, bookings, costs, masters, payments, purchases, receivables, reports, trips, years
 from app.api.masters_config import SPECS
 from app.api.deps import current_user
 from app.core.config import settings
@@ -37,7 +37,7 @@ async def load_grains(request: Request, call_next):
     if request.method == "GET" and not request.url.path.startswith("/static") and "hx-request" not in request.headers:
         try:
             async with SessionLocal() as db:
-                request.state.grains = (await db.execute(select(Grain.id, Grain.name, Grain.name_gu).order_by(Grain.name))).all()
+                request.state.grains = (await db.execute(select(Grain.id, Grain.grain_name.label("name"), Grain.grain_name_gu.label("name_gu")).order_by(Grain.grain_name))).all()
         except Exception:
             request.state.grains = []
     return await call_next(request)
@@ -45,7 +45,8 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.include_router(auth.router)
 app.include_router(account.router)
 app.include_router(masters.router)
-app.include_router(village.router)
+app.include_router(purchases.router)
+app.include_router(bookings.router)
 app.include_router(costs.router)
 app.include_router(reports.router)
 app.include_router(trips.router)

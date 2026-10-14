@@ -16,7 +16,7 @@ purchase_farmer_entries.total_available_bags = purchase_farmer_entries.no_of_fil
 
 total_remaining_bags <= total_available_bags
 if purchase_farmer_entry_id does not exist in truck_load_lines ledger 
-then truck_load_lines.total_remaining_bags = purchase_farmer_entries.total_available_bags AND truck_load_lines.no_of_loaded_bags is (initialize automatically as purchase_farmer_entries selected from dropdown in UI) 
+then truck_load_lines.total_remaining_bags = purchase_farmer_entries.total_available_bags AND truck_load_lines.no_of_loaded_bags is (initialize automatically as purchase_farmer_entries selected from select input data in UI) 
 truck_load_lines.total_remaining_bags = truck_load_lines.total_remaining_bags - truck_load_lines.no_of_loaded_bags
  
 bilties.total_bags_in_truck = sum of truck_load_lines.no_of_loaded_bags, for particular trip_id from different purchase_farmer_entry_id

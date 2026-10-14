@@ -1,4 +1,6 @@
-"""Truck trips: loading from commencings, the bilty (weights, rate, broker) and what follows from it."""
+"""Truck trips: loading from farmer entries, the bilty (weights) and what follows from it.
+
+A trip belongs to a broker booking, which fixes the grain, the industry, the sale rate and the broker."""
 
 from datetime import date
 from typing import Annotated
@@ -7,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi_csrf_protect import CsrfProtect
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,14 +19,13 @@ from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
 from app.models import (
-    Bilty, Broker, Commencing, Grain, Industry, LabourGroup, Transporter, TruckLoadLine, TruckTrip, Truck, User,
+    Bilty, BrokerBooking, Brokerage, LabourGroup, PurchaseFarmerEntry, PurchaseInfo, Transporter, Truck, TruckLoadLine, TruckTrip, User,
 )
-from app.models.sales import _ceil_div, freight_amount
-from app.services import audit
+from app.services import audit, money
 from app.services.locks import advisory_lock
 from app.services.payables import paid_for
 from app.services.receivables import received_map
-from app.services.stock import stock_by_commencing
+from app.services.stock import renumber_remaining, stock_by_entry
 from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible
 
 router = APIRouter(prefix="/trips")
@@ -42,39 +43,42 @@ def _int(ge=0, gt=None, le=INT_MAX):
 
 class TripIn(BaseModel):
     trip_date: date
+    broker_booking_id: int
     truck_id: int
-    transport_id: int
+    transporter_id: int
     labour_group_id: int
-    industry_id: int
-    grain_id: int
     rent_per_ton: _int() | None = None
     rent_per_bag: _int() | None = None
     advance_amount: _int() | None = None
+    other_payable: _int() | None = None
     other_deduction: _int() | None = None
     description: str | None = None
 
 
-ZERO_FIELDS = ("rent_per_ton", "rent_per_bag", "advance_amount", "other_deduction")
+ZERO_FIELDS = ("rent_per_ton", "rent_per_bag", "advance_amount", "other_payable", "other_deduction")
 
 
 async def _options(db: AsyncSession, model, order):
-    return list((await db.scalars(select(model).order_by(order))).all())
+    return list((await db.scalars(select(model).order_by(order))).unique().all())
 
 
 async def trip_fields(db: AsyncSession) -> list[F]:
-    trucks, transports = await _options(db, Truck, Truck.truck_number), await _options(db, Transporter, Transporter.pet_name)
-    groups, industries, grains = await _options(db, LabourGroup, LabourGroup.group_name), await _options(db, Industry, Industry.name), await _options(db, Grain, Grain.name)
+    trucks, transporters = await _options(db, Truck, Truck.truck_number), await _options(db, Transporter, Transporter.pet_name)
+    groups = await _options(db, LabourGroup, LabourGroup.group_name)
+    bookings = list((await db.scalars(select(BrokerBooking).order_by(BrokerBooking.booking_date.desc(), BrokerBooking.id.desc()).limit(300))).unique().all())
     return [
         F("trip_date", "Date", "તારીખ", kind="date", required=True),
+        F("broker_booking_id", "Booking (broker · grain → industry)", "બુકિંગ (દલાલ · અનાજ → ઉદ્યોગ)", kind="select", required=True,
+          options=tuple((str(b.id), f"{b.booking_date} · {b.brokerage.broker.broker_name} · {b.grain.grain_name} → {b.industry.industrialist_name} · {b.truck_size}t") for b in bookings),
+          help=("Fixes the grain, the industry, the rate and the broker for this trip", "આ ટ્રીપ માટે અનાજ, ઉદ્યોગ, ભાવ અને દલાલ નક્કી કરે છે")),
         F("truck_id", "Truck", "ટ્રક", kind="select", required=True, options=tuple((str(t.id), f"{t.truck_number} — {t.driver_name}") for t in trucks)),
-        F("transport_id", "Transport", "ટ્રાન્સપોર્ટ", kind="select", required=True, options=tuple((str(t.id), f"{t.pet_name} — {t.location}") for t in transports)),
-        F("labour_group_id", "Loading labour", "લોડિંગ મજૂર", kind="select", required=True, options=tuple((str(g.id), f"{g.group_name} — {g.name}") for g in groups)),
-        F("industry_id", "Industry (unloading at)", "ઉદ્યોગ (ખાલી થશે)", kind="select", required=True, options=tuple((str(i.id), f"{i.name} — {i.location}") for i in industries)),
-        F("grain_id", "Grain (one per trip)", "અનાજ (એક ટ્રીપમાં એક)", kind="select", required=True, options=tuple((str(g.id), f"{g.name} / {g.name_gu or ''}") for g in grains)),
+        F("transporter_id", "Transport", "ટ્રાન્સપોર્ટ", kind="select", required=True, options=tuple((str(t.id), f"{t.pet_name} — {t.location}") for t in transporters)),
+        F("labour_group_id", "Loading labour", "લોડિંગ મજૂર", kind="select", required=True, options=tuple((str(g.id), g.group_name) for g in groups)),
         F("rent_per_ton", "Rent per ton (₹)", "ટન દીઠ ભાડું (₹)", kind="int",
-          help=("Freight = the larger of rent/ton × tons and rent/bag × bags", "ભાડું = ટન ભાડું × ટન અને બેગ ભાડું × બેગ માંથી મોટું")),
+          help=("Fill exactly one of rent per ton / rent per bag", "ટન ભાડું અથવા બેગ ભાડું — બેમાંથી એક જ ભરો")),
         F("rent_per_bag", "Rent per bag (₹)", "બેગ દીઠ ભાડું (₹)", kind="int"),
         F("advance_amount", "Advance given to driver (₹)", "ડ્રાઇવરને આપેલ એડવાન્સ (₹)", kind="int"),
+        F("other_payable", "Other payable to the truck (₹)", "ટ્રકને અન્ય ચૂકવવાપાત્ર (₹)", kind="int"),
         F("other_deduction", "Other deduction (₹)", "અન્ય કપાત (₹)", kind="int"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ]
@@ -82,18 +86,23 @@ async def trip_fields(db: AsyncSession) -> list[F]:
 
 def trip_values(t: TruckTrip) -> dict:
     return dict(
-        trip_date=t.trip_date.isoformat(), truck_id=str(t.truck_id), transport_id=str(t.transport_id), labour_group_id=str(t.labour_group_id),
-        industry_id=str(t.industry_id), grain_id=str(t.grain_id), rent_per_ton=str(t.rent_per_ton), rent_per_bag=str(t.rent_per_bag),
-        advance_amount=str(t.advance_amount), other_deduction=str(t.other_deduction), description=t.description or "",
+        trip_date=t.trip_date.isoformat(), broker_booking_id=str(t.broker_booking_id), truck_id=str(t.truck_id), transporter_id=str(t.transporter_id),
+        labour_group_id=str(t.labour_group_id), rent_per_ton=str(t.rent_per_ton), rent_per_bag=str(t.rent_per_bag), advance_amount=str(t.advance_amount),
+        other_payable=str(t.other_payable), other_deduction=str(t.other_deduction), description=t.description or "",
     )
 
 
 def trip_snapshot(t: TruckTrip) -> dict:
     return dict(
-        trip_date=t.trip_date, truck_id=t.truck_id, transport_id=t.transport_id, labour_group_id=t.labour_group_id, industry_id=t.industry_id,
-        grain_id=t.grain_id, rent_per_ton=t.rent_per_ton, rent_per_bag=t.rent_per_bag, advance_amount=t.advance_amount,
+        trip_date=t.trip_date, broker_booking_id=t.broker_booking_id, truck_id=t.truck_id, transporter_id=t.transporter_id, labour_group_id=t.labour_group_id,
+        rent_per_ton=t.rent_per_ton, rent_per_bag=t.rent_per_bag, advance_amount=t.advance_amount, other_payable=t.other_payable,
         other_deduction=t.other_deduction, description=t.description,
     )
+
+
+def _locked_trip_fields(trip: TruckTrip | None) -> set[str]:
+    # the loaded bags and the bilty are tied to the booking's grain / industry / rate
+    return {"broker_booking_id"} if trip is not None and (trip.load_lines or trip.bilty is not None) else set()
 
 
 # ================================================================== bilty form
@@ -101,11 +110,7 @@ def trip_snapshot(t: TruckTrip) -> dict:
 class BiltyIn(BaseModel):
     bill_number: _int(gt=0)
     bilty_date: date
-    broker_id: int
-    grain_rate: _int(gt=0)
-    rate_unit_kg: _int(gt=0, le=1000)
-    rate_change: _int() | None = None
-    brokerage_amount: _int() | None = None
+    any_rate_change: _int() | None = None
     merchant_total_weight: _int(gt=0, le=WEIGHT_MAX)
     merchant_tare_weight: _int(le=WEIGHT_MAX)
     industry_total_weight: _int(gt=0, le=WEIGHT_MAX) | None = None
@@ -113,18 +118,13 @@ class BiltyIn(BaseModel):
     description: str | None = None
 
 
-async def bilty_fields(db: AsyncSession) -> list[F]:
-    brokers = await _options(db, Broker, Broker.name)
+def bilty_fields() -> list[F]:
     kg = ("kg", "કિલો")
     return [
         F("bill_number", "Bill number", "બિલ નંબર", kind="int", required=True, help=("Unique within the business year", "વ્યવસાય વર્ષમાં અનન્ય")),
         F("bilty_date", "Bilty date", "બિલ્ટી તારીખ", kind="date", required=True),
-        F("broker_id", "Broker", "દલાલ", kind="select", required=True, options=tuple((str(b.id), f"{b.name} — ₹{b.brokerage_per_truck}/truck") for b in brokers)),
-        F("brokerage_amount", "Brokerage for this truck (₹)", "આ ટ્રકની દલાલી (₹)", kind="int",
-          help=("Leave blank to use the broker's standard brokerage", "ખાલી રાખો તો દલાલની નક્કી દલાલી લેવાશે")),
-        F("grain_rate", "Sale rate (₹)", "વેચાણ ભાવ (₹)", kind="int", required=True),
-        F("rate_unit_kg", "Rate is per (kg)", "ભાવ કેટલા કિલો દીઠ", kind="int", required=True, help=("e.g. 20 or 100", "દા.ત. 20 અથવા 100")),
-        F("rate_change", "Rate reduction after delivery (₹)", "ડિલિવરી પછી ભાવ ઘટાડો (₹)", kind="int"),
+        F("any_rate_change", "Rate reduction after delivery (₹)", "ડિલિવરી પછી ભાવ ઘટાડો (₹)", kind="int",
+          help=("Taken off the booked rate", "બુક કરેલા ભાવમાંથી ઘટાડો")),
         F("merchant_total_weight", f"Our weighbridge: loaded truck ({kg[0]})", f"આપણો કાંટો: ભરેલી ટ્રક ({kg[1]})", kind="int", required=True),
         F("merchant_tare_weight", f"Our weighbridge: empty truck ({kg[0]})", f"આપણો કાંટો: ખાલી ટ્રક ({kg[1]})", kind="int", required=True),
         F("industry_total_weight", f"Industry: loaded truck ({kg[0]})", f"કારખાનું: ભરેલી ટ્રક ({kg[1]})", kind="int",
@@ -137,8 +137,7 @@ async def bilty_fields(db: AsyncSession) -> list[F]:
 def bilty_values(b: Bilty) -> dict:
     n = lambda v: "" if v is None else str(v)  # noqa: E731
     return dict(
-        bill_number=str(b.bill_number), bilty_date=b.bilty_date.isoformat(), broker_id=str(b.broker_id), brokerage_amount=str(b.brokerage_amount),
-        grain_rate=str(b.grain_rate), rate_unit_kg=str(b.rate_unit_kg), rate_change=str(b.rate_change),
+        bill_number=str(b.bill_number), bilty_date=b.bilty_date.isoformat(), any_rate_change=str(b.any_rate_change),
         merchant_total_weight=str(b.merchant_total_weight), merchant_tare_weight=str(b.merchant_tare_weight),
         industry_total_weight=n(b.industry_total_weight), industry_tare_weight=n(b.industry_tare_weight), description=b.description or "",
     )
@@ -146,9 +145,8 @@ def bilty_values(b: Bilty) -> dict:
 
 def bilty_snapshot(b: Bilty) -> dict:
     return dict(
-        bill_number=b.bill_number, bilty_date=b.bilty_date, broker_id=b.broker_id, brokerage_amount=b.brokerage_amount, grain_rate=b.grain_rate,
-        rate_unit_kg=b.rate_unit_kg, rate_change=b.rate_change, merchant_total_weight=b.merchant_total_weight,
-        merchant_tare_weight=b.merchant_tare_weight, industry_total_weight=b.industry_total_weight,
+        bill_number=b.bill_number, bilty_date=b.bilty_date, total_bags_in_truck=b.total_bags_in_truck, any_rate_change=b.any_rate_change,
+        merchant_total_weight=b.merchant_total_weight, merchant_tare_weight=b.merchant_tare_weight, industry_total_weight=b.industry_total_weight,
         industry_tare_weight=b.industry_tare_weight, description=b.description,
     )
 
@@ -156,20 +154,25 @@ def bilty_snapshot(b: Bilty) -> dict:
 # ================================================================== load line form
 
 class LineIn(BaseModel):
-    commencing_id: int
-    bags: _int(gt=0)
+    purchase_farmer_entry_id: int
+    no_of_loaded_bags: _int(gt=0) | None = None  # blank: load everything still unloaded in the entry
 
 
 async def line_fields(db: AsyncSession, trip: TruckTrip) -> list[F]:
-    commencings = list((await db.scalars(select(Commencing).where(Commencing.grain_id == trip.grain_id).order_by(Commencing.commencing_date.desc(), Commencing.id.desc()))).all())
-    stock = await stock_by_commencing(db, [c.id for c in commencings])
+    on_trip = {line.purchase_farmer_entry_id for line in trip.load_lines}
+    entries = list((await db.scalars(
+        select(PurchaseFarmerEntry).join(PurchaseInfo, PurchaseInfo.id == PurchaseFarmerEntry.purchase_info_id)
+        .where(PurchaseInfo.grain_id == trip.grain.id).order_by(PurchaseFarmerEntry.purchase_entry_date.desc(), PurchaseFarmerEntry.id.desc()).limit(500)
+    )).unique().all())
+    stock = await stock_by_entry(db, [e.id for e in entries])
     options = tuple(
-        (str(c.id), f"{c.village} · {c.commencing_date} — {stock[c.id].available} bags available")
-        for c in commencings if c.id in stock and stock[c.id].available > 0
+        (str(e.id), f"{e.purchase_info.village.village_name} · {e.farmer.farmer_name} · {e.purchase_entry_date} — {stock[e.id].available} bags left")
+        for e in entries if e.id in stock and stock[e.id].available > 0 and e.id not in on_trip
     )
     return [
-        F("commencing_id", "Load from (village / commencing)", "ક્યાંથી ભર્યું (ગામ / કમેન્સિંગ)", kind="select", required=True, options=options),
-        F("bags", "Bags loaded", "ભરેલી બેગ", kind="int", required=True),
+        F("purchase_farmer_entry_id", "Load from (village · farmer)", "ક્યાંથી ભર્યું (ગામ · ખેડૂત)", kind="select", required=True, options=options),
+        F("no_of_loaded_bags", "Bags loaded", "ભરેલી બેગ", kind="int",
+          help=("Leave blank to load all the bags left in that entry", "ખાલી રાખો તો તે એન્ટ્રીની બાકી બધી બેગ ભરાશે")),
     ]
 
 
@@ -182,14 +185,20 @@ async def _get_trip(db: AsyncSession, trip_id: int) -> TruckTrip:
     return trip
 
 
-def _final(freight: int, advance: int, deduction: int) -> int:
-    return max(freight - advance - deduction, 0)
+def _total(weight_kg: int | None, bags: int, rent_per_ton: int, rent_per_bag: int, advance: int, other_payable: int, deduction: int) -> int:
+    return money.truck_trip_total_amount(money.trip_total(weight_kg, bags, rent_per_ton, rent_per_bag), advance, other_payable, deduction)
 
 
 def _below_paid(paid: int, new_amount: int, what: tuple[str, str]) -> tuple[str, str] | None:
     if new_amount < paid:
         return (f"₹{paid} is already paid as {what[0]}; this change would take it below that", f"{what[1]} તરીકે ₹{paid} ચૂકવાઈ ગયા છે; આ ફેરફારથી તે ઓછું થશે")
     return None
+
+
+async def _sync_bilty_bags(db: AsyncSession, trip: TruckTrip) -> None:
+    """bilties.total_bags_in_truck always equals the sum of the trip's loaded bags."""
+    if trip.bilty is not None:
+        trip.bilty.total_bags_in_truck = sum(line.no_of_loaded_bags for line in trip.load_lines)
 
 
 async def _years_with_trips(db: AsyncSession, user: User) -> list[str]:
@@ -206,7 +215,8 @@ async def list_page(
     year = year if year in years else current_year_label()
     stmt = select(TruckTrip).where(TruckTrip.business_year == year)
     if grain_id:
-        stmt = stmt.where(TruckTrip.grain_id == grain_id)
+        stmt = (stmt.join(BrokerBooking, BrokerBooking.id == TruckTrip.broker_booking_id)
+                .join(Brokerage, Brokerage.id == BrokerBooking.brokerage_id).where(Brokerage.grain_id == grain_id))
     trips = list((await db.scalars(stmt.order_by(TruckTrip.trip_date.desc(), TruckTrip.id.desc()))).unique().all())
     return render_with_csrf(request, csrf, "trip_list.html", user=user, trips=trips, grain_id=grain_id, year=year, years=years,
                             year_locked=year != current_year_label(), warn_pct=SHORT_WARN_PCT)
@@ -216,7 +226,8 @@ async def list_page(
 
 @router.get("/new", response_class=HTMLResponse)
 async def new_page(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
-    ctx = form_context(fields=await trip_fields(db), values=dict(trip_date=today().isoformat(), rent_per_ton="0", rent_per_bag="0", advance_amount="0", other_deduction="0"),
+    ctx = form_context(fields=await trip_fields(db),
+                       values=dict(trip_date=today().isoformat(), rent_per_ton="0", rent_per_bag="0", advance_amount="0", other_payable="0", other_deduction="0"),
                        errors={}, action="/trips", heading=("New truck trip", "નવી ટ્રક ટ્રીપ"), back_url="/trips")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
 
@@ -224,7 +235,7 @@ async def new_page(request: Request, user: User = Depends(current_user), csrf: C
 @router.get("/{trip_id}/edit", response_class=HTMLResponse)
 async def edit_page(request: Request, trip_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     trip = await _get_trip(db, trip_id)
-    fields = lock(await trip_fields(db), {"grain_id"} if trip.load_lines else set())
+    fields = lock(await trip_fields(db), _locked_trip_fields(trip))
     ctx = form_context(fields=fields, values=trip_values(trip), errors={}, action=f"/trips/{trip.id}",
                        heading=(f"Edit trip: {trip.truck.truck_number}", f"ટ્રીપ સુધારો: {trip.truck.truck_number}"), back_url=f"/trips/{trip.id}")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
@@ -246,9 +257,10 @@ async def _save_trip(request: Request, trip: TruckTrip | None, user: User, db: A
     trip_id = trip.id if trip else None
     fields = await trip_fields(db)
     raw = await read_form(request)
-    if trip is not None and trip.load_lines:
-        fields = lock(fields, {"grain_id"})
-        raw["grain_id"] = str(trip.grain_id)  # a trip with loaded bags keeps its grain
+    locked = _locked_trip_fields(trip)
+    if locked:
+        fields = lock(fields, locked)
+        raw["broker_booking_id"] = str(trip.broker_booking_id)  # a trip with loaded bags / a bilty keeps its booking
     action = f"/trips/{trip_id}" if trip_id else "/trips"
     heading = ("Edit trip", "ટ્રીપ સુધારો") if trip else ("New truck trip", "નવી ટ્રક ટ્રીપ")
 
@@ -261,7 +273,9 @@ async def _save_trip(request: Request, trip: TruckTrip | None, user: User, db: A
         return rerender(errors)
     for name in ZERO_FIELDS:
         clean[name] = clean[name] or 0
-    for name, model in (("truck_id", Truck), ("transport_id", Transporter), ("labour_group_id", LabourGroup), ("industry_id", Industry), ("grain_id", Grain)):
+    if (clean["rent_per_ton"] > 0) == (clean["rent_per_bag"] > 0):
+        return rerender({"rent_per_ton": ("Fill exactly one of rent per ton / rent per bag", "ટન ભાડું અથવા બેગ ભાડું — બેમાંથી એક જ ભરો")})
+    for name, model in (("broker_booking_id", BrokerBooking), ("truck_id", Truck), ("transporter_id", Transporter), ("labour_group_id", LabourGroup)):
         if await db.get(model, clean[name]) is None:
             return rerender({name: ("Unknown value", "અજ્ઞાત કિંમત")})
     try:
@@ -273,8 +287,8 @@ async def _save_trip(request: Request, trip: TruckTrip | None, user: User, db: A
 
     before = None
     if trip is not None:
-        freight = freight_amount(trip.freight_weight_kg, trip.bags, clean["rent_per_ton"], clean["rent_per_bag"])
-        problem = _below_paid(await paid_for(db, "truck_trip", trip.id), _final(freight, clean["advance_amount"], clean["other_deduction"]), ("freight", "ભાડા"))
+        total = _total(trip.freight_weight_kg, trip.bags, clean["rent_per_ton"], clean["rent_per_bag"], clean["advance_amount"], clean["other_payable"], clean["other_deduction"])
+        problem = _below_paid(await paid_for(db, "truck", trip.id), total, ("freight", "ભાડા"))
         if problem:
             return rerender({"rent_per_ton": problem})
         before = trip_snapshot(trip)
@@ -304,8 +318,8 @@ async def detail_page(request: Request, trip_id: int, user: User = Depends(curre
     line_form = form_context(fields=await line_fields(db, trip), values={}, errors={}, action=f"/trips/{trip.id}/lines", heading=("Add load", "લોડ ઉમેરો"), back_url=f"/trips/{trip.id}")
     ctx = dict(
         trip=trip, bilty=bilty, line_form=line_form, warn_pct=SHORT_WARN_PCT,
-        freight_paid=await paid_for(db, "truck_trip", trip.id),
-        brokerage_paid=await paid_for(db, "bilty_brokerage", bilty.id) if bilty else 0,
+        freight_paid=await paid_for(db, "truck", trip.id),
+        brokerage_paid=await paid_for(db, "broker", bilty.id) if bilty else 0,
         received=(await received_map(db, [bilty.id])).get(bilty.id, 0) if bilty else 0,
     )
     return render_with_csrf(request, csrf, "trip_detail.html", user=user, **ctx)
@@ -327,19 +341,25 @@ async def add_line(request: Request, trip_id: int, user: User = Depends(current_
     try:
         await assert_year_open(db, trip.trip_date)
     except YearLockedError as exc:
-        return form({"bags": YEAR_LOCKED(exc.label)})
-    commencing = await db.get(Commencing, clean["commencing_id"])
-    if commencing is None or commencing.grain_id != trip.grain_id:
-        return form({"commencing_id": ("Pick a village with the same grain as this trip", "આ ટ્રીપના અનાજવાળું ગામ પસંદ કરો")})
-    await advisory_lock(db, "stock", commencing.id)  # two clerks loading the same village must not oversell it
-    available = (await stock_by_commencing(db, [commencing.id])).get(commencing.id)
+        return form({"no_of_loaded_bags": YEAR_LOCKED(exc.label)})
+    entry = await db.get(PurchaseFarmerEntry, clean["purchase_farmer_entry_id"])
+    if entry is None or entry.purchase_info.grain_id != trip.grain.id:
+        return form({"purchase_farmer_entry_id": ("Pick an entry with the same grain as this trip", "આ ટ્રીપના અનાજવાળી એન્ટ્રી પસંદ કરો")})
+    if any(line.purchase_farmer_entry_id == entry.id for line in trip.load_lines):
+        return form({"purchase_farmer_entry_id": ("This entry is already loaded on this trip", "આ એન્ટ્રી આ ટ્રીપમાં પહેલેથી ભરાઈ ગઈ છે")})
+    await advisory_lock(db, "stock", entry.id)  # two clerks loading the same entry must not oversell it
+    available = (await stock_by_entry(db, [entry.id])).get(entry.id)
     available = available.available if available else 0
-    if clean["bags"] > available:
-        return form({"bags": (f"Only {available} bags are available in {commencing.village}", f"{commencing.village} માં ફક્ત {available} બેગ ઉપલબ્ધ છે")})
-    line = TruckLoadLine(trip_id=trip.id, commencing_id=commencing.id, bags=clean["bags"])
+    bags = clean["no_of_loaded_bags"] or available
+    if bags <= 0 or bags > available:
+        return form({"no_of_loaded_bags": (f"Only {available} bags are left in this entry", f"આ એન્ટ્રીમાં ફક્ત {available} બેગ બાકી છે")})
+    line = TruckLoadLine(trip_id=trip.id, purchase_farmer_entry_id=entry.id, no_of_loaded_bags=bags, total_remaining_bags=available - bags)
     db.add(line)
     await db.flush()
-    audit.log(db, user, "create", "truck_load_lines", line.id, dict(trip_id=trip.id, commencing_id=commencing.id, bags=clean["bags"]))
+    await renumber_remaining(db, entry.id)
+    if trip.bilty is not None:
+        trip.bilty.total_bags_in_truck = sum(l.no_of_loaded_bags for l in trip.load_lines) + bags
+    audit.log(db, user, "create", "truck_load_lines", line.id, dict(trip_id=trip.id, purchase_farmer_entry_id=entry.id, no_of_loaded_bags=bags))
     await db.commit()
     return Response(status_code=204, headers={"HX-Redirect": f"/trips/{trip_id}"})
 
@@ -351,7 +371,7 @@ async def delete_line(request: Request, line_id: int, user: User = Depends(curre
     if line is None:
         raise HTTPException(404)
     trip = await _get_trip(db, line.trip_id)
-    trip_id = trip.id
+    trip_id, entry_id, bags = trip.id, line.purchase_farmer_entry_id, line.no_of_loaded_bags
 
     def flash(en, gu):
         return render(request, "partials/flash_text.html", kind="error", en=en, gu=gu)
@@ -359,14 +379,23 @@ async def delete_line(request: Request, line_id: int, user: User = Depends(curre
     try:
         await assert_year_open(db, trip.trip_date)
     except YearLockedError as exc:
-        msg = YEAR_LOCKED(exc.label)
-        return flash(*msg)
-    freight = freight_amount(trip.freight_weight_kg, trip.bags - line.bags, trip.rent_per_ton, trip.rent_per_bag)
-    problem = _below_paid(await paid_for(db, "truck_trip", trip.id), _final(freight, trip.advance_amount, trip.other_deduction), ("freight", "ભાડા"))
+        return flash(*YEAR_LOCKED(exc.label))
+    new_bags = trip.bags - bags
+    total = _total(trip.freight_weight_kg, new_bags, trip.rent_per_ton, trip.rent_per_bag, trip.advance_amount, trip.other_payable, trip.other_deduction)
+    problem = _below_paid(await paid_for(db, "truck", trip.id), total, ("freight", "ભાડા"))
     if problem:
         return flash(*problem)
-    audit.log(db, user, "delete", "truck_load_lines", line.id, dict(trip_id=trip_id, commencing_id=line.commencing_id, bags=line.bags))
+    if trip.bilty is not None:
+        per_bag = trip.bilty.booking.brokerage.brokerage_per_bag
+        problem = _below_paid(await paid_for(db, "broker", trip.bilty.id), money.brokerage_amount(new_bags, per_bag), ("brokerage", "દલાલી"))
+        if problem:
+            return flash(*problem)
+    audit.log(db, user, "delete", "truck_load_lines", line.id, dict(trip_id=trip_id, purchase_farmer_entry_id=entry_id, no_of_loaded_bags=bags))
     await db.delete(line)
+    await db.flush()
+    await renumber_remaining(db, entry_id)
+    if trip.bilty is not None:
+        trip.bilty.total_bags_in_truck = new_bags
     await db.commit()
     return Response(status_code=204, headers={"HX-Redirect": f"/trips/{trip_id}"})
 
@@ -377,8 +406,8 @@ async def delete_line(request: Request, line_id: int, user: User = Depends(curre
 async def bilty_page(request: Request, trip_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     trip = await _get_trip(db, trip_id)
     b = trip.bilty
-    values = bilty_values(b) if b else dict(bilty_date=today().isoformat(), rate_unit_kg="20", rate_change="0")
-    ctx = form_context(fields=await bilty_fields(db), values=values, errors={}, action=f"/trips/{trip.id}/bilty",
+    values = bilty_values(b) if b else dict(bilty_date=today().isoformat(), any_rate_change="0")
+    ctx = form_context(fields=bilty_fields(), values=values, errors={}, action=f"/trips/{trip.id}/bilty",
                        heading=((f"Edit bilty — {trip.truck.truck_number}", f"બિલ્ટી સુધારો — {trip.truck.truck_number}") if b else (f"New bilty — {trip.truck.truck_number}", f"નવી બિલ્ટી — {trip.truck.truck_number}")),
                        back_url=f"/trips/{trip.id}")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
@@ -389,7 +418,7 @@ async def save_bilty(request: Request, trip_id: int, user: User = Depends(curren
     await csrf.validate_csrf(request)
     trip = await _get_trip(db, trip_id)
     bilty = trip.bilty
-    fields = await bilty_fields(db)
+    fields = bilty_fields()
     raw = await read_form(request)
     heading = ("Edit bilty", "બિલ્ટી સુધારો") if bilty else ("New bilty", "નવી બિલ્ટી")
     rerender = lambda errs: render(request, "partials/master_form.html", **form_context(  # noqa: E731
@@ -398,6 +427,9 @@ async def save_bilty(request: Request, trip_id: int, user: User = Depends(curren
     clean, errors = run_validation(BiltyIn, fields, normalize_fields(fields, raw))
     if errors:
         return rerender(errors)
+    bags = trip.bags
+    if bags <= 0:
+        return rerender({"bill_number": ("Add the loaded bags to the trip first", "પહેલા ટ્રીપમાં ભરેલી બેગ ઉમેરો")})
     if clean["merchant_tare_weight"] >= clean["merchant_total_weight"]:
         return rerender({"merchant_tare_weight": ("Empty weight must be less than loaded weight", "ખાલી વજન ભરેલા વજન કરતાં ઓછું હોવું જોઈએ")})
     i_total, i_tare = clean["industry_total_weight"], clean["industry_tare_weight"]
@@ -405,13 +437,11 @@ async def save_bilty(request: Request, trip_id: int, user: User = Depends(curren
         return rerender({"industry_tare_weight" if i_tare is None else "industry_total_weight": ("Enter both industry weights, or neither", "કારખાનાના બંને વજન ભરો, અથવા એકેય નહીં")})
     if i_total is not None and i_tare >= i_total:
         return rerender({"industry_tare_weight": ("Empty weight must be less than loaded weight", "ખાલી વજન ભરેલા વજન કરતાં ઓછું હોવું જોઈએ")})
-    if clean["rate_change"] and clean["rate_change"] > clean["grain_rate"]:
-        return rerender({"rate_change": ("Cannot exceed the sale rate", "વેચાણ ભાવથી વધુ ન હોઈ શકે")})
-    broker = await db.get(Broker, clean["broker_id"])
-    if broker is None:
-        return rerender({"broker_id": ("Unknown broker", "અજ્ઞાત દલાલ")})
-    clean["rate_change"] = clean["rate_change"] or 0
-    clean["brokerage_amount"] = broker.brokerage_per_truck if clean["brokerage_amount"] is None else clean["brokerage_amount"]
+    booking = trip.broker_booking
+    clean["any_rate_change"] = clean["any_rate_change"] or 0
+    if clean["any_rate_change"] > booking.grain_rate_per_booking_weight:
+        return rerender({"any_rate_change": ("Cannot exceed the booked rate", "બુક કરેલા ભાવથી વધુ ન હોઈ શકે")})
+    clean["total_bags_in_truck"] = bags
     try:
         clean["business_year"] = await assert_year_open(db, clean["bilty_date"])
         if bilty is not None:
@@ -429,14 +459,12 @@ async def save_bilty(request: Request, trip_id: int, user: User = Depends(curren
     i_net = None if i_total is None else i_total - i_tare
     if bilty is not None:
         received = (await received_map(db, [bilty.id])).get(bilty.id, 0)
-        new_receivable = None if i_net is None else _ceil_div(i_net * (clean["grain_rate"] - clean["rate_change"]), clean["rate_unit_kg"])
+        new_receivable = None if i_net is None else money.receivable_after_percentage_deduction(
+            money.receivable_amount(i_net, booking.brokerage.grain.booking_weight, booking.grain_rate_per_booking_weight, clean["any_rate_change"]), booking.percentage_deduction)
         if received and (new_receivable is None or new_receivable < received):
             return rerender({"industry_total_weight": (f"₹{received} is already received against this bilty; the receivable cannot go below that", f"આ બિલ્ટી સામે ₹{received} મળી ગયા છે; લેણાં તેથી ઓછા ન થઈ શકે")})
-        problem = _below_paid(await paid_for(db, "bilty_brokerage", bilty.id), clean["brokerage_amount"], ("brokerage", "દલાલી"))
-        if problem:
-            return rerender({"brokerage_amount": problem})
-    freight = freight_amount(i_net if i_net is not None else m_net, trip.bags, trip.rent_per_ton, trip.rent_per_bag)
-    problem = _below_paid(await paid_for(db, "truck_trip", trip.id), _final(freight, trip.advance_amount, trip.other_deduction), ("freight", "ભાડા"))
+    total = _total(i_net if i_net is not None else m_net, bags, trip.rent_per_ton, trip.rent_per_bag, trip.advance_amount, trip.other_payable, trip.other_deduction)
+    problem = _below_paid(await paid_for(db, "truck", trip.id), total, ("freight", "ભાડા"))
     if problem:
         return rerender({"merchant_total_weight": problem})
 
@@ -446,7 +474,7 @@ async def save_bilty(request: Request, trip_id: int, user: User = Depends(curren
         for name, value in clean.items():
             setattr(bilty, name, value)
     else:
-        bilty = Bilty(trip_id=trip.id, created_by=user.id, **clean)
+        bilty = Bilty(truck_trip_id=trip.id, created_by=user.id, **clean)
         db.add(bilty)
     await db.flush()
     audit.log(db, user, "update" if before else "create", "bilties", bilty.id, audit.diff(before, bilty_snapshot(bilty)))

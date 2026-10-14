@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th %}
+{% block title %}Bookings{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-xl font-semibold flex-1">{{ t('Broker bookings', 'દલાલ બુકિંગ') }}</h1>
+  <form method="get" class="flex items-center gap-2">
+    <span class="text-sm">{{ t('Business year', 'વ્યવસાય વર્ષ') }}</span>
+    <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
+      {% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+    </select>
+    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
+  </form>
+  <a href="/bookings/new" class="btn btn-primary btn-sm">+ {{ t('New booking', 'નવું બુકિંગ') }}</a>
+</div>
+<div class="overflow-x-auto bg-base-100 rounded-box shadow">
+  <table class="table table-zebra table-sm">
+    <thead><tr>
+      {{ th('Date', 'તારીખ') }}{{ th('Broker', 'દલાલ') }}{{ th('Grain', 'અનાજ') }}{{ th('Industry', 'ઉદ્યોગ') }}{{ th('Rate', 'ભાવ') }}
+      {{ th('Truck size', 'ટ્રક સાઇઝ') }}{{ th('Deduction %', 'કપાત %') }}{{ th('Trips', 'ટ્રીપ') }}<th></th>
+    </tr></thead>
+    <tbody>
+    {% for b in bookings %}
+      <tr>
+        <td class="whitespace-nowrap">{{ b.booking_date }}</td>
+        <td>{{ b.brokerage.broker.broker_name }}<div class="text-xs opacity-60">₹{{ b.brokerage.brokerage_per_bag }}/{{ t('bag', 'બેગ') }}</div></td>
+        <td>{{ b.grain.grain_name }}</td>
+        <td>{{ b.industry.industrialist_name }}</td>
+        <td>{{ b.grain_rate_per_booking_weight | inr }} / {{ b.grain.booking_weight }} kg</td>
+        <td>{{ b.truck_size }} t</td>
+        <td>{{ b.percentage_deduction if b.percentage_deduction is not none else '' }}</td>
+        <td>{{ counts.get(b.id, 0) }}</td>
+        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/bookings/{{ b.id }}/edit">{{ t('Edit', 'સુધારો') }}</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="9" class="text-center opacity-60">{{ t('No bookings in this year', 'આ વર્ષમાં કોઈ બુકિંગ નથી') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

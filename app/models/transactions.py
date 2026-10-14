@@ -6,9 +6,13 @@ set by the application from the record's own date (file9-database.txt, rule 5)."
 from datetime import date
 
 from sqlalchemy import BigInteger, CheckConstraint, Date, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from decimal import ROUND_HALF_UP, Decimal
+
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.masters import Brokerage, Farmer, Grain, Industry, LabourGroup, BagSupplier, Transporter, Truck, Village
+from app.services import money
 
 BUSINESS_YEAR = r"^[0-9]{4}-[0-9]{2}$"
 
@@ -44,6 +48,9 @@ class PurchaseInfo(TimestampMixin, Base):
     business_year: Mapped[str] = mapped_column(String(7))
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    village: Mapped[Village] = relationship(lazy="joined")
+    grain: Mapped[Grain] = relationship(lazy="joined")
 
 
 class PurchaseFarmerEntry(TimestampMixin, Base):
@@ -88,6 +95,19 @@ class PurchaseFarmerEntry(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
+    purchase_info: Mapped[PurchaseInfo] = relationship(lazy="joined")
+    farmer: Mapped[Farmer] = relationship(lazy="joined")
+    labour_group: Mapped[LabourGroup] = relationship(lazy="joined")
+
+    @property
+    def net_payable(self) -> int:
+        """payable_amount - borrowed_amount: what the farmer is still to be paid."""
+        return self.payable_amount - self.borrowed_amount
+
+    @property
+    def total_kg(self) -> int:
+        return self.no_of_filled_bags * self.purchase_info.grain.net_bag_weight + self.extra_kilos
+
 
 class BrokerBooking(TimestampMixin, Base):
     """An order booked through a broker: industry, sale rate per booking weight, truck size, deduction."""
@@ -115,6 +135,13 @@ class BrokerBooking(TimestampMixin, Base):
     business_year: Mapped[str] = mapped_column(String(7))
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    brokerage: Mapped[Brokerage] = relationship(lazy="joined")
+    industry: Mapped[Industry] = relationship(lazy="joined")
+
+    @property
+    def grain(self) -> Grain:
+        return self.brokerage.grain
 
 
 class TruckTrip(TimestampMixin, Base):
@@ -145,6 +172,55 @@ class TruckTrip(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
+    broker_booking: Mapped[BrokerBooking] = relationship(lazy="joined")
+    truck: Mapped[Truck] = relationship(lazy="joined")
+    transporter: Mapped[Transporter] = relationship(lazy="joined")
+    labour_group: Mapped[LabourGroup] = relationship(lazy="joined")
+    bilty: Mapped["Bilty | None"] = relationship(back_populates="trip", uselist=False, lazy="joined")
+    load_lines: Mapped[list["TruckLoadLine"]] = relationship(lazy="selectin", order_by="TruckLoadLine.id")
+
+    @property
+    def industry(self) -> Industry:
+        return self.broker_booking.industry
+
+    @property
+    def grain(self) -> Grain:
+        return self.broker_booking.brokerage.grain
+
+    @property
+    def bags(self) -> int:
+        """total_bags_in_truck: the sum of the loaded bags over the trip's load lines."""
+        return sum(line.no_of_loaded_bags for line in self.load_lines)
+
+    @property
+    def freight_weight_kg(self) -> int | None:
+        """Freight is charged on the industry's weight; until unloaded our own weight is a provisional stand-in."""
+        if self.bilty is None:
+            return None
+        b = self.bilty
+        return b.industry_net_weight if b.industry_net_weight is not None else b.merchant_net_weight
+
+    @property
+    def freight_is_provisional(self) -> bool:
+        return self.bilty is None or self.bilty.industry_net_weight is None
+
+    @property
+    def freight_by_weight(self) -> int:
+        return money.trip_freight_by_weight(self.freight_weight_kg, self.rent_per_ton)
+
+    @property
+    def freight_by_bags(self) -> int:
+        return money.trip_freight_by_bags(self.bags, self.rent_per_bag)
+
+    @property
+    def trip_total(self) -> int:
+        return self.freight_by_weight + self.freight_by_bags
+
+    @property
+    def total_amount(self) -> int:
+        """truck_trip_total_amount = trip_total - advance_amount + other_payable - other_deduction."""
+        return money.truck_trip_total_amount(self.trip_total, self.advance_amount, self.other_payable, self.other_deduction)
+
 
 class TruckLoadLine(Base):
     """Bags of one farmer entry loaded on one trip (no date of its own: it belongs to its trip's year)."""
@@ -162,6 +238,8 @@ class TruckLoadLine(Base):
     purchase_farmer_entry_id: Mapped[int] = mapped_column(ForeignKey("purchase_farmer_entries.id"))
     no_of_loaded_bags: Mapped[int] = mapped_column(Integer)
     total_remaining_bags: Mapped[int] = mapped_column(Integer)
+
+    entry: Mapped[PurchaseFarmerEntry] = relationship(lazy="joined")
 
 
 class Bilty(TimestampMixin, Base):
@@ -195,6 +273,103 @@ class Bilty(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
+    trip: Mapped[TruckTrip] = relationship(back_populates="bilty", lazy="joined")
+
+    # ---- weights (kg)
+    @property
+    def merchant_net_weight(self) -> int:
+        return self.merchant_total_weight - self.merchant_tare_weight
+
+    @property
+    def industry_net_weight(self) -> int | None:
+        if self.industry_total_weight is None:
+            return None
+        return self.industry_total_weight - self.industry_tare_weight
+
+    @property
+    def expected_total_loaded_weight(self) -> int | None:
+        return money.expected_total_loaded_weight(
+            [(line.no_of_loaded_bags, line.entry.expected_raw_weight_per_bag) for line in self.trip.load_lines]
+        )
+
+    @property
+    def difference_in_loading_weight(self) -> int | None:
+        """(merchant_total_weight - merchant_tare_weight) - expected_total_loaded_weight."""
+        expected = self.expected_total_loaded_weight
+        return None if expected is None else self.merchant_net_weight - expected
+
+    @property
+    def average_per_bag_difference(self) -> Decimal | None:
+        diff = self.difference_in_loading_weight
+        if diff is None or not self.total_bags_in_truck:
+            return None
+        return (Decimal(diff) / self.total_bags_in_truck).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def difference_in_delivering_weight(self) -> int | None:
+        """(industry_total - industry_tare) - (merchant_total - merchant_tare); negative = industry weighed less."""
+        n = self.industry_net_weight
+        return None if n is None else n - self.merchant_net_weight
+
+    @property
+    def total_weight_difference(self) -> int | None:
+        return None if self.industry_total_weight is None else self.industry_total_weight - self.merchant_total_weight
+
+    @property
+    def tare_weight_difference(self) -> int | None:
+        return None if self.industry_tare_weight is None else self.industry_tare_weight - self.merchant_tare_weight
+
+    @property
+    def percentage_difference(self) -> Decimal | None:
+        """Shortage as % of our weight; positive = the industry weighed less."""
+        diff = self.difference_in_delivering_weight
+        if diff is None:
+            return None
+        return (Decimal(-diff) * 100 / Decimal(self.merchant_net_weight)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    # ---- money (rate, deduction, broker and grain come from the booking)
+    @property
+    def booking(self) -> BrokerBooking:
+        return self.trip.broker_booking
+
+    @property
+    def effective_rate(self) -> int:
+        return self.booking.grain_rate_per_booking_weight - self.any_rate_change
+
+    @property
+    def booking_weight(self) -> int:
+        return self.booking.brokerage.grain.booking_weight
+
+    @property
+    def receivable_amount(self) -> int | None:
+        """((industry net kg) / booking_weight) * (rate - any_rate_change). None until the industry weight is in."""
+        n = self.industry_net_weight
+        if n is None:
+            return None
+        return money.receivable_amount(n, self.booking_weight, self.booking.grain_rate_per_booking_weight, self.any_rate_change)
+
+    @property
+    def receivable_after_deduction(self) -> int | None:
+        """receivable_amount * (1 - percentage_deduction / 100): what the industry is actually billed."""
+        r = self.receivable_amount
+        return None if r is None else money.receivable_after_percentage_deduction(r, self.booking.percentage_deduction)
+
+    @property
+    def estimated_amount(self) -> int:
+        """What we expected to bill, from our own weight at the booked rate."""
+        amount = money.receivable_amount(self.merchant_net_weight, self.booking_weight, self.booking.grain_rate_per_booking_weight, self.any_rate_change)
+        return money.receivable_after_percentage_deduction(amount, self.booking.percentage_deduction)
+
+    @property
+    def error_receivable_amount(self) -> int | None:
+        r = self.receivable_after_deduction
+        return None if r is None else r - self.estimated_amount
+
+    @property
+    def brokerage_amount(self) -> int:
+        """total_bags_in_truck * brokerage_per_bag (the broker's rate for this grain)."""
+        return money.brokerage_amount(self.total_bags_in_truck, self.booking.brokerage.brokerage_per_bag)
+
 
 class LabourWork(TimestampMixin, Base):
     """A labour group's day: what they earned, what they borrowed (deducted), and petrol/meal we covered (not deducted)."""
@@ -222,6 +397,12 @@ class LabourWork(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
+    labour_group: Mapped[LabourGroup] = relationship(lazy="joined")
+
+    @property
+    def net_payable(self) -> int:
+        return self.payable_amount - self.borrowing_amount
+
 
 class BagSupply(TimestampMixin, Base):
     """Bags a supplier delivered to a farmer's place. A business cost, never deducted from the farmer."""
@@ -245,3 +426,7 @@ class BagSupply(TimestampMixin, Base):
     business_year: Mapped[str] = mapped_column(String(7))
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
+    supplier: Mapped[BagSupplier] = relationship(lazy="joined")
+    farmer: Mapped[Farmer] = relationship(lazy="joined")

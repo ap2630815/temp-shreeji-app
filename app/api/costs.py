@@ -45,7 +45,7 @@ class LabourIn(BaseModel):
 async def labour_fields(db: AsyncSession) -> list[F]:
     groups = list((await db.scalars(select(LabourGroup).order_by(LabourGroup.group_name))).all())
     return [
-        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True, options=tuple((str(g.id), f"{g.group_name} — {g.name}") for g in groups)),
+        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True, options=tuple((str(g.id), g.group_name) for g in groups)),
         F("work_date", "Date", "તારીખ", kind="date", required=True),
         F("payable_amount", "Wages earned (₹)", "મજૂરી (₹)", kind="int"),
         F("borrowing_amount", "Borrowing to deduct (₹)", "ઉધાર કાપવાના (₹)", kind="int", help=("Taken in advance by the group; deducted from this day's wages", "જૂથે એડવાન્સ લીધેલ; આ દિવસની મજૂરીમાંથી કપાશે")),
@@ -70,7 +70,7 @@ async def labour_list(request: Request, year: str = "", user: User = Depends(cur
     years = await _years(db, LabourWork, user)
     year = year if year in years else current_year_label()
     rows = list((await db.scalars(select(LabourWork).where(LabourWork.business_year == year).order_by(LabourWork.work_date.desc(), LabourWork.id.desc()))).unique().all())
-    paid = {p.payable_id: p.paid for p in await load_payables(db, "labour")}
+    paid = {p.payable_id: p.paid for p in await load_payables(db, "labour_group")}
     return render_with_csrf(request, csrf, "labour_list.html", user=user, rows=rows, paid=paid, year=year, years=years, year_locked=year != current_year_label())
 
 
@@ -130,7 +130,7 @@ async def _save_labour(request: Request, w: LabourWork | None, user: User, db: A
         return rerender({"work_date": YEAR_LOCKED(exc.label)})
     before = None
     if w is not None:
-        paid = await paid_for(db, "labour_work", w.id)
+        paid = await paid_for(db, "labour_group", w.id)
         net = clean["payable_amount"] - clean["borrowing_amount"]
         if net < paid:
             return rerender({"payable_amount": (f"₹{paid} is already paid for this day; wages cannot go below that", f"આ દિવસ માટે ₹{paid} ચૂકવાઈ ગયા છે; મજૂરી તેથી ઓછી ન થઈ શકે")})
@@ -156,31 +156,32 @@ class BagIn(BaseModel):
     supplier_id: int
     farmer_id: int
     supply_date: date
-    rate: Annotated[int, Field(gt=0, le=1_000_000)]
-    units: Annotated[int, Field(gt=0, le=INT_MAX)]
+    rate_per_bag: Annotated[int, Field(gt=0, le=1_000_000)]
+    no_of_bags: Annotated[int, Field(gt=0, le=INT_MAX)]
     description: str | None = None
 
 
 async def bag_fields(db: AsyncSession) -> list[F]:
     suppliers = list((await db.scalars(select(BagSupplier).order_by(BagSupplier.pet_name))).all())
-    farmers = list((await db.scalars(select(Farmer).order_by(Farmer.village, Farmer.name))).all())
+    farmers = list((await db.scalars(select(Farmer).order_by(Farmer.farmer_name))).unique().all())
+    farmers.sort(key=lambda f: (f.village.village_name, f.farmer_name))
     return [
         F("supplier_id", "Bag supplier", "બારદાન સપ્લાયર", kind="select", required=True, options=tuple((str(s.id), f"{s.pet_name} — {s.name}") for s in suppliers)),
-        F("farmer_id", "Delivered at farmer's place", "ખેડૂતને ત્યાં ઉતાર્યું", kind="select", required=True, options=tuple((str(f.id), f"{f.village} — {f.name}") for f in farmers),
+        F("farmer_id", "Delivered at farmer's place", "ખેડૂતને ત્યાં ઉતાર્યું", kind="select", required=True, options=tuple((str(f.id), f"{f.village.village_name} — {f.farmer_name}") for f in farmers),
           help=("The farmer who stores the bags for the village", "જે ખેડૂત ગામ માટે બારદાન સાચવે છે")),
         F("supply_date", "Date", "તારીખ", kind="date", required=True),
-        F("rate", "Rate per bag (₹)", "બેગ દીઠ ભાવ (₹)", kind="int", required=True),
-        F("units", "Bags supplied", "આપેલી બેગ", kind="int", required=True),
+        F("rate_per_bag", "Rate per bag (₹)", "બેગ દીઠ ભાવ (₹)", kind="int", required=True),
+        F("no_of_bags", "Bags supplied", "આપેલી બેગ", kind="int", required=True),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ]
 
 
 def bag_values(b: BagSupply) -> dict:
-    return dict(supplier_id=str(b.supplier_id), farmer_id=str(b.farmer_id), supply_date=b.supply_date.isoformat(), rate=str(b.rate), units=str(b.units), description=b.description or "")
+    return dict(supplier_id=str(b.supplier_id), farmer_id=str(b.farmer_id), supply_date=b.supply_date.isoformat(), rate_per_bag=str(b.rate_per_bag), no_of_bags=str(b.no_of_bags), description=b.description or "")
 
 
 def bag_snapshot(b: BagSupply) -> dict:
-    return dict(supplier_id=b.supplier_id, farmer_id=b.farmer_id, supply_date=b.supply_date, rate=b.rate, units=b.units, payable_amount=b.payable_amount, description=b.description)
+    return dict(supplier_id=b.supplier_id, farmer_id=b.farmer_id, supply_date=b.supply_date, rate_per_bag=b.rate_per_bag, no_of_bags=b.no_of_bags, payable_amount=b.payable_amount, description=b.description)
 
 
 @router.get("/bag-supplies", response_class=HTMLResponse)
@@ -192,12 +193,12 @@ async def bag_list(request: Request, year: str = "", view: str = "supplies", use
     storage: dict[int, dict] = {}
     for r in rows:  # bags held at each farmer's place for the year
         s = storage.setdefault(r.farmer_id, dict(farmer=r.farmer, units=0, amount=0, suppliers=set()))
-        s["units"] += r.units
+        s["units"] += r.no_of_bags
         s["amount"] += r.payable_amount
         s["suppliers"].add(r.supplier.pet_name)
     return render_with_csrf(request, csrf, "bag_list.html", user=user, rows=rows, paid=paid, year=year, years=years, view=view,
-                            storage=sorted(storage.values(), key=lambda s: (s["farmer"].village, s["farmer"].name)),
-                            total_units=sum(r.units for r in rows), total_amount=sum(r.payable_amount for r in rows), year_locked=year != current_year_label())
+                            storage=sorted(storage.values(), key=lambda s: (s["farmer"].village.village_name, s["farmer"].farmer_name)),
+                            total_units=sum(r.no_of_bags for r in rows), total_amount=sum(r.payable_amount for r in rows), year_locked=year != current_year_label())
 
 
 @router.get("/bag-supplies/new", response_class=HTMLResponse)
@@ -251,12 +252,12 @@ async def _save_bag(request: Request, b: BagSupply | None, user: User, db: Async
             await assert_year_open(db, b.supply_date)
     except YearLockedError as exc:
         return rerender({"supply_date": YEAR_LOCKED(exc.label)})
-    clean["payable_amount"] = clean["rate"] * clean["units"]
+    clean["payable_amount"] = clean["rate_per_bag"] * clean["no_of_bags"]
     before = None
     if b is not None:
-        paid = await paid_for(db, "bag_supply", b.id)
+        paid = await paid_for(db, "bag_supplier", b.id)
         if clean["payable_amount"] < paid:
-            return rerender({"units": (f"₹{paid} is already paid for this supply; the amount cannot go below that", f"આ સપ્લાય માટે ₹{paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
+            return rerender({"no_of_bags": (f"₹{paid} is already paid for this supply; the amount cannot go below that", f"આ સપ્લાય માટે ₹{paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
         before = bag_snapshot(b)
         for name, value in clean.items():
             setattr(b, name, value)
@@ -269,5 +270,5 @@ async def _save_bag(request: Request, b: BagSupply | None, user: User, db: Async
         await db.commit()
     except IntegrityError:
         await db.rollback()
-        return rerender({"units": GENERIC_ERROR})
+        return rerender({"no_of_bags": GENERIC_ERROR})
     return Response(status_code=204, headers={"HX-Redirect": "/bag-supplies"})

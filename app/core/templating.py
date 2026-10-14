@@ -15,6 +15,16 @@ from app.api.masters_config import SPECS
 templates.env.globals["L"] = LABELS
 
 
+def cell(row, path: str):
+    """Value of a (possibly dotted) attribute path: cell(farmer, 'village.village_name')."""
+    for part in path.split("."):
+        row = getattr(row, part)
+    return "" if row is None else row
+
+
+templates.env.globals["cell"] = cell
+
+
 def year_span(label: str | None = None) -> tuple[str, str]:
     """('2026-Oct', '2027-Sept') for a '2026-27' label; defaults to the current Oct-Sep business year."""
     from datetime import date

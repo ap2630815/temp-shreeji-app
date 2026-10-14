@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from app.models import PurchaseEntry
+from app.models import PurchaseFarmerEntry
 from app.services.audit import diff
 from app.services.ledger import EntryView, allocate
 from app.services.money import payable_amount
@@ -62,7 +62,7 @@ def test_allocate_rejects_overpayment_and_non_positive():
 
 
 def _view(payable, borrowing, paid, due_date):
-    e = PurchaseEntry(payable_amount=payable, borrowing=borrowing, due_date=due_date)
+    e = PurchaseFarmerEntry(payable_amount=payable, borrowed_amount=borrowing, due_date=due_date)
     return EntryView(e, paid)
 
 
@@ -86,7 +86,7 @@ def test_payable_dataclass_status_and_overdue():
     from app.services.payables import Payable
 
     def mk(amount, paid, due_date):
-        return Payable("truck_trip", 1, "transporter", 1, "T", date(2026, 1, 1), due_date, "x", amount, paid)
+        return Payable("truck", 1, "truck", 1, "T", date(2026, 1, 1), due_date, "x", amount, paid)
 
     today = date(2026, 2, 1)
     assert mk(1000, 0, None).status == "pending" and not mk(1000, 0, None).is_overdue(today)  # no due date -> never overdue
@@ -95,18 +95,33 @@ def test_payable_dataclass_status_and_overdue():
 
 
 def test_bilty_view_status():
-    from app.models import Bilty
+    from app.models import Bilty, BrokerBooking, Brokerage, Grain, TruckTrip
     from app.services.receivables import BiltyView
 
     def view(industry_weight, received):
-        b = Bilty(grain_rate=300, rate_unit_kg=20, rate_change=0, merchant_total_weight=10_800, merchant_tare_weight=0,
+        booking = BrokerBooking(grain_rate_per_booking_weight=300, percentage_deduction=None, brokerage=Brokerage(brokerage_per_bag=0, grain=Grain(booking_weight=20)))
+        b = Bilty(any_rate_change=0, total_bags_in_truck=1, merchant_total_weight=10_800, merchant_tare_weight=0,
                   industry_total_weight=industry_weight, industry_tare_weight=0 if industry_weight else None)
+        b.trip = TruckTrip(broker_booking=booking)
         return BiltyView(b, received)
 
     assert view(None, 0).status == "unweighed" and view(None, 0).due is None
     v = view(10_000, 0)  # 10,000 kg / 20 * 300 = 150,000
     assert (v.receivable, v.due, v.status) == (150_000, 150_000, "pending")
     assert view(10_000, 50_000).status == "partial" and view(10_000, 150_000).status == "paid"
+
+
+def test_total_available_bags_and_handful():
+    from app.services.money import total_available_bags
+
+    assert total_available_bags(120, 5) == 125 and total_available_bags(0, 0) == 0
+
+
+def test_business_year_matches_the_format_check():
+    import re
+
+    for d in (date(2025, 10, 1), date(2026, 9, 30), date(2099, 12, 31)):
+        assert re.match(r"^[0-9]{4}-[0-9]{2}$", business_year_of(d))
 
 
 # ---------------------------------------------------------------- business year closing
