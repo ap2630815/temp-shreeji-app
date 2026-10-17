@@ -3,6 +3,6 @@
 {% block pre_form %}
 <div class="alert bg-base-100 shadow-sm mb-3 text-sm flex-wrap">
   <span>{{ t('Outstanding', 'બાકી') }}: <b>{{ summary.due | inr }}</b>{% if summary.overdue %} · <span class="text-error">{{ t('Overdue', 'મુદત વીતી') }} {{ summary.overdue | inr }}</span>{% endif %}</span>
-  {% if party_type == 'farmer' and party.head_of_family %}<span class="badge badge-warning">{{ t('Verify with head of family', 'કુટુંબના વડા સાથે ચકાસો') }}: {{ party.head_of_family }}</span>{% endif %}
+  {% if party_type == 'farmer' and party.head_of_family and party.head_of_family | lower != 'self' %}<span class="badge badge-warning">{{ t('Verify with head of family', 'કુટુંબના વડા સાથે ચકાસો') }}: {{ party.head_of_family }}</span>{% endif %}
 </div>
 {% endblock %}

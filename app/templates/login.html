@@ -3,7 +3,7 @@
 {% block title %}{{ L['login'][0] }}{% endblock %}
 {% block body %}
 <main class="min-h-screen flex items-center justify-center p-4">
-  <form class="card bg-base-100 shadow-xl w-full max-w-sm" hx-post="/login" hx-target="#login-error" hx-swap="innerHTML">
+  <form class="card bg-base-100 shadow-xl w-full max-w-sm" hx-post="/Login" hx-target="#login-error" hx-swap="innerHTML">
     <div class="card-body gap-3">
       <h1 class="card-title">{{ bi('app_name') }}</h1>
       <label class="form-control">

@@ -2,20 +2,23 @@
 {% from "partials/bilabel.html" import t, th %}
 {% block title %}Bag supplies{% endblock %}
 {% block content %}
+<div class="stackbi">
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <h1 class="text-xl font-semibold flex-1">{{ t('Bag supplies', 'બારદાન સપ્લાય') }}</h1>
+  <h1 class="text-xl font-semibold">{{ t('Bag supplies', 'બારદાન સપ્લાય') }}</h1>
+  <span class="flex-1"></span>
+  <span class="flex flex-col leading-tight text-sm font-semibold text-center"><span>{{ total_units }} bags</span><span>{{ total_amount | inr }}</span></span>
+  <a href="/Payables?type=bag_supplier" class="btn btn-sm">{{ t('Pay suppliers', 'સપ્લાયરને ચુકવણી') }}</a>
+  <a href="/BagSupplies/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>
   <form method="get" class="flex items-center gap-2">
     <input type="hidden" name="view" value="{{ view }}">
+    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
     {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>
-  <span class="badge badge-lg">{{ total_units }} {{ t('bags', 'બેગ') }} · {{ total_amount | inr }}</span>
-  <a href="/dues?type=bag_supplier" class="btn btn-sm">{{ t('Pay suppliers', 'સપ્લાયરને ચુકવણી') }}</a>
-  <a href="/bag-supplies/new" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>
 </div>
 <div class="tabs tabs-boxed bg-base-100 mb-3 w-fit">
-  <a class="tab {{ 'tab-active' if view != 'storage' }}" href="/bag-supplies?year={{ year }}">{{ t('Supplies', 'સપ્લાય') }}</a>
-  <a class="tab {{ 'tab-active' if view == 'storage' }}" href="/bag-supplies?year={{ year }}&view=storage">{{ t('Storage by farmer', 'ખેડૂત મુજબ સંગ્રહ') }}</a>
+  <a class="tab h-auto py-1 {{ 'tab-active' if view != 'storage' }}" href="/BagSupplies?year={{ year }}"><span class="flex flex-col leading-tight text-center"><span>Supplies</span><span class="gu text-xs">સપ્લાય</span></span></a>
+  <a class="tab h-auto py-1 {{ 'tab-active' if view == 'storage' }}" href="/BagSupplies?year={{ year }}&view=storage"><span class="flex flex-col leading-tight text-center"><span>Storage by farmer</span><span class="gu text-xs">ખેડૂત મુજબ સંગ્રહ</span></span></a>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
 {% if view == 'storage' %}
@@ -33,10 +36,10 @@
     {% for b in rows %}{% set p = paid.get(b.id, 0) %}
       <tr>
         <td class="whitespace-nowrap">{{ b.supply_date }}</td>
-        <td><a class="link" href="/statements/bag_supplier/{{ b.supplier_id }}">{{ b.supplier.pet_name }}</a></td>
+        <td><a class="link" href="/Statements/bag_supplier/{{ b.supplier_id }}">{{ b.supplier.pet_name }}</a></td>
         <td>{{ b.farmer.village.village_name }} — {{ b.farmer.farmer_name }}</td>
         <td>{{ b.no_of_bags }}</td><td>{{ b.rate_per_bag | inr }}</td><td>{{ b.payable_amount | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (b.payable_amount - p) | inr }}</td>
-        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/bag-supplies/{{ b.id }}/edit">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/BagSupplies/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}<tr><td colspan="9" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>
@@ -44,4 +47,5 @@
 {% endif %}
 </div>
 <p class="text-xs opacity-60 mt-2">{{ t('Bag cost is a business expense; it is never deducted from farmers.', 'બારદાનનો ખર્ચ વેપારીનો છે; ખેડૂતના હિસાબમાંથી ક્યારેય કપાતો નથી.') }}</p>
+</div>
 {% endblock %}

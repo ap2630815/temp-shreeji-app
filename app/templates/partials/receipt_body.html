@@ -10,7 +10,7 @@
   <div>{{ t('Paid to', 'ચૂકવ્યા') }} ({{ party_label[0]}} <span class="gu">{{ party_label[1] }}</span>): <b>{{ party_name }}</b>{% if party_name_gu %} <span class="gu">({{ party_name_gu }})</span>{% endif %}</div>
   <div>{% if party_type == 'farmer' %}{{ t('Village', 'ગામ') }}: <b>{{ party.village.village_name }}</b>{% endif %}</div>
   <div>{{ t('Received by', 'લેનાર') }}: <b>{{ payment.receiver_name }}</b></div>
-  <div>{{ t('Receiver mobile', 'લેનારનો મોબાઇલ') }}: {{ payment.receiver_mobile }}</div>
+  <div>{{ t('Receiver mobile', 'લેનારનો મોબાઇલ') }}: {{ payment.receiver_mobile | mobhtml }}</div>
   <div>{{ t('Method', 'રીત') }}: <b>{{ payment.method | upper }}</b></div>
   <div>{{ t('Reference', 'રેફરન્સ') }}: {{ payment.reference_no or '—' }}</div>
 </div>

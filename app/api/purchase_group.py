@@ -16,10 +16,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, lock, normalize_fields, read_form, today
-from app.api.masters_config import F, run_validation
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, today
+from app.api.masters_config import F, national_mobile, run_validation
 from app.core.db import get_db
-from app.core.templating import render, render_with_csrf
+from app.core.templating import format_mobile, render, render_with_csrf
 from app.models import Farmer, Grain, LabourGroup, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, TruckLoadLine, User, Village
 from app.services import audit, roster
 from app.services.ledger import entry_views, paid_for_entry, purchase_group_entries, totals
@@ -98,7 +98,7 @@ class EntryIn(BaseModel):
 def entry_fields(farmers: list[Farmer], groups: list[LabourGroup]) -> list[F]:
     return [
         F("farmer_id", "Farmer", "ખેડૂત", kind="select", required=True,
-          options=tuple((str(f.id), f"{f.farmer_name} — {f.village.village_name} — {f.mobile}") for f in farmers)),
+          options=tuple((str(f.id), f"{f.farmer_name} — {f.village.village_name} — {format_mobile(f.mobile)}") for f in farmers)),
         F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True,
           options=tuple((str(g.id), g.group_name) for g in groups)),
         F("purchase_entry_date", "Date", "તારીખ", kind="date", required=True),
@@ -210,14 +210,15 @@ async def _form_page_ctx(db: AsyncSession, p_id: int | None, fields, values, err
     )
 
 
-@router.get("/new", response_class=HTMLResponse)
+@router.get("/New", response_class=HTMLResponse)
 async def new_page(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     villages, grains = await _masters(db)
-    ctx = await _form_page_ctx(db, None, purchase_group_fields(villages, grains), dict(purchase_group_date=today().isoformat()), {}, [])
+    values = apply_toolbar(request, dict(purchase_group_date=today().isoformat()))
+    ctx = await _form_page_ctx(db, None, purchase_group_fields(villages, grains), values, {}, [])
     return render_with_csrf(request, csrf, "purchase_group_form_page.html", user=user, **ctx)
 
 
-@router.get("/farmer-search", response_class=HTMLResponse)
+@router.get("/FarmerSearch", response_class=HTMLResponse)
 async def farmer_search(
     request: Request, pv: str = "", pq: str = "", pfree: str = "", pinfo: str = "", pg: str = "", user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
 ):
@@ -230,7 +231,9 @@ async def farmer_search(
     q = pq.strip()
     if q:
         like = f"%{q}%"
-        stmt = stmt.where(or_(Farmer.farmer_name.ilike(like), Farmer.farmer_name_gu.ilike(like), Farmer.mobile.ilike(like), Farmer.head_of_family.ilike(like)))
+        digits = national_mobile(q) if any(ch.isdigit() for ch in q) else ""  # 98765 43210 / +91 98765 43210 find 9876543210
+        stmt = stmt.where(or_(Farmer.farmer_name.ilike(like), Farmer.farmer_name_gu.ilike(like), Farmer.mobile.ilike(like), Farmer.head_of_family.ilike(like),
+                              *([Farmer.mobile.ilike(f"%{digits}%")] if digits else [])))
     farmers = list((await db.scalars(stmt)).unique().all())
     deals = await roster.other_deals(db, [f.id for f in farmers], int(pg), current_year_label(), int(pinfo) if pinfo.isdigit() else None) if pg.isdigit() else {}
     if pfree:
@@ -238,7 +241,7 @@ async def farmer_search(
     return render(request, "partials/farmer_results.html", farmers=farmers, deals=deals)
 
 
-@router.get("/{purchase_group_id}/edit", response_class=HTMLResponse)
+@router.get("/{purchase_group_id}/Edit", response_class=HTMLResponse)
 async def edit_page(
     request: Request, purchase_group_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
@@ -246,7 +249,7 @@ async def edit_page(
     villages, grains = await _masters(db)
     fields = lock(purchase_group_fields(villages, grains), await _locked_info_fields(db, p, user))
     selected = await _farmers_by_id(db, await roster.listed_farmer_ids(db, p.id))
-    ctx = await _form_page_ctx(db, p.id, fields, purchase_group_values(p), {}, selected)
+    ctx = await _form_page_ctx(db, p.id, fields, apply_toolbar(request, purchase_group_values(p)), {}, selected)
     return render_with_csrf(request, csrf, "purchase_group_form_page.html", user=user, **ctx)
 
 
@@ -414,7 +417,7 @@ def _entry_ctx(p, fields, values, errors, action, heading, has_farmers=True):
     )
 
 
-@router.get("/{purchase_group_id}/entries/new", response_class=HTMLResponse)
+@router.get("/{purchase_group_id}/Entries/New", response_class=HTMLResponse)
 async def new_entry_page(
     request: Request, purchase_group_id: int, farmer_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
@@ -423,13 +426,13 @@ async def new_entry_page(
     ctx = _entry_ctx(
         p, entry_fields(farmers, groups),
         dict(purchase_entry_date=today().isoformat(), extra_kilos="0", no_of_handful_bags="0", borrowed_amount="0", farmer_id=str(farmer_id) if farmer_id else ""), {},
-        f"/PurchaseGroup/{p.id}/entries",
+        f"/PurchaseGroup/{p.id}/Entries",
         (f"Add farmer entry — {p.village.village_name}", f"ખેડૂત એન્ટ્રી ઉમેરો — {p.village.village_name}"), bool(farmers),
     )
     return render_with_csrf(request, csrf, "entry_form_page.html", user=user, **ctx)
 
 
-@router.get("/entries/{entry_id}/edit", response_class=HTMLResponse)
+@router.get("/Entries/{entry_id}/Edit", response_class=HTMLResponse)
 async def edit_entry_page(
     request: Request, entry_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
@@ -440,13 +443,13 @@ async def edit_entry_page(
     farmers, groups = await _entry_form_data(db, p)
     fields = lock(entry_fields(farmers, groups), {"farmer_id"})
     ctx = _entry_ctx(
-        p, fields, entry_values(e), {}, f"/PurchaseGroup/entries/{e.id}",
+        p, fields, entry_values(e), {}, f"/PurchaseGroup/Entries/{e.id}",
         (f"Edit entry — {e.farmer.farmer_name}", f"એન્ટ્રી સુધારો — {e.farmer.farmer_name}"),
     )
     return render_with_csrf(request, csrf, "entry_form_page.html", user=user, **ctx)
 
 
-@router.post("/{purchase_group_id}/entries", response_class=HTMLResponse)
+@router.post("/{purchase_group_id}/Entries", response_class=HTMLResponse)
 async def create_entry(
     request: Request, purchase_group_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
@@ -455,7 +458,7 @@ async def create_entry(
     return await _save_entry(request, p, None, user, db)
 
 
-@router.post("/entries/{entry_id}", response_class=HTMLResponse)
+@router.post("/Entries/{entry_id}", response_class=HTMLResponse)
 async def update_entry(
     request: Request, entry_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
@@ -476,7 +479,7 @@ async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry
         raw["farmer_id"] = str(e.farmer_id)
     heading = (f"Edit entry — {e.farmer.farmer_name}", f"એન્ટ્રી સુધારો — {e.farmer.farmer_name}") if e else (
         f"Add farmer entry — {village_name}", f"ખેડૂત એન્ટ્રી ઉમેરો — {village_name}")
-    action = f"/PurchaseGroup/entries/{e.id}" if e else f"/PurchaseGroup/{p_id}/entries"
+    action = f"/PurchaseGroup/Entries/{e.id}" if e else f"/PurchaseGroup/{p_id}/Entries"
     ctx_p = SimpleNamespace(id=p_id, village=SimpleNamespace(village_name=village_name), grain=p.grain,
                             grain_rate_per_20kg=p.grain_rate_per_20kg, pay_after_no_of_days=p.pay_after_no_of_days)
 
@@ -505,13 +508,13 @@ async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry
 
     new_payable = payable_amount(clean["no_of_filled_bags"], clean["extra_kilos"], net_weight, p.grain_rate_per_20kg)
     if clean["borrowed_amount"] > new_payable:
-        return rerender({"borrowed_amount": (f"Cannot exceed the amount payable (₹{new_payable})", f"ચૂકવવાપાત્ર રકમ (₹{new_payable}) થી વધુ ન હોઈ શકે")})
+        return rerender({"borrowed_amount": (f"Cannot exceed the amount payable (₹ {new_payable})", f"ચૂકવવાપાત્ર રકમ (₹ {new_payable}) થી વધુ ન હોઈ શકે")})
 
     before = None
     if e is not None:
         paid = await paid_for_entry(db, e.id)
         if new_payable - clean["borrowed_amount"] < paid:
-            return rerender({"no_of_filled_bags": (f"₹{paid} is already paid against this entry; the amount cannot go below that", f"આ એન્ટ્રી સામે ₹{paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
+            return rerender({"no_of_filled_bags": (f"₹ {paid} is already paid against this entry; the amount cannot go below that", f"આ એન્ટ્રી સામે ₹ {paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
         loaded = int(await db.scalar(select(func.coalesce(func.sum(TruckLoadLine.no_of_loaded_bags), 0)).where(TruckLoadLine.purchase_farmer_entry_id == e.id)))
         available = total_available_bags(clean["no_of_filled_bags"], clean["no_of_handful_bags"])
         if available < loaded:

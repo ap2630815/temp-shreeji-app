@@ -1,22 +1,26 @@
 {% extends "layout.html" %}
 {% from "partials/bilabel.html" import t, th %}
-{% macro line(label, value, cls='') %}<tr><td>{{ t(label[0], label[1]) }}</td><td class="text-right {{ cls }}">{{ value | inr }}</td></tr>{% endmacro %}
+{% macro line(label, value, cls='') %}<tr><td><span class="block">{{ label[0] }}</span><span class="gu block text-xs">{{ label[1] }}</span></td><td class="text-right {{ cls }}">{{ value | inr }}</td></tr>{% endmacro %}
+{# a sub-field: English above Gujarati on the left, its value on the right #}
+{% macro sub(en, gu, val='') %}<div class="sub-row flex items-start justify-between gap-6 py-1 w-full"><span class="inline-flex flex-col leading-snug"><span class="text-xs text-base-content">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span>{% if val != '' %}<b class="text-sm text-base-content whitespace-nowrap tabular-nums">{{ val }}</b>{% endif %}</div>{% endmacro %}
 {% block title %}Report {{ year }}{% endblock %}
 {% block content %}
+<div class="stackall">
 <div class="flex flex-wrap items-center gap-3 mb-4">
   <h1 class="text-xl font-semibold flex-1">{{ t('Year report', 'વર્ષનો અહેવાલ') }}</h1>
   <form method="get" class="flex items-center gap-2">
+    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
   </form>
 </div>
 
 <div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
   <div class="stat py-2"><div class="stat-title">{{ t('Income', 'આવક') }}</div><div class="stat-value text-2xl">{{ income | inr }}</div>
-    <div class="stat-desc">{{ t('billed', 'બિલ') }} {{ sales.billed | inr }}{% if estimated_unweighed %} + {{ t('estimated', 'અંદાજ') }} {{ estimated_unweighed | inr }}{% endif %}</div></div>
+    <div class="stat-desc w-full mt-1 border-t border-base-300 pt-1">{{ sub('billed', 'બિલ', sales.billed | inr) }}{% if estimated_unweighed %}{{ sub('estimated', 'અંદાજ', estimated_unweighed | inr) }}{% endif %}</div></div>
   <div class="stat py-2"><div class="stat-title">{{ t('Costs of goods sold & expenses', 'વેચાયેલા માલનો ખર્ચ અને અન્ય ખર્ચ') }}</div><div class="stat-value text-2xl">{{ net_costs | inr }}</div>
-    <div class="stat-desc">{{ t('after stock in hand', 'સ્ટોક બાદ') }} {{ stock_value | inr }}</div></div>
+    <div class="stat-desc w-full mt-1 border-t border-base-300 pt-1">{{ sub('after stock in hand', 'સ્ટોક બાદ', stock_value | inr) }}</div></div>
   <div class="stat py-2"><div class="stat-title">{{ t('Net', 'ચોખ્ખું') }}</div><div class="stat-value text-2xl {{ 'text-error' if net < 0 else 'text-success' }}">{{ net | inr }}</div>
-    <div class="stat-desc">{% if sales.awaiting_weight %}{{ sales.awaiting_weight }} {{ t('truck(s) awaiting industry weight', 'ટ્રકનું કારખાનાનું વજન બાકી') }}{% else %}{{ t('all trucks weighed', 'બધી ટ્રક તોલાઈ') }}{% endif %}</div></div>
+    <div class="stat-desc w-full mt-1 border-t border-base-300 pt-1">{% if sales.awaiting_weight %}{{ sub('truck(s) awaiting industry weight', 'ટ્રકનું કારખાનાનું વજન બાકી', sales.awaiting_weight) }}{% else %}{{ sub('all trucks weighed', 'બધી ટ્રક તોલાઈ') }}{% endif %}</div></div>
 </div>
 
 <div class="grid lg:grid-cols-2 gap-4">
@@ -45,13 +49,13 @@
     <h2 class="font-semibold">{{ t('Outstanding now (all years)', 'અત્યારે બાકી (બધા વર્ષ)') }}</h2>
     <table class="table table-sm"><tbody>
       {{ line(('To receive from industries', 'ઉદ્યોગો પાસેથી લેવાના'), receivable_now, 'font-semibold') }}
-      {% for key, spec in parties.items() %}<tr><td>{{ t('To pay: ' ~ spec.label[0], 'ચૂકવવાના: ' ~ spec.label[1]) }} <a class="link text-xs" href="/dues?type={{ key }}">→</a></td><td class="text-right">{{ owed[key] | inr }}</td></tr>{% endfor %}
+      {% for key, spec in parties.items() %}<tr><td><span class="inline-flex items-center gap-2"><span class="inline-flex flex-col"><span>To pay: {{ spec.label[0] }}</span><span class="gu text-xs">ચૂકવવાના: {{ spec.label[1] }}</span></span><a class="link text-xs" href="/Payables?type={{ key }}">→</a></span></td><td class="text-right">{{ owed[key] | inr }}</td></tr>{% endfor %}
     </tbody></table>
   </div></div>
 
   <div class="card bg-base-100 shadow"><div class="card-body p-4">
     <h2 class="font-semibold">{{ t('Weight shortage', 'વજન ઘટ') }}</h2>
-    <p class="text-sm">{{ t('Industry weighed', 'કારખાનામાં તોલાયું') }} <b>{{ '{:,}'.format(sales.short_kg) }} kg</b> ({{ ship_pct }}%) {{ t('less than our weighbridge, across weighed trucks.', 'આપણા કાંટા કરતાં ઓછું, તોલાયેલી ટ્રકમાં.') }}</p>
+    <div class="text-sm">{{ sub('Industry weighed less than our weighbridge, across weighed trucks', 'કારખાનામાં તોલાયું આપણા કાંટા કરતાં ઓછું, તોલાયેલી ટ્રકમાં', '{:,} kg ({}%)'.format(sales.short_kg, ship_pct)) }}</div>
   </div></div>
 </div>
 
@@ -67,4 +71,5 @@
     </tbody>
   </table></div>
 </div></div>
+</div>
 {% endblock %}

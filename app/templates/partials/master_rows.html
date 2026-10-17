@@ -1,11 +1,11 @@
 {% for row in rows %}
 <tr>
-  {% for col in spec.list_columns %}<td>{{ cell(row, col) }}</td>{% endfor %}
+  {% for col in spec.list_columns %}<td>{{ cell(row, col) | mobhtml if spec.field(col).is_mobile else cell(row, col) }}</td>{% endfor %}
   <td class="text-right whitespace-nowrap">
-    {% if spec.slug == 'farmers' %}<a class="btn btn-ghost btn-xs" href="/farmers/{{ row.id }}/statement">{{ L['statement'][0] }} {{ L['statement'][1] }}</a>{% endif %}
-    <a class="btn btn-ghost btn-xs" href="/masters/{{ spec.slug }}/{{ row.id }}/edit">{{ L['edit'][0] }} {{ L['edit'][1] }}</a>
+    {% if spec.slug == 'Farmers' %}<a class="btn btn-ghost btn-xs" href="/Farmers/{{ row.id }}/Statement"><span class="bi"><span>{{ L['statement'][0] }}</span> <span class="gu">{{ L['statement'][1] }}</span></span></a>{% endif %}
+    <a class="btn btn-ghost btn-xs" href="/Masters/{{ spec.slug }}/{{ row.id }}/Edit"><span class="bi"><span>{{ L['edit'][0] }}</span> <span class="gu">{{ L['edit'][1] }}</span></span></a>
   </td>
 </tr>
 {% else %}
-<tr><td colspan="{{ spec.list_columns | length + 1 }}" class="text-center opacity-60">{{ L['no_records'][0] }} {{ L['no_records'][1] }}</td></tr>
+<tr><td colspan="{{ spec.list_columns | length + 1 }}" class="text-center opacity-60"><span class="bi"><span>{{ L['no_records'][0] }}</span> <span class="gu">{{ L['no_records'][1] }}</span></span></td></tr>
 {% endfor %}

@@ -13,16 +13,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, lock, normalize_fields, read_form, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, today
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
+from app.services.filters import trip_conditions
 from app.models import Bilty, BrokerBooking, Brokerage, Industry, TruckTrip, User
 from app.services import audit, money
 from app.services.receivables import received_map
 from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible
 
-router = APIRouter(prefix="/bookings")
+router = APIRouter(prefix="/Bookings")
 
 TRUCK_SIZES = (10, 15, 20, 25, 30, 35)
 
@@ -37,8 +38,8 @@ class BookingIn(BaseModel):
     description: str | None = None
 
 
-async def booking_fields(db: AsyncSession) -> list[F]:
-    brokerages = list((await db.scalars(select(Brokerage))).unique().all())
+async def booking_fields(db: AsyncSession, grain_id: int = 0) -> list[F]:
+    brokerages = list((await db.scalars(select(Brokerage).where(*([Brokerage.grain_id == grain_id] if grain_id else [])))).unique().all())
     brokerages.sort(key=lambda b: (b.broker.broker_name, b.grain.grain_name))
     industries = list((await db.scalars(select(Industry).order_by(Industry.industrialist_name))).all())
     return [
@@ -88,13 +89,15 @@ async def _trip_count(db: AsyncSession, booking_id: int) -> int:
 
 @router.get("", response_class=HTMLResponse)
 async def list_page(
-    request: Request, year: str = "", grain_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
+    request: Request, year: str = "", grain_id: int = 0, village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
     years = allowed_years(user, (await db.scalars(select(BrokerBooking.business_year).distinct())).all())
     year = year if year in years else current_year_label()
     stmt = select(BrokerBooking).where(BrokerBooking.business_year == year)
     if grain_id:
         stmt = stmt.join(Brokerage, Brokerage.id == BrokerBooking.brokerage_id).where(Brokerage.grain_id == grain_id)
+    if village_id:  # bookings that have a trip carrying bags bought in that village
+        stmt = stmt.where(BrokerBooking.id.in_(select(TruckTrip.broker_booking_id).where(*trip_conditions(0, village_id))))
     bookings = list((await db.scalars(stmt.order_by(BrokerBooking.booking_date.desc(), BrokerBooking.id.desc()))).unique().all())
     counts = {}
     if bookings:
@@ -106,19 +109,19 @@ async def list_page(
 
 # ---------------------------------------------------------------- create / edit
 
-@router.get("/new", response_class=HTMLResponse)
+@router.get("/New", response_class=HTMLResponse)
 async def new_page(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
-    ctx = form_context(fields=await booking_fields(db), values=dict(booking_date=today().isoformat()), errors={}, action="/bookings",
-                       heading=("New booking", "નવું બુકિંગ"), back_url="/bookings")
+    ctx = form_context(fields=await booking_fields(db, toolbar_ids(request)[1]), values=dict(booking_date=today().isoformat()), errors={}, action="/Bookings",
+                       heading=("New booking", "નવું બુકિંગ"), back_url="/Bookings")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
 
 
-@router.get("/{booking_id}/edit", response_class=HTMLResponse)
+@router.get("/{booking_id}/Edit", response_class=HTMLResponse)
 async def edit_page(request: Request, booking_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     b = await _get_booking(db, booking_id)
     locked = {"brokerage_id", "industry_id", "booking_date"} if await _trip_count(db, b.id) else set()
-    ctx = form_context(fields=lock(await booking_fields(db), locked), values=booking_values(b), errors={}, action=f"/bookings/{b.id}",
-                       heading=("Edit booking", "બુકિંગ સુધારો"), back_url="/bookings")
+    ctx = form_context(fields=lock(await booking_fields(db), locked), values=booking_values(b), errors={}, action=f"/Bookings/{b.id}",
+                       heading=("Edit booking", "બુકિંગ સુધારો"), back_url="/Bookings")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
 
 
@@ -143,10 +146,10 @@ async def _save(request: Request, b: BrokerBooking | None, user: User, db: Async
         fields = lock(fields, {"brokerage_id", "industry_id", "booking_date"})
         stored = booking_values(b)
         raw.update({name: stored[name] for name in ("brokerage_id", "industry_id", "booking_date")})  # trips depend on these
-    action = f"/bookings/{b_id}" if b_id else "/bookings"
+    action = f"/Bookings/{b_id}" if b_id else "/Bookings"
     heading = ("Edit booking", "બુકિંગ સુધારો") if b else ("New booking", "નવું બુકિંગ")
     rerender = lambda errs: render(request, "partials/master_form.html", **form_context(  # noqa: E731
-        fields=fields, values=raw, errors=errs, action=action, heading=heading, back_url="/bookings"))
+        fields=fields, values=raw, errors=errs, action=action, heading=heading, back_url="/Bookings"))
 
     clean, errors = run_validation(BookingIn, fields, normalize_fields(fields, raw))
     if errors:
@@ -176,8 +179,8 @@ async def _save(request: Request, b: BrokerBooking | None, user: User, db: Async
                 money.receivable_amount(n, x.booking_weight, clean["grain_rate_per_booking_weight"], x.any_rate_change), clean["percentage_deduction"])
             if new < received[x.id]:
                 return rerender({"grain_rate_per_booking_weight": (
-                    f"Bill #{x.bill_number} already has ₹{received[x.id]} received; this change would take its bill below that",
-                    f"બિલ #{x.bill_number} સામે ₹{received[x.id]} મળી ગયા છે; આ ફેરફારથી બિલ તેથી ઓછું થશે")})
+                    f"Bill #{x.bill_number} already has ₹ {received[x.id]} received; this change would take its bill below that",
+                    f"બિલ #{x.bill_number} સામે ₹ {received[x.id]} મળી ગયા છે; આ ફેરફારથી બિલ તેથી ઓછું થશે")})
         before = booking_snapshot(b)
         for name, value in clean.items():
             setattr(b, name, value)
@@ -191,4 +194,4 @@ async def _save(request: Request, b: BrokerBooking | None, user: User, db: Async
     except IntegrityError:
         await db.rollback()
         return rerender({"booking_date": GENERIC_ERROR})
-    return Response(status_code=204, headers={"HX-Redirect": "/bookings"})
+    return Response(status_code=204, headers={"HX-Redirect": "/Bookings"})

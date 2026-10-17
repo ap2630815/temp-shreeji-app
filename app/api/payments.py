@@ -1,4 +1,4 @@
-"""Payments to any party (farmer, transporter, labour, bag supplier, broker), statements, receipts and dues."""
+"""Payments to any party (farmer, transporter, labour, bag supplier, broker), statements, receipts and payables."""
 
 from datetime import date
 from typing import Annotated, Literal
@@ -19,7 +19,7 @@ from app.core.pdf import render_pdf
 from app.core.templating import render, render_with_csrf
 from app.models import Payment, User
 from app.services import payables as pay_svc
-from app.services.ledger import all_entry_views, totals
+from app.services.ledger import DIRECT, FARMER, all_entry_views, totals
 from app.services.payables import PARTIES, PaymentError
 from app.services.years import YearLockedError
 
@@ -43,7 +43,7 @@ def payment_fields() -> list[F]:
     return [
         F("payment_date", "Payment date", "ચુકવણીની તારીખ", kind="date", required=True),
         F("amount", "Amount (₹)", "રકમ (₹)", kind="int", required=True,
-          help=("Settles the oldest dues first; partial payment is fine", "સૌથી જૂની બાકી પહેલા ચૂકવાશે; આંશિક ચુકવણી ચાલે")),
+          help=("Settles the oldest payables first; partial payment is fine", "સૌથી જૂની બાકી પહેલા ચૂકવાશે; આંશિક ચુકવણી ચાલે")),
         F("method", "Method", "રીત", kind="select", required=True, options=METHOD_OPTIONS),
         F("receiver_name", "Receiver name", "લેનારનું નામ", required=True, max_length=120),
         F("receiver_mobile", "Receiver mobile", "લેનારનો મોબાઇલ", kind="tel", required=True, pattern=MOBILE,
@@ -74,22 +74,22 @@ async def farmer_statement_data(db: AsyncSession, farmer_id: int) -> dict:
     return dict(farmer=farmer, views=views, payments=await pay_svc.payments_of(db, "farmer", farmer_id), totals=totals(views, now), today=now)
 
 
-@router.get("/farmers/{farmer_id}/statement", response_class=HTMLResponse)
+@router.get("/Farmers/{farmer_id}/Statement", response_class=HTMLResponse)
 async def farmer_statement_page(
     request: Request, farmer_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
     return render_with_csrf(request, csrf, "statement.html", user=user, **await farmer_statement_data(db, farmer_id))
 
 
-@router.get("/farmers/{farmer_id}/statement.pdf")
+@router.get("/Farmers/{farmer_id}/Statement.pdf")
 async def farmer_statement_pdf(farmer_id: int, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     pdf = await run_in_threadpool(render_pdf, "print/statement.html", **await farmer_statement_data(db, farmer_id))
     return Response(pdf, media_type="application/pdf", headers=PDF_HEADERS)
 
 
-@router.get("/farmers/{farmer_id}/pay")
+@router.get("/Farmers/{farmer_id}/Pay")
 async def farmer_pay_redirect(farmer_id: int, user: User = Depends(current_user)):
-    return RedirectResponse(f"/pay/farmer/{farmer_id}", status_code=303)
+    return RedirectResponse(f"/Pay/farmer/{farmer_id}", status_code=303)
 
 
 # ------------------------------------------------------------------ generic statement
@@ -102,19 +102,19 @@ async def statement_data(db: AsyncSession, party_type: str, party_id: int) -> di
                 party_name_gu=PARTIES[party_type].name_gu(party), party_mobile=PARTIES[party_type].mobile(party), rows=rows, payments=await pay_svc.payments_of(db, party_type, party_id), totals=pay_svc.summarize(rows, now), today=now)
 
 
-@router.get("/statements/{party_type}/{party_id}", response_class=HTMLResponse)
+@router.get("/Statements/{party_type}/{party_id}", response_class=HTMLResponse)
 async def statement_page(
     request: Request, party_type: str, party_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
     if party_type == "farmer":
-        return RedirectResponse(f"/farmers/{party_id}/statement", status_code=303)
+        return RedirectResponse(f"/Farmers/{party_id}/Statement", status_code=303)
     return render_with_csrf(request, csrf, "statement_generic.html", user=user, **await statement_data(db, party_type, party_id))
 
 
-@router.get("/statements/{party_type}/{party_id}/pdf")
+@router.get("/Statements/{party_type}/{party_id}/Pdf")
 async def statement_pdf(party_type: str, party_id: int, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     if party_type == "farmer":
-        return RedirectResponse(f"/farmers/{party_id}/statement.pdf", status_code=303)
+        return RedirectResponse(f"/Farmers/{party_id}/Statement.pdf", status_code=303)
     pdf = await run_in_threadpool(render_pdf, "print/statement_generic.html", **await statement_data(db, party_type, party_id))
     return Response(pdf, media_type="application/pdf", headers=PDF_HEADERS)
 
@@ -125,13 +125,13 @@ def _pay_ctx(party_type: str, party, fields, values, errors, summary):
     name = PARTIES[party_type].name(party)
     label = party_label(party_type)
     return form_context(
-        fields=fields, values=values, errors=errors, action=f"/pay/{party_type}/{party.id}",
+        fields=fields, values=values, errors=errors, action=f"/Pay/{party_type}/{party.id}",
         heading=(f"Pay {label[0].lower()}: {name}", f"ચુકવણી ({label[1]}): {name}"),
-        back_url=f"/statements/{party_type}/{party.id}", party=party, party_type=party_type, summary=summary,
+        back_url=f"/Statements/{party_type}/{party.id}", party=party, party_type=party_type, summary=summary,
     )
 
 
-@router.get("/pay/{party_type}/{party_id}", response_class=HTMLResponse)
+@router.get("/Pay/{party_type}/{party_id}", response_class=HTMLResponse)
 async def pay_page(
     request: Request, party_type: str, party_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
@@ -144,7 +144,7 @@ async def pay_page(
     return render_with_csrf(request, csrf, "pay_form_page.html", user=user, **_pay_ctx(party_type, party, payment_fields(), values, {}, summary))
 
 
-@router.post("/pay/{party_type}/{party_id}", response_class=HTMLResponse)
+@router.post("/Pay/{party_type}/{party_id}", response_class=HTMLResponse)
 async def pay(
     request: Request, party_type: str, party_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
@@ -174,7 +174,7 @@ async def pay(
     except IntegrityError:
         await db.rollback()
         return rerender({"amount": GENERIC_ERROR})
-    return Response(status_code=204, headers={"HX-Redirect": f"/payments/{payment_id}"})
+    return Response(status_code=204, headers={"HX-Redirect": f"/Payments/{payment_id}"})
 
 
 # ------------------------------------------------------------------ receipt
@@ -189,31 +189,34 @@ async def receipt_data(db: AsyncSession, payment_id: int) -> dict:
                 lines=await pay_svc.payment_lines(db, payment))
 
 
-@router.get("/payments/{payment_id}", response_class=HTMLResponse)
+@router.get("/Payments/{payment_id}", response_class=HTMLResponse)
 async def receipt_page(
     request: Request, payment_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
     return render_with_csrf(request, csrf, "receipt.html", user=user, **await receipt_data(db, payment_id))
 
 
-@router.get("/payments/{payment_id}/receipt.pdf")
+@router.get("/Payments/{payment_id}/Receipt.pdf")
 async def receipt_pdf(payment_id: int, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     pdf = await run_in_threadpool(render_pdf, "print/receipt.html", **await receipt_data(db, payment_id))
     return Response(pdf, media_type="application/pdf", headers=PDF_HEADERS)
 
 
-# ------------------------------------------------------------------ dues
+# ------------------------------------------------------------------ payables
 
-@router.get("/dues", response_class=HTMLResponse)
-async def dues_page(
-    request: Request, type: str = "farmer", village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
+@router.get("/Payables", response_class=HTMLResponse)
+async def payables_page(
+    request: Request, type: str = "farmer", village_id: int = 0, grain_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
     if type not in PARTIES:
         raise HTTPException(404)
     now = today()
     per_party: dict[int, dict] = {}
+    on_grain: set[tuple[str, int]] | None = None
+    if type == "farmer" and grain_id:  # the toolbar grain: only the entries (purchase or individual) of that grain
+        on_grain = {(DIRECT if v.entry.is_direct else FARMER, v.entry.id) for v in await all_entry_views(db) if v.entry.grain.id == grain_id}
     for p in await pay_svc.load_payables(db, type):
-        if p.due <= 0:
+        if p.due <= 0 or (on_grain is not None and (p.payable_type, p.payable_id) not in on_grain):
             continue
         row = per_party.setdefault(p.party_id, dict(party_id=p.party_id, name=p.party_name, due=0, overdue=0, earliest=p.sort_key[0], items=0))
         row["due"] += p.due
@@ -234,5 +237,5 @@ async def dues_page(
     rows = [r for r in per_party.values() if not village_id or r["village_id"] == village_id]  # the toolbar village filters farmers
     rows.sort(key=lambda r: (-r["overdue"], r["earliest"], r["name"]))
     summary = dict(due=sum(r["due"] for r in rows), overdue=sum(r["overdue"] for r in rows))
-    return render_with_csrf(request, csrf, "dues.html", user=user, rows=rows, summary=summary,
+    return render_with_csrf(request, csrf, "payables.html", user=user, rows=rows, summary=summary,
                             today=now, type=type, parties=PARTIES)

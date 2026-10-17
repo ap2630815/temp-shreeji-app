@@ -10,29 +10,29 @@
   {{ card('/PurchaseFarmersEntries', 'Purchase Farmers Entries', 'ખરીદી ખેડૂત નોંધ') }}
   {{ card('/PurchaseIndividual', 'Purchase Individual', 'ખરીદી વ્યક્તિગત') }}
   {{ card('/PurchaseGroup', 'Purchase Group', 'ખરીદી જૂથ') }}
-  {{ card('/dues?type=farmer', 'Farmer dues', 'ખેડૂતોની બાકી ચુકવણી') }}
-  {{ card('/bag-supplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
-  {{ card('/labour-work', 'Labour work', 'મજૂર કામ') }}
+  {{ card('/Payables?type=farmer', 'Farmer payables', 'ખેડૂતોની બાકી ચુકવણી') }}
+  {{ card('/BagSupplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
+  {{ card('/LabourWork', 'Labour work', 'મજૂર કામ') }}
 </div>
 <h2 class="font-semibold mb-2">{{ t('Selling (trucks)', 'વેચાણ (ટ્રક)') }}</h2>
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-  {{ card('/bookings', 'Broker bookings', 'દલાલ બુકિંગ') }}
-  {{ card('/trips', 'Truck trips & bilty', 'ટ્રક ટ્રીપ અને બિલ્ટી') }}
-  {{ card('/receivables', 'Receivables', 'ઉદ્યોગો પાસેથી લેણાં') }}
-  {{ card('/dues?type=truck', 'Truck dues', 'ટ્રક માલિકને ચૂકવવાના') }}
-  {{ card('/dues?type=broker', 'Broker dues', 'દલાલને ચૂકવવાના') }}
+  {{ card('/Bookings', 'Broker bookings', 'દલાલ બુકિંગ') }}
+  {{ card('/Trips', 'Truck trips & bilty', 'ટ્રક ટ્રીપ અને બિલ્ટી') }}
+  {{ card('/Receivables', 'Receivables', 'ઉદ્યોગો પાસેથી લેણાં') }}
+  {{ card('/Payables?type=truck', 'Truck payables', 'ટ્રક માલિકને ચૂકવવાના') }}
+  {{ card('/Payables?type=broker', 'Broker payables', 'દલાલને ચૂકવવાના') }}
 </div>
 <h2 class="font-semibold mb-2">{{ t('Accounts', 'હિસાબ') }}</h2>
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-  {{ card('/dues', 'All payables', 'બધી ચૂકવણીઓ') }}
-  {{ card('/reports/year', 'Year report', 'વર્ષનો અહેવાલ') }}
-  {% if user.role == 'owner' %}{{ card('/years', 'Business years', 'વ્યવસાય વર્ષ') }}{% endif %}
+  {{ card('/Payables', 'All payables', 'બધી ચૂકવણીઓ') }}
+  {{ card('/Reports/Year', 'Year report', 'વર્ષનો અહેવાલ') }}
+  {% if user.role == 'owner' %}{{ card('/Years', 'Business years', 'વ્યવસાય વર્ષ') }}{% endif %}
 </div>
 
 <h2 class="font-semibold mb-2">{{ t('Masters', 'માસ્ટર્સ') }}</h2>
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
   {% for slug, spec in masters.items() %}
-  <a href="/masters/{{ slug }}" class="card bg-base-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary transition">
+  <a href="/Masters/{{ slug }}" class="card bg-base-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary transition">
     <div class="card-body p-4"><span>{{ spec.label[0] }}</span> <span class="gu text-sm">{{ spec.label[1] }}</span></div>
   </a>
   {% endfor %}

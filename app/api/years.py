@@ -13,7 +13,7 @@ from app.core.templating import render_with_csrf
 from app.models import BagSupply, BrokerBooking, PurchaseIndividual, LabourWork, Payment, PurchaseFarmerEntry, PurchaseGroup, Receipt, TruckTrip, User
 from app.services.years import allowed_years, current_year_label, year_bounds
 
-router = APIRouter(prefix="/years")
+router = APIRouter(prefix="/Years")
 
 
 @router.get("", response_class=HTMLResponse)

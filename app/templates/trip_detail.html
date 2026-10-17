@@ -6,16 +6,16 @@
 {% block content %}
 {% set booking = trip.broker_booking %}
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <a href="/trips?year={{ trip.business_year }}" class="btn btn-ghost btn-sm">←</a>
+  <a href="/Trips?year={{ trip.business_year }}" class="btn btn-ghost btn-sm">←</a>
   <h1 class="text-xl font-semibold flex-1">{{ trip.truck.truck_number }} → {{ trip.industry.industrialist_name }} · {{ trip.grain.grain_name }}</h1>
-  <a href="/trips/{{ trip.id }}/edit" class="btn btn-sm">{{ t('Edit trip', 'ટ્રીપ સુધારો') }}</a>
-  <a href="/trips/{{ trip.id }}/bilty" class="btn btn-primary btn-sm">{{ t('Edit bilty', 'બિલ્ટી સુધારો') if bilty else t('Add bilty', 'બિલ્ટી ઉમેરો') }}</a>
+  <a href="/Trips/{{ trip.id }}/Edit" class="btn btn-sm">{{ t('Edit trip', 'ટ્રીપ સુધારો') }}</a>
+  <a href="/Trips/{{ trip.id }}/Bilty" class="btn btn-primary btn-sm">{{ t('Edit bilty', 'બિલ્ટી સુધારો') if bilty else t('Add bilty', 'બિલ્ટી ઉમેરો') }}</a>
 </div>
 <p class="text-sm mb-1">{{ trip.trip_date }} · {{ t('Transport', 'ટ્રાન્સપોર્ટ') }}: {{ trip.transporter.pet_name }}
-  · {{ t('Truck owner', 'ટ્રક માલિક') }}: <a class="link" href="/statements/truck/{{ trip.truck_id }}">{{ trip.truck.truck_owner_name }}</a>
-  · {{ t('Driver', 'ડ્રાઇવર') }}: {{ trip.truck.driver_name }} ({{ trip.truck.driver_mobile }}) · {{ t('Labour', 'મજૂર') }}: {{ trip.labour_group.group_name }}</p>
+  · {{ t('Truck owner', 'ટ્રક માલિક') }}: <a class="link" href="/Statements/truck/{{ trip.truck_id }}">{{ trip.truck.truck_owner_name }}</a>
+  · {{ t('Driver', 'ડ્રાઇવર') }}: {{ trip.truck.driver_name }} ({{ trip.truck.driver_mobile | mobhtml }}) · {{ t('Labour', 'મજૂર') }}: {{ trip.labour_group.group_name }}</p>
 <p class="text-sm mb-1">{{ t('Booking', 'બુકિંગ') }}: {{ booking.booking_date }} · {{ t('Broker', 'દલાલ') }}:
-  <a class="link" href="/statements/broker/{{ booking.brokerage.broker_id }}">{{ booking.brokerage.broker.broker_name }}</a> · {{ booking.truck_size }} t</p>
+  <a class="link" href="/Statements/broker/{{ booking.brokerage.broker_id }}">{{ booking.brokerage.broker.broker_name }}</a> · {{ booking.truck_size }} T</p>
 {% if trip.description %}<p class="text-sm opacity-80 mb-2">{{ trip.description }}</p>{% endif %}
 <div id="flash" class="mb-3"></div>
 
@@ -29,7 +29,7 @@
         <td><a class="link" href="/PurchaseGroup/{{ line.entry.purchase_group_id }}">{{ line.entry.purchase_group.village.village_name }}</a> · {{ line.entry.farmer.farmer_name }}
           <span class="opacity-60 text-xs">{{ line.entry.purchase_entry_date }}</span></td>
         <td class="text-right">{{ line.no_of_loaded_bags }}<div class="text-xs opacity-60">{{ t('left', 'બાકી') }} {{ line.total_remaining_bags }}</div></td>
-        <td class="text-right"><button class="btn btn-ghost btn-xs text-error" hx-post="/trips/lines/{{ line.id }}/delete" hx-target="#flash"
+        <td class="text-right"><button class="btn btn-ghost btn-xs text-error" hx-post="/Trips/Lines/{{ line.id }}/Delete" hx-target="#flash"
             hx-confirm="Remove this load? / આ લોડ કાઢી નાખવો?">✕</button></td>
       </tr>
       {% else %}<tr><td class="opacity-60">{{ t('Nothing loaded yet', 'હજી કંઈ ભર્યું નથી') }}</td></tr>{% endfor %}
@@ -80,7 +80,7 @@
       {% if trip.rent_per_ton %}
       {{ row('By weight', 'વજન મુજબ', ('%s kg × ₹%s/t = ' % ('{:,}'.format(trip.freight_weight_kg or 0), trip.rent_per_ton)) ~ (trip.freight_by_weight | inr)) }}
       {% else %}
-      {{ row('By bags', 'બેગ મુજબ', ('%s × ₹%s = ' % (trip.bags, trip.rent_per_bag)) ~ (trip.freight_by_bags | inr)) }}
+      {{ row('By bags', 'બેગ મુજબ', ('%s × ₹ %s = ' % (trip.bags, trip.rent_per_bag)) ~ (trip.freight_by_bags | inr)) }}
       {% endif %}
       {{ row('Trip total', 'ટ્રીપ કુલ', trip.trip_total | inr, 'font-semibold') }}
       {{ row('Advance to driver', 'ડ્રાઇવરને એડવાન્સ', '− ' ~ (trip.advance_amount | inr)) }}
@@ -90,7 +90,7 @@
       {{ row('Paid', 'ચૂકવ્યું', freight_paid | inr) }}
       {{ row('Balance', 'બાકી', (trip.total_amount - freight_paid) | inr, 'font-semibold') }}
     </tbody></table>
-    <a class="btn btn-sm btn-outline w-fit" href="/pay/truck/{{ trip.truck_id }}">{{ t('Pay truck owner', 'ટ્રક માલિકને ચુકવણી') }}</a>
+    <a class="btn btn-sm btn-outline w-fit" href="/Pay/truck/{{ trip.truck_id }}">{{ t('Pay truck owner', 'ટ્રક માલિકને ચુકવણી') }}</a>
   </div></div>
 
   <!-- ------------------------------------------------ sale -->
@@ -98,7 +98,7 @@
     <h2 class="font-semibold">{{ t('Sale to industry', 'ઉદ્યોગને વેચાણ') }}</h2>
     {% if bilty %}
     <table class="table table-sm"><tbody>
-      {{ row('Rate', 'ભાવ', '₹%s per %s kg%s' % (booking.grain_rate_per_booking_weight, bilty.booking_weight, (' − ₹%s' % bilty.any_rate_change) if bilty.any_rate_change else '')) }}
+      {{ row('Rate', 'ભાવ', '₹ %s per %s kg%s' % (booking.grain_rate_per_booking_weight, bilty.booking_weight, (' − ₹ %s' % bilty.any_rate_change) if bilty.any_rate_change else '')) }}
       {{ row('Estimated (our weight)', 'અંદાજ (આપણું વજન)', bilty.estimated_amount | inr) }}
       {% if bilty.receivable_amount is not none %}
         {{ row('Receivable (industry weight)', 'લેણાં (કારખાનાનું વજન)', bilty.receivable_amount | inr) }}
@@ -109,7 +109,7 @@
       {% endif %}
       {{ row('Brokerage', 'દલાલી', (bilty.brokerage_amount | inr) ~ ' (' ~ t('paid', 'ચૂકવ્યું') ~ ' ' ~ (brokerage_paid | inr) ~ ')') }}
     </tbody></table>
-    <a class="btn btn-sm btn-outline w-fit" href="/industries/{{ trip.industry.id }}/account">{{ t('Industry account', 'ઉદ્યોગ ખાતું') }}</a>
+    <a class="btn btn-sm btn-outline w-fit" href="/Industries/{{ trip.industry.id }}/Account">{{ t('Industry account', 'ઉદ્યોગ ખાતું') }}</a>
     {% else %}<p class="text-sm opacity-60">—</p>{% endif %}
   </div></div>
 </div>

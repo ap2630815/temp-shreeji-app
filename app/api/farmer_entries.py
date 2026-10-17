@@ -6,8 +6,9 @@
                           One flat row per farmer entry in purchase_individuals, no purchase_group.
 
 A direct entry is part of the farmer ledger: it is paid through the normal farmer payments (allocations of type
-'purchase_individual'), and shows up in dues, statements, the year report and the farmer analysis next to the purchase entries."""
+'purchase_individual'), and shows up in payables, statements, the year report and the farmer analysis next to the purchase entries."""
 
+from dataclasses import replace
 from datetime import date, timedelta
 from typing import Annotated
 
@@ -20,10 +21,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, lock, normalize_fields, read_form, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, today
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
-from app.core.templating import render, render_with_csrf
+from app.core.templating import format_mobile, render, render_with_csrf
 from app.models import PurchaseIndividual, Farmer, Grain, LabourGroup, PurchaseFarmerEntry, PurchaseGroup, User, Village
 from app.services import audit
 from app.services.ledger import all_entry_views, direct_entry_views, paid_for_direct, totals
@@ -49,8 +50,13 @@ async def _ledger_page(request, csrf, db, user, *, year, grain_id, village_id, d
     source = direct_entry_views(db) if direct else all_entry_views(db)
     views = [v for v in await source if v.entry.business_year == year and (not grain_id or v.entry.grain.id == grain_id) and (not village_id or v.entry.farmer.village_id == village_id)]  # the village of the farmer; a purchase's own village is reached through its # link
     views.sort(key=lambda v: (v.entry.entry_date, v.entry.id), reverse=True)
+    group_stmt = select(PurchaseGroup).where(PurchaseGroup.business_year == year)  # the Group Ledger dropdown follows the toolbar too
+    if grain_id:
+        group_stmt = group_stmt.where(PurchaseGroup.grain_id == grain_id)
+    if village_id:
+        group_stmt = group_stmt.where(PurchaseGroup.village_id == village_id)
     infos = [] if direct else list((await db.scalars(
-        select(PurchaseGroup).where(PurchaseGroup.business_year == year).order_by(PurchaseGroup.purchase_group_date.desc(), PurchaseGroup.id.desc()).limit(100)
+        group_stmt.order_by(PurchaseGroup.purchase_group_date.desc(), PurchaseGroup.id.desc()).limit(100)
     )).unique().all())
     now = today()
     return render_with_csrf(request, csrf, "farmers_entries.html", user=user, views=views, totals=totals(views, now), today=now, year=year, years=years,
@@ -108,7 +114,7 @@ async def direct_fields(db: AsyncSession) -> tuple[list[F], list[F], dict[int, i
         F("terms", "Terms & conditions", "શરતો", kind="textarea", help=("Leave blank to copy the grain's default terms", "ખાલી રાખો તો અનાજની ડિફોલ્ટ શરતો લેવાશે")),
     ]
     entry = [
-        F("farmer_id", "Farmer", "ખેડૂત", kind="select", required=True, options=tuple((str(f.id), f"{f.farmer_name} — {f.village.village_name} — {f.mobile}") for f in farmers)),
+        F("farmer_id", "Farmer", "ખેડૂત", kind="select", required=True, options=tuple((str(f.id), f"{f.farmer_name} — {f.village.village_name} — {format_mobile(f.mobile)}") for f in farmers)),
         F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True, options=tuple((str(g.id), g.group_name) for g in groups)),
         F("no_of_filled_bags", "Filled bags", "ભરેલી બેગ", kind="int", required=True),
         F("extra_kilos", "Extra kilos (loose, beyond full bags)", "વધારાના કિલો (પૂરી બેગ ઉપરાંત)", kind="int"),
@@ -156,7 +162,7 @@ def _ctx(purchase_fields, entry_fields, values, errors, action, heading, nets, e
     )
 
 
-@router.get("/PurchaseIndividual/new", response_class=HTMLResponse)
+@router.get("/PurchaseIndividual/New", response_class=HTMLResponse)
 async def direct_new(request: Request, like: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     purchase, entry, nets, farmer_villages = await direct_fields(db)
     values = dict(purchase_individual_date=today().isoformat(), extra_kilos="0", no_of_handful_bags="0", borrowed_amount="0")
@@ -164,16 +170,20 @@ async def direct_new(request: Request, like: int = 0, user: User = Depends(curre
         prev = await db.get(PurchaseIndividual, like)
         if prev is not None:
             values.update({k: v for k, v in direct_values(prev).items() if k in {f.name for f in purchase}})
+    values = apply_toolbar(request, values)  # the toolbar village / grain start their fields (editable)
+    village_id = toolbar_ids(request)[0]
+    if village_id:  # and the farmers of that village
+        entry = [replace(f, options=tuple(o for o in f.options if farmer_villages.get(int(o[0])) == village_id)) if f.name == "farmer_id" else f for f in entry]
     ctx = _ctx(purchase, entry, values, {}, "/PurchaseIndividual", ("Add purchase individual", "ખરીદી વ્યક્તિગત ઉમેરો"), nets, False, farmer_villages)
     return render_with_csrf(request, csrf, "direct_form_page.html", user=user, **ctx)
 
 
-@router.get("/PurchaseIndividual/{entry_id}/edit", response_class=HTMLResponse)
+@router.get("/PurchaseIndividual/{entry_id}/Edit", response_class=HTMLResponse)
 async def direct_edit(request: Request, entry_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     e = await _get_direct(db, entry_id)
     purchase, entry, nets, farmer_villages = await direct_fields(db)
     locked = {"farmer_id"} if await paid_for_direct(db, e.id) else set()  # money already paid to this farmer is tied to him
-    ctx = _ctx(purchase, lock(entry, locked), direct_values(e), {}, f"/PurchaseIndividual/{e.id}",
+    ctx = _ctx(purchase, lock(entry, locked), apply_toolbar(request, direct_values(e)), {}, f"/PurchaseIndividual/{e.id}",
                (f"Edit direct entry — {e.farmer.farmer_name}", f"સીધી નોંધ સુધારો — {e.farmer.farmer_name}"), nets, True, farmer_villages)
     return render_with_csrf(request, csrf, "direct_form_page.html", user=user, **ctx)
 
@@ -238,9 +248,9 @@ async def _save_direct(request: Request, e: PurchaseIndividual | None, user: Use
     clean["due_date"] = clean["purchase_individual_date"] + timedelta(days=clean["pay_after_no_of_days"])
     clean["total_available_bags"] = total_available_bags(clean["no_of_filled_bags"], clean["no_of_handful_bags"])
     if clean["borrowed_amount"] > clean["payable_amount"]:
-        return rerender({"borrowed_amount": (f"Cannot exceed the amount payable (₹{clean['payable_amount']})", f"ચૂકવવાપાત્ર રકમ (₹{clean['payable_amount']}) થી વધુ ન હોઈ શકે")})
+        return rerender({"borrowed_amount": (f"Cannot exceed the amount payable (₹ {clean['payable_amount']})", f"ચૂકવવાપાત્ર રકમ (₹ {clean['payable_amount']}) થી વધુ ન હોઈ શકે")})
     if clean["payable_amount"] - clean["borrowed_amount"] < paid:
-        return rerender({"no_of_filled_bags": (f"₹{paid} is already paid against this entry; the amount cannot go below that", f"આ એન્ટ્રી સામે ₹{paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
+        return rerender({"no_of_filled_bags": (f"₹ {paid} is already paid against this entry; the amount cannot go below that", f"આ એન્ટ્રી સામે ₹ {paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
 
     before = None
     if e is not None:
@@ -258,4 +268,4 @@ async def _save_direct(request: Request, e: PurchaseIndividual | None, user: Use
     except IntegrityError:
         await db.rollback()
         return rerender({"no_of_filled_bags": GENERIC_ERROR})
-    return Response(status_code=204, headers={"HX-Redirect": f"/PurchaseIndividual/new?like={new_id}" if again else "/PurchaseIndividual"})
+    return Response(status_code=204, headers={"HX-Redirect": f"/PurchaseIndividual/New?like={new_id}" if again else "/PurchaseIndividual"})

@@ -19,7 +19,8 @@ from app.api.payments import METHOD_OPTIONS, PDF_HEADERS
 from app.core.db import get_db
 from app.core.pdf import render_pdf
 from app.core.templating import render, render_with_csrf
-from app.models import Industry, Receipt, ReceiptAllocation, User
+from app.models import Industry, Receipt, ReceiptAllocation, TruckTrip, User
+from app.services.filters import trip_conditions
 from app.services import receivables as svc
 from app.services.payables import PaymentError
 from app.services.years import YearLockedError
@@ -63,10 +64,14 @@ async def account_data(db: AsyncSession, industry_id: int) -> dict:
 
 # ------------------------------------------------------------------ overview
 
-@router.get("/receivables", response_class=HTMLResponse)
-async def overview(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
+@router.get("/Receivables", response_class=HTMLResponse)
+async def overview(request: Request, grain_id: int = 0, village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     per: dict[int, list] = {}
+    conds = trip_conditions(grain_id, village_id)  # the toolbar: booking grain / village the bags were bought in
+    allowed = set((await db.scalars(select(TruckTrip.id).where(*conds))).all()) if conds else None
     for v in await svc.bilty_views(db):
+        if allowed is not None and v.bilty.truck_trip_id not in allowed:
+            continue
         per.setdefault(v.bilty.trip.industry.id, []).append(v)
     industries = {i.id: i for i in (await db.scalars(select(Industry).where(Industry.id.in_(per)))).all()} if per else {}
     rows = sorted(((industries[i], svc.summarize(vs)) for i, vs in per.items()), key=lambda r: (-r[1]["due"], r[0].industrialist_name))
@@ -76,12 +81,12 @@ async def overview(request: Request, user: User = Depends(current_user), csrf: C
 
 # ------------------------------------------------------------------ account
 
-@router.get("/industries/{industry_id}/account", response_class=HTMLResponse)
+@router.get("/Industries/{industry_id}/Account", response_class=HTMLResponse)
 async def account_page(request: Request, industry_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     return render_with_csrf(request, csrf, "industry_account.html", user=user, **await account_data(db, industry_id))
 
 
-@router.get("/industries/{industry_id}/account.pdf")
+@router.get("/Industries/{industry_id}/Account.pdf")
 async def account_pdf(industry_id: int, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     pdf = await run_in_threadpool(render_pdf, "print/industry_account.html", **await account_data(db, industry_id))
     return Response(pdf, media_type="application/pdf", headers=PDF_HEADERS)
@@ -91,12 +96,12 @@ async def account_pdf(industry_id: int, user: User = Depends(current_user), db: 
 
 def _ctx(industry: Industry, fields, values, errors):
     return form_context(
-        fields=fields, values=values, errors=errors, action=f"/industries/{industry.id}/receive",
-        heading=(f"Receive from {industry.industrialist_name}", f"{industry.industrialist_name} પાસેથી પ્રાપ્તિ"), back_url=f"/industries/{industry.id}/account", industry=industry,
+        fields=fields, values=values, errors=errors, action=f"/Industries/{industry.id}/Receive",
+        heading=(f"Receive from {industry.industrialist_name}", f"{industry.industrialist_name} પાસેથી પ્રાપ્તિ"), back_url=f"/Industries/{industry.id}/Account", industry=industry,
     )
 
 
-@router.get("/industries/{industry_id}/receive", response_class=HTMLResponse)
+@router.get("/Industries/{industry_id}/Receive", response_class=HTMLResponse)
 async def receive_page(request: Request, industry_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     industry = await _industry(db, industry_id)
     summary = svc.summarize(await svc.bilty_views(db, industry_id))
@@ -104,7 +109,7 @@ async def receive_page(request: Request, industry_id: int, user: User = Depends(
     return render_with_csrf(request, csrf, "receive_form_page.html", user=user, summary=summary, **_ctx(industry, receipt_fields(), values, {}))
 
 
-@router.post("/industries/{industry_id}/receive", response_class=HTMLResponse)
+@router.post("/Industries/{industry_id}/Receive", response_class=HTMLResponse)
 async def receive(request: Request, industry_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     await csrf.validate_csrf(request)
     industry = await _industry(db, industry_id)
@@ -128,7 +133,7 @@ async def receive(request: Request, industry_id: int, user: User = Depends(curre
     except IntegrityError:
         await db.rollback()
         return rerender({"amount": GENERIC_ERROR})
-    return Response(status_code=204, headers={"HX-Redirect": f"/receipts/{receipt_id}"})
+    return Response(status_code=204, headers={"HX-Redirect": f"/Receipts/{receipt_id}"})
 
 
 # ------------------------------------------------------------------ voucher
@@ -148,12 +153,12 @@ async def voucher_data(db: AsyncSession, receipt_id: int) -> dict:
     return dict(receipt=receipt, industry=receipt.industry, lines=lines)
 
 
-@router.get("/receipts/{receipt_id}", response_class=HTMLResponse)
+@router.get("/Receipts/{receipt_id}", response_class=HTMLResponse)
 async def voucher_page(request: Request, receipt_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     return render_with_csrf(request, csrf, "receipt_in.html", user=user, **await voucher_data(db, receipt_id))
 
 
-@router.get("/receipts/{receipt_id}/voucher.pdf")
+@router.get("/Receipts/{receipt_id}/Voucher.pdf")
 async def voucher_pdf(receipt_id: int, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     pdf = await run_in_threadpool(render_pdf, "print/receipt_in.html", **await voucher_data(db, receipt_id))
     return Response(pdf, media_type="application/pdf", headers=PDF_HEADERS)

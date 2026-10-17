@@ -1,6 +1,6 @@
 {# usage: {% from "partials/bilabel.html" import bi, t, badge %} #}
 {% macro bi(key) -%}
-<span>{{ L[key][0] }}</span> <span class="gu">{{ L[key][1] }}</span>
+<span class="bi"><span>{{ L[key][0] }}</span> <span class="gu">{{ L[key][1] }}</span></span>
 {%- endmacro %}
 
 {# inline English / Gujarati pair #}

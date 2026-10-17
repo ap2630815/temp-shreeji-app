@@ -10,7 +10,7 @@ column                  | type                     | constraints
 id                      | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 farmer_name             | VARCHAR(120)             | NOT NULL
 farmer_name_gu          | VARCHAR(120)             | -
-head_of_family          | VARCHAR(60)              | -
+head_of_family          | VARCHAR(100)             | NOT NULL on the form  -- "Self", or the farmer's own surname + head's name + father's name, joined by spaces
 mobile                  | VARCHAR(10)              | NOT NULL, UNIQUE
 email                   | VARCHAR(60)              | UNIQUE
 village_id              | INTEGER                  | NOT NULL, FOREIGN KEY -> villages.id

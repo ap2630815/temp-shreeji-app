@@ -49,7 +49,7 @@ LABOUR = [("Hanuman Group", "હનુમાન ગ્રુપ", "Parmar Lakha 
 TRANSPORTERS = [("Shree Ganesh Transport", "Ganesh", "Rajkot"), ("Jay Bhavani Roadways", "Bhavani", "Junagadh"), ("Saurashtra Carriers", "Saurashtra", "Gondal"), ("Patel Logistics", "Patel Logi", "Morbi"),
                 ("Maa Karni Transport", "Karni", "Jetpur"), ("Khodal Freight", "Khodal", "Upleta"), ("Sorath Roadlines", "Sorath", "Keshod"), ("New Gujarat Cargo", "NG Cargo", "Jamnagar"),
                 ("Dwarka Transport Co", "Dwarka TC", "Dhoraji"), ("Ramdev Transport", "Ramdev", "Rajkot")]
-TRUCKS = ["GJ11AB1234", "GJ03BT4521", "GJ14X6720", "GJ01DZ3345", "GJ03AX9081", "GJ11BC2277", "GJ10TT5566", "GJ03CD7410", "GJ13AA8802", "GJ05YZ1969"]
+TRUCKS = ["GJ 11 AB 1234", "GJ 03 BT 4521", "GJ 14  X 6720", "GJ 01 DZ 3345", "GJ 03 AX 9081", "GJ 11 BC 2277", "GJ 10 TT 5566", "GJ 03 CD 7410", "GJ 13 AA 8802", "GJ 05 YZ 1969"]
 INDUSTRIES = [("Shree Balaji Rice Mill", "શ્રી બાલાજી રાઈસ મિલ", "Rice", "Morbi"), ("Khodal Oil Mill", "ખોડલ ઓઈલ મિલ", "Groundnut oil", "Gondal"),
               ("Annapurna Flour Mill", "અન્નપૂર્ણા ફ્લોર મિલ", "Wheat flour", "Rajkot"), ("Gujarat Dal Mill", "ગુજરાત દાલ મિલ", "Dal", "Jetpur"), ("Saurashtra Agro", "સૌરાષ્ટ્ર એગ્રો", "Castor oil", "Jamnagar"),
               ("Sorath Foods", "સોરઠ ફૂડ્સ", "Besan", "Junagadh"), ("Madhav Agro Industries", "માધવ એગ્રો ઇન્ડસ્ટ્રીઝ", "Pulses", "Dhoraji"), ("Jay Jalaram Mill", "જય જલારામ મિલ", "Rice", "Upleta"),

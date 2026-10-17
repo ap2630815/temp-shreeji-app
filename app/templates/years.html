@@ -12,7 +12,7 @@
       <td class="font-semibold">{{ y.label }}</td>
       <td>{{ y.bounds[0] }} → {{ y.bounds[1] }}</td>
       <td>{% if y.current %}<span class="badge badge-success">{{ t('Current', 'ચાલુ') }}</span>{% else %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}</td>
-      <td class="text-right"><a class="btn btn-sm btn-outline" href="/reports/year?year={{ y.label }}">{{ t('Report', 'અહેવાલ') }}</a></td>
+      <td class="text-right"><a class="btn btn-sm btn-outline" href="/Reports/Year?year={{ y.label }}">{{ t('Report', 'અહેવાલ') }}</a></td>
     </tr>{% endfor %}
   </tbody></table>
 </div>

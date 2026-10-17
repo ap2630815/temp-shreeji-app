@@ -30,7 +30,7 @@
     var form = document.getElementById('direct-form');
     var nets = JSON.parse(form.dataset.nets);
     var num = function (v) { return parseInt(v || '0', 10) || 0; };
-    var fmt = function (n) { return '₹' + n.toLocaleString('en-IN'); };
+    var fmt = function (n) { return '₹ ' + n.toLocaleString('en-IN'); };
     function recompute() {
       var net = nets[form.grain_id.value] || 0;
       var amount = Math.ceil((num(form.no_of_filled_bags.value) * net + num(form.extra_kilos.value)) * num(form.grain_rate_per_20kg.value) / 20);

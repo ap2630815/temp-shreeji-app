@@ -9,17 +9,17 @@ from app.core.security import hash_password, verify_password
 from app.core.templating import render, render_with_csrf
 from app.models import User
 
-router = APIRouter(prefix="/account")
+router = APIRouter(prefix="/Account")
 
 MIN_PASSWORD_LENGTH = 8
 
 
-@router.get("/password", response_class=HTMLResponse)
+@router.get("/Password", response_class=HTMLResponse)
 async def password_page(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends()):
     return render_with_csrf(request, csrf, "account_password.html", user=user)
 
 
-@router.post("/password", response_class=HTMLResponse)
+@router.post("/Password", response_class=HTMLResponse)
 async def change_password(
     request: Request,
     current_password: str = Form(...),

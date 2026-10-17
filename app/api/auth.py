@@ -14,12 +14,12 @@ from app.models import User
 router = APIRouter()
 
 
-@router.get("/login", response_class=HTMLResponse)
+@router.get("/Login", response_class=HTMLResponse)
 async def login_page(request: Request, csrf: CsrfProtect = Depends()):
     return render_with_csrf(request, csrf, "login.html")
 
 
-@router.post("/login")
+@router.post("/Login")
 async def login(
     request: Request,
     username: str = Form(...),
@@ -43,9 +43,9 @@ async def login(
     return response
 
 
-@router.post("/logout")
+@router.post("/Logout")
 async def logout(request: Request, csrf: CsrfProtect = Depends(), _: User = Depends(current_user)):
     await csrf.validate_csrf(request)
-    response = Response(status_code=204, headers={"HX-Redirect": "/login"})
+    response = Response(status_code=204, headers={"HX-Redirect": "/Login"})
     response.delete_cookie(SESSION_COOKIE)
     return response

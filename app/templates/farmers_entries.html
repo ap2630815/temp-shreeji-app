@@ -21,6 +21,7 @@
   </div>
   <span class="flex-1"></span>
   {% endif %}
+  {% if direct %}<a href="/PurchaseIndividual/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
   <form method="get" class="flex items-center gap-2">
     <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
@@ -28,7 +29,6 @@
     </select>
     {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>
-  {% if direct %}<a href="/PurchaseIndividual/new" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
 </div>
 
 <div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
@@ -51,7 +51,7 @@
     {% for v in views %}{% set e = v.entry %}
       <tr>
         <td class="whitespace-nowrap">{{ e.entry_date }}</td>
-        <td><a class="link" href="/farmers/{{ e.farmer_id }}/statement">{{ e.farmer.farmer_name }}</a>{% if e.description %}<div class="text-xs opacity-60">{{ e.description }}</div>{% endif %}</td>
+        <td><a class="link" href="/Farmers/{{ e.farmer_id }}/Statement">{{ e.farmer.farmer_name }}</a>{% if e.description %}<div class="text-xs opacity-60">{{ e.description }}</div>{% endif %}</td>
         <td>{{ e.farmer.village.village_name }}</td>
         <td>{{ e.grain.grain_name }}</td>
         {% if not direct %}<td>{% if e.is_direct %}<span class="badge badge-ghost badge-sm">{{ t('Individual', 'વ્યક્તિગત') }}</span>{% else %}<a class="link" href="/PurchaseGroup/{{ e.purchase_group_id }}">#{{ e.purchase_group_id }}</a>{% endif %}</td>{% endif %}
@@ -65,7 +65,7 @@
         <td class="font-semibold">{{ v.due | inr }}</td>
         <td class="whitespace-nowrap {{ 'text-error' if v.is_overdue(today) }}">{{ e.due_date }}</td>
         <td>{{ badge(v.status, v.is_overdue(today)) }}</td>
-        <td class="text-right whitespace-nowrap"><a class="btn btn-ghost btn-xs" href="{{ '/PurchaseIndividual/%s/edit' % e.id if e.is_direct else '/PurchaseGroup/entries/%s/edit' % e.id }}">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right whitespace-nowrap"><a class="btn btn-ghost btn-xs" href="{{ '/PurchaseIndividual/%s/Edit' % e.id if e.is_direct else '/PurchaseGroup/Entries/%s/Edit' % e.id }}">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}
       <tr><td colspan="16" class="text-center opacity-60">{{ t('No entries in this year', 'આ વર્ષમાં કોઈ નોંધ નથી') }}</td></tr>

@@ -47,7 +47,7 @@ class PartySpec:
 
 PARTIES: dict[str, PartySpec] = {
     "farmer": PartySpec(("Farmer", "ખેડૂત"), Farmer, lambda p: p.farmer_name, lambda p: p.farmer_name_gu, lambda p: p.mobile,
-                        lambda p: (p.head_of_family or p.farmer_name, p.mobile)),
+                        lambda p: (p.farmer_name if (p.head_of_family or "").lower() == "self" else (p.head_of_family or p.farmer_name), p.mobile)),
     "truck": PartySpec(("Truck", "ટ્રક"), Truck, lambda p: p.truck_number, lambda p: None, lambda p: p.truck_owner_mobile,
                        lambda p: (p.truck_owner_name, p.truck_owner_mobile)),  # paid to the truck owner
     "labour_group": PartySpec(("Labour", "મજૂર"), LabourGroup, lambda p: p.group_name, lambda p: p.group_name_gu, lambda p: "",
@@ -147,7 +147,7 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         paid = await _paid_map(db, pt, [r.id for r in rows])
         for r in rows:
             out.append(Payable(pt, r.id, party_type, r.supplier_id, r.supplier.pet_name, r.supply_date, None,
-                               f"{r.no_of_bags} bags @ ₹{r.rate_per_bag} to {r.farmer.farmer_name} ({r.farmer.village.village_name})", r.payable_amount, paid.get(r.id, 0)))
+                               f"{r.no_of_bags} bags @ ₹ {r.rate_per_bag} to {r.farmer.farmer_name} ({r.farmer.village.village_name})", r.payable_amount, paid.get(r.id, 0)))
     elif party_type == "broker":
         stmt = (
             select(Bilty)
@@ -204,7 +204,7 @@ async def record_payment(db: AsyncSession, user: User, party_type: str, party_id
     try:
         plan = allocate(data["amount"], [((p.payable_type, p.payable_id), p.due) for p in payables])  # (type, id): two tables can share an id
     except ValueError:
-        raise PaymentError("amount", (f"Exceeds the outstanding amount (₹{outstanding})", f"બાકી રકમ (₹{outstanding}) થી વધુ")) from None
+        raise PaymentError("amount", (f"Exceeds the outstanding amount (₹ {outstanding})", f"બાકી રકમ (₹ {outstanding}) થી વધુ")) from None
     earlier = int(await db.scalar(select(func.count()).select_from(Payment).where(Payment.party_type == party_type, Payment.party_id == party_id)))
     status = "partial" if data["amount"] < outstanding else ("final" if earlier else "complete")
     payment = Payment(party_type=party_type, party_id=party_id, business_year=year, status=status, created_by=user.id, **data)

@@ -12,7 +12,7 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
     user = await db.get(User, user_id) if user_id else None
     if user is None or not user.is_active:
         # full page loads go to login; HTMX requests get a client-side redirect
-        headers = {"HX-Redirect": "/login"} if request.headers.get("HX-Request") else {"Location": "/login"}
+        headers = {"HX-Redirect": "/Login"} if request.headers.get("HX-Request") else {"Location": "/Login"}
         raise HTTPException(status_code=401 if "HX-Redirect" in headers else 303, headers=headers)
     return user
 

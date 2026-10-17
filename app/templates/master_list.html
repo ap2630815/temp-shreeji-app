@@ -2,11 +2,16 @@
 {% from "partials/bilabel.html" import bi %}
 {% block title %}{{ spec.label[0] }}{% endblock %}
 {% block content %}
+<div class="stackbi">
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <h1 class="text-xl font-semibold flex-1">{{ spec.label[0] }} <span class="gu">{{ spec.label[1] }}</span></h1>
-  <input type="search" name="q" value="{{ q }}" placeholder="{{ L['search'][0] }} {{ L['search'][1] }}" class="input input-bordered input-sm"
-         hx-get="/masters/{{ spec.slug }}" hx-trigger="input changed delay:300ms, search" hx-target="#rows" hx-swap="innerHTML">
-  <a href="/masters/{{ spec.slug }}/new" class="btn btn-primary btn-sm">+ {{ bi('add') }}</a>
+  <h1 class="text-xl font-semibold flex-1 leading-tight"><span class="block">{{ spec.label[0] }}</span><span class="gu block">{{ spec.label[1] }}</span></h1>
+  <div class="relative">
+    <input type="search" name="q" value="{{ q }}" placeholder=" " class="peer input input-bordered input-sm h-10 w-56"
+           hx-get="/Masters/{{ spec.slug }}" hx-include="[name=village_id],[name=grain_id]" hx-trigger="input changed delay:300ms, search" hx-target="#rows" hx-swap="innerHTML">
+    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 flex flex-col leading-tight text-xs opacity-60 peer-focus:hidden peer-[:not(:placeholder-shown)]:hidden">
+      <span>{{ L['search'][0] }}</span><span class="gu">{{ L['search'][1] }}</span></span>
+  </div>
+  <a href="/Masters/{{ spec.slug }}/New" class="btn btn-primary btn-sm">+ {{ bi('add') }}</a>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
   <table class="table table-zebra">
@@ -18,5 +23,6 @@
     </thead>
     <tbody id="rows">{% include "partials/master_rows.html" %}</tbody>
   </table>
+</div>
 </div>
 {% endblock %}

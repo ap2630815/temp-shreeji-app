@@ -327,7 +327,7 @@ async def bag_report(db: AsyncSession, year: str, grain_id: int, village_id: int
     r.stats = [
         Stat("Supplies", "સપ્લાય", len(rows_), "int", f"{len({b.supplier_id for b in rows_})} suppliers"),
         Stat("Bags supplied", "આપેલી બેગ", bags, "int"),
-        Stat("Amount", "રકમ", amount, "inr", f"avg ₹{round(amount / bags, 2) if bags else 0} / bag"),
+        Stat("Amount", "રકમ", amount, "inr", f"avg ₹ {round(amount / bags, 2) if bags else 0} / bag"),
         Stat("Paid", "ચૂકવ્યું", paid_total, "inr", f"{pct(paid_total, amount) or 0}% of amount"),
         Stat("Due", "બાકી", amount - paid_total),
     ]
@@ -370,7 +370,7 @@ async def broker_report(db: AsyncSession, year: str, grain_id: int, village_id: 
     r.stats = [
         Stat("Bilties", "બિલ્ટી", len(bilties), "int", f"{len({b.booking.brokerage.broker_id for b in bilties})} brokers"),
         Stat("Bags", "બેગ", bags, "int"),
-        Stat("Brokerage", "દલાલી", amount, "inr", f"avg ₹{round(amount / bags, 2) if bags else 0} / bag"),
+        Stat("Brokerage", "દલાલી", amount, "inr", f"avg ₹ {round(amount / bags, 2) if bags else 0} / bag"),
         Stat("Paid", "ચૂકવ્યું", paid_total, "inr", f"{pct(paid_total, amount) or 0}% of brokerage"),
         Stat("Due", "બાકી", amount - paid_total),
     ]

@@ -2,11 +2,12 @@
 {% from "partials/bilabel.html" import t, th %}
 {% block title %}Receivables{% endblock %}
 {% block content %}
+<div class="stackbi">
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <h1 class="text-xl font-semibold flex-1">{{ t('Receivables from industries', 'ઉદ્યોગો પાસેથી લેણાં') }}</h1>
-  <span class="badge badge-lg">{{ t('Billed', 'બિલ') }}: {{ totals.billed | inr }}</span>
-  <span class="badge badge-lg">{{ t('Received', 'મળ્યા') }}: {{ totals.received | inr }}</span>
-  <span class="badge badge-lg badge-warning">{{ t('Outstanding', 'બાકી') }}: {{ totals.due | inr }}</span>
+  <h1 class="text-xl font-semibold flex-1 leading-tight">{{ t('Receivables from industries', 'ઉદ્યોગો પાસેથી લેણાં') }}</h1>
+  <span class="badge badge-lg h-auto py-1 gap-3">{{ t('Billed', 'બિલ') }}<b>{{ totals.billed | inr }}</b></span>
+  <span class="badge badge-lg h-auto py-1 gap-3">{{ t('Received', 'મળ્યા') }}<b>{{ totals.received | inr }}</b></span>
+  <span class="badge badge-lg badge-warning h-auto py-1 gap-3">{{ t('Outstanding', 'બાકી') }}<b>{{ totals.due | inr }}</b></span>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
   <table class="table table-zebra table-sm">
@@ -14,14 +15,14 @@
     <tbody>
     {% for industry, s in rows %}
       <tr>
-        <td><a class="link" href="/industries/{{ industry.id }}/account">{{ industry.industrialist_name }}</a><div class="text-xs opacity-60">{{ industry.location }}</div></td>
+        <td><a class="link" href="/Industries/{{ industry.id }}/Account">{{ industry.industrialist_name }}</a><div class="text-xs opacity-60">{{ industry.location }}</div></td>
         <td>{{ s.trucks }}</td>
         <td>{% if s.awaiting_weight %}<span class="badge badge-warning badge-sm">{{ s.awaiting_weight }}</span>{% else %}0{% endif %}</td>
         <td>{{ '{:,}'.format(s.short_kg) }}</td>
         <td>{{ s.billed | inr }}</td><td>{{ s.received | inr }}</td><td class="font-semibold">{{ s.due | inr }}</td>
         <td class="text-right whitespace-nowrap">
-          <a class="btn btn-primary btn-xs" href="/industries/{{ industry.id }}/receive">{{ t('Receive', 'પ્રાપ્તિ') }}</a>
-          <a class="btn btn-ghost btn-xs" href="/industries/{{ industry.id }}/account">{{ t('Account', 'ખાતું') }}</a>
+          <a class="btn btn-primary btn-xs" href="/Industries/{{ industry.id }}/Receive">{{ t('Receive', 'પ્રાપ્તિ') }}</a>
+          <a class="btn btn-ghost btn-xs" href="/Industries/{{ industry.id }}/Account">{{ t('Account', 'ખાતું') }}</a>
         </td>
       </tr>
     {% else %}
@@ -29,5 +30,6 @@
     {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 {% endblock %}

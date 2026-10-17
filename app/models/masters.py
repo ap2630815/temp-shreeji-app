@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
 MOBILE = r"^[0-9]{10}$"
-TRUCK_NO = r"^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$"
+TRUCK_NO = r"^[A-Z]{2} [0-9]{2} (?: [A-Z]|[A-Z]{2}) [0-9]{4}$"  # GJ 01 DG 3345 / GJ 14  X 6720 (a one-letter series is padded to two columns)
 
 
 def _digits_check(col: str, name: str | None = None, nullable: bool = False) -> CheckConstraint:
@@ -64,7 +64,7 @@ class Truck(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    truck_number: Mapped[str] = mapped_column(String(13), unique=True)  # GJ03AB1234, no spaces
+    truck_number: Mapped[str] = mapped_column(String(13), unique=True)  # GJ 03 AB 1234, with the spaces
     truck_owner_name: Mapped[str] = mapped_column(String(120))
     truck_owner_mobile: Mapped[str] = mapped_column(String(10))
     driver_name: Mapped[str] = mapped_column(String(120))
@@ -149,7 +149,7 @@ class Farmer(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     farmer_name: Mapped[str] = mapped_column(String(120))  # surname person father grandfather
     farmer_name_gu: Mapped[str | None] = mapped_column(String(120))
-    head_of_family: Mapped[str | None] = mapped_column(String(60))  # verify with before payment
+    head_of_family: Mapped[str | None] = mapped_column(String(100))  # ask him before payment: "Self", or surname (the farmer's own) + name + father's name
     mobile: Mapped[str] = mapped_column(String(10), unique=True)
     email: Mapped[str | None] = mapped_column(String(60), unique=True)
     village_id: Mapped[int] = mapped_column(ForeignKey("villages.id"))

@@ -27,25 +27,44 @@
         </form>
         <div class="flex-1"></div>
         <div class="hidden sm:flex flex-col leading-tight text-sm px-2"><span class="font-semibold">{{ user.username }}</span><span class="opacity-70">{{ user.role }}</span></div>
-        <a class="btn btn-sm btn-ghost h-auto min-h-0 py-1 flex-col gap-0 leading-tight" href="/account/password"><span>{{ L['change_password'][0] }}</span><span class="gu text-xs">{{ L['change_password'][1] }}</span></a>
-        <button class="btn btn-sm bg-base-200 hover:bg-base-300 text-black border-base-300 h-auto min-h-0 py-1 flex-col gap-0 leading-tight" hx-post="/logout"><span>{{ L['logout'][0] }}</span><span class="gu text-xs">{{ L['logout'][1] }}</span></button>
+        <a class="btn btn-sm btn-ghost h-auto min-h-0 py-1 flex-col gap-0 leading-tight" href="/Account/Password"><span>{{ L['change_password'][0] }}</span><span class="gu text-xs">{{ L['change_password'][1] }}</span></a>
+        <button class="btn btn-sm bg-base-200 hover:bg-base-300 text-black border-base-300 h-auto min-h-0 py-1 flex-col gap-0 leading-tight" hx-post="/Logout"><span>{{ L['logout'][0] }}</span><span class="gu text-xs">{{ L['logout'][1] }}</span></button>
       </div>
     </div>
     <div class="px-3 pt-2">
       <form method="get" class="flex flex-wrap items-center gap-3 bg-base-100 border border-base-300 rounded-box px-4 py-2">
         {% for k, v in request.query_params.multi_items() if k not in ('grain_id', 'village_id') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-        <select name="village_id" aria-label="Village" class="select select-bordered select-sm w-auto min-w-0 toolbar-select" onchange="this.form.submit()">
-          <option value="">{{ L['village'][0] }}&nbsp;&nbsp;&nbsp;{{ L['village'][1] }}</option>
-          {% for v in request.state.villages %}<option value="{{ v.id }}" {{ 'selected' if request.query_params.get('village_id') == v.id|string }}>{{ v.name }}&nbsp;&nbsp;&nbsp;{{ v.name_gu or '' }}</option>{% endfor %}
-        </select>
-        <select name="grain_id" aria-label="Grain" class="select select-bordered select-sm w-auto min-w-0 toolbar-select" onchange="this.form.submit()">
-          <option value="">{{ L['grain'][0] }}&nbsp;&nbsp;&nbsp;{{ L['grain'][1] }}</option>
-          {% for g in request.state.grains %}<option value="{{ g.id }}" {{ 'selected' if request.query_params.get('grain_id') == g.id|string }}>{{ g.name }}&nbsp;&nbsp;&nbsp;{{ g.name_gu }}</option>{% endfor %}
-        </select>
+        {# each filter is one button: English above, Gujarati below (the chosen name once picked); the real drop-down lies invisibly over it #}
+        {% set vid = request.query_params.get('village_id', '') | int(0) %}
+        {% set gid = request.query_params.get('grain_id', '') | int(0) %}
+        {% set sel_v = (request.state.villages | selectattr('id', 'equalto', vid) | list | first) if vid else none %}
+        {% set sel_g = (request.state.grains | selectattr('id', 'equalto', gid) | list | first) if gid else none %}
+        {# pages whose data has no grain behind it: the grain filter is frozen and dulled #}
+        {% set grain_off = request.url.path.startswith('/BagSupplies') %}
+        <div class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight relative normal-case font-semibold filter-btn {{ 'on' if sel_v }}">
+          <span>{{ sel_v.name if sel_v else L['village'][0] }}</span><span class="gu text-xs">{{ (sel_v.name_gu or '') if sel_v else L['village'][1] }}</span>
+          <select name="village_id" aria-label="Village" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="this.form.submit()">
+            <option value="">All બધા</option>
+            {% for v in request.state.villages %}<option value="{{ v.id }}" {{ 'selected' if v.id == vid }}>{{ v.name }} {{ v.name_gu or '' }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight relative normal-case font-semibold filter-btn {{ 'opacity-40 cursor-not-allowed' if grain_off else ('on' if sel_g) }}">
+          <span>{{ sel_g.name if sel_g else L['grain'][0] }}</span><span class="gu text-xs">{{ (sel_g.name_gu or '') if sel_g else L['grain'][1] }}</span>
+          <select name="grain_id" aria-label="Grain" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="this.form.submit()" {% if grain_off %}disabled title="Not used on this page"{% endif %}>
+            <option value="">All બધા</option>
+            {% for g in request.state.grains %}<option value="{{ g.id }}" {{ 'selected' if g.id == gid }}>{{ g.name }} {{ g.name_gu }}</option>{% endfor %}
+          </select>
+        </div>
         <span class="flex-1"></span>
         {# the report keeps whatever year / village / grain is chosen here #}
         {% set keep = [] %}{% for k in ('year', 'village_id', 'grain_id') %}{% if request.query_params.get(k) %}{% set _ = keep.append(k ~ '=' ~ request.query_params.get(k)) %}{% endif %}{% endfor %}
-        <a href="/analysis{{ '?' ~ keep|join('&') if keep }}" class="btn btn-sm btn-primary h-auto min-h-0 py-1 flex-col gap-0 leading-tight {{ 'btn-active' if request.url.path.startswith('/analysis') }}"><span>Analysis</span><span class="gu text-xs">વિશ્લેષણ</span></a>
+        {# next to Analysis: clears the village and grain filters in one click (lit while any filter is applied) #}
+        {% set any_filter = sel_v or (sel_g and not grain_off) %}
+        <a href="{{ request.url.path }}{{ ('?' ~ request.url.remove_query_params(['village_id', 'grain_id']).query) if request.url.remove_query_params(['village_id', 'grain_id']).query }}" role="switch" aria-checked="{{ 'true' if any_filter else 'false' }}" title="Clear all filters"
+           class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight normal-case font-semibold {{ 'btn-primary' if any_filter else 'btn-disabled opacity-50' }}" {% if not any_filter %}tabindex="-1" aria-disabled="true"{% endif %}>
+          <span>{{ 'Filter on' if any_filter else 'Filter off' }}</span><span class="gu text-xs">{{ 'ફિલ્ટર ચાલુ' if any_filter else 'ફિલ્ટર બંધ' }}</span>
+        </a>
+        <a href="/Analysis{{ '?' ~ keep|join('&') if keep }}" class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight normal-case font-semibold filter-btn {{ 'on' if request.url.path.startswith('/Analysis') }}"><span>Analysis</span><span class="gu text-xs">વિશ્લેષણ</span></a>
       </form>
     </div>
     <main class="p-4 w-full max-w-6xl mx-auto">
@@ -69,18 +88,18 @@
             {{ item('/PurchaseGroup', 'Purchase Group', 'ખરીદી જૂથ', '/PurchaseGroup') }}
           </ul>
         </li>
-        {{ item('/bag-supplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
-        {{ item('/labour-work', 'Labour work', 'મજૂર કામ') }}
+        {{ item('/BagSupplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
+        {{ item('/LabourWork', 'Labour work', 'મજૂર કામ') }}
         <li class="menu-title">{{ title('Selling', 'વેચાણ') }}</li>
-        {{ item('/bookings', 'Bookings', 'બુકિંગ', '/bookings') }}
-        {{ item('/trips', 'Trips', 'ટ્રીપ', '/trips') }}
-        {{ item('/receivables', 'Receivables', 'લેણાં') }}
+        {{ item('/Bookings', 'Bookings', 'બુકિંગ', '/Bookings') }}
+        {{ item('/Trips', 'Trips', 'ટ્રીપ', '/Trips') }}
+        {{ item('/Receivables', 'Receivables', 'લેણાં') }}
         <li class="menu-title">{{ title('Accounts', 'હિસાબ') }}</li>
-        {{ item('/dues', 'Payables', 'ચૂકવવાપાત્ર') }}
-        {{ item('/reports/year', 'Report', 'અહેવાલ') }}
-        {% if user.role == 'owner' %}{{ item('/years', 'Years', 'વર્ષ') }}{% endif %}
+        {{ item('/Payables', 'Payables', 'ચૂકવવાપાત્ર') }}
+        {{ item('/Reports/Year', 'Report', 'અહેવાલ') }}
+        {% if user.role == 'owner' %}{{ item('/Years', 'Years', 'વર્ષ') }}{% endif %}
         <li class="menu-title">{{ title('Masters', 'માસ્ટર્સ') }}</li>
-        {% for slug, spec in MASTERS.items() %}{{ item('/masters/' ~ slug, spec.label[0], spec.label[1], '/masters/' ~ slug) }}{% endfor %}
+        {% for slug, spec in MASTERS.items() %}{{ item('/Masters/' ~ slug, spec.label[0], spec.label[1], '/Masters/' ~ slug) }}{% endfor %}
       </ul>
     </aside>
   </div>
@@ -95,6 +114,17 @@
       cb.checked = !cb.checked;
     }
   }
+  // the toolbar's village / grain follow you from a list into its forms and detail pages (links inside the page only, the sidebar starts afresh)
+  (function () {
+    var cur = new URLSearchParams(location.search), keep = ['village_id', 'grain_id'].filter(function (k) { return /^\d+$/.test(cur.get(k) || ''); });
+    if (!keep.length) return;
+    document.querySelectorAll('main a[href^="/"]').forEach(function (a) {
+      var u = new URL(a.getAttribute('href'), location.origin);
+      if (/\.pdf$|^\/(static|logout)/.test(u.pathname)) return;
+      keep.forEach(function (k) { if (!u.searchParams.has(k)) u.searchParams.set(k, cur.get(k)); });
+      a.setAttribute('href', u.pathname + u.search + u.hash);
+    });
+  })();
   try { if (localStorage.getItem("sidebar-collapsed") === "1") document.body.classList.add("sidebar-collapsed"); } catch (e) {}
 </script>
 {% endblock %}

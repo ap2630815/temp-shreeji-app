@@ -2,14 +2,17 @@
 {% from "partials/bilabel.html" import t, th %}
 {% block title %}Labour work{% endblock %}
 {% block content %}
+<div class="stackbi">
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <h1 class="text-xl font-semibold flex-1">{{ t('Labour work', 'મજૂર કામ') }}</h1>
+  <h1 class="text-xl font-semibold">{{ t('Labour work', 'મજૂર કામ') }}</h1>
+  <span class="flex-1"></span>
+  <a href="/Payables?type=labour_group" class="btn btn-sm">{{ t('Pay labour', 'મજૂરને ચુકવણી') }}</a>
+  <a href="/LabourWork/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>
   <form method="get" class="flex items-center gap-2">
+    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
     {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>
-  <a href="/dues?type=labour_group" class="btn btn-sm">{{ t('Pay labour', 'મજૂરને ચુકવણી') }}</a>
-  <a href="/labour-work/new" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
   <table class="table table-zebra table-sm">
@@ -18,14 +21,15 @@
     {% for w in rows %}{% set p = paid.get(w.id, 0) %}
       <tr>
         <td class="whitespace-nowrap">{{ w.work_date }}</td>
-        <td><a class="link" href="/statements/labour_group/{{ w.labour_group_id }}">{{ w.labour_group.group_name }}</a>{% if w.description %}<div class="text-xs opacity-60">{{ w.description }}</div>{% endif %}</td>
+        <td><a class="link" href="/Statements/labour_group/{{ w.labour_group_id }}">{{ w.labour_group.group_name }}</a>{% if w.description %}<div class="text-xs opacity-60">{{ w.description }}</div>{% endif %}</td>
         <td>{{ w.payable_amount | inr }}</td><td>{{ w.borrowing_amount | inr if w.borrowing_amount else '' }}</td>
         <td class="font-medium">{{ w.net_payable | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (w.net_payable - p) | inr }}</td>
         <td>{{ w.petrol | inr if w.petrol else '' }}</td><td>{{ w.meal | inr if w.meal else '' }}</td>
-        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/labour-work/{{ w.id }}/edit">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/LabourWork/{{ w.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}<tr><td colspan="10" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 {% endblock %}

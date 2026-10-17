@@ -16,7 +16,7 @@ Screens: /PurchaseFarmersEntries = all farmers' ledger entries of the business y
   /PurchaseIndividual (sidebar: opens under "Purchase Farmers Entries" on hover) = purchase_individuals: ONE form (+add / +edit, "Save & add another") with the purchase_group columns (date, village, grain,
   rate, pay after, terms) and the purchase_farmers_entries columns (farmer, labour group, bags, kilos, handful bags, raw weight, quality, store, borrowed)
   together and ONE description. One row per farmer entry, no purchase_group. It is part of the farmer ledger: shown on /PurchaseFarmersEntries, in the
-  farmer statement, in dues and payments (allocations of type 'purchase_individual'), in the year report and in the farmer analysis.
+  farmer statement, in payables and payments (allocations of type 'purchase_individual'), in the year report and in the farmer analysis.
   (Not yet: loading a purchase individual's bags on a truck.)
 
 purchase_group (deal) and its farmers:

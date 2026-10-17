@@ -92,7 +92,7 @@ async def record_receipt(db: AsyncSession, user: User, industry_id: int, data: d
     except ValueError:
         waiting = sum(1 for v in views if v.receivable is None)
         hint = (f" ({waiting} truck(s) still need the industry weight)", f" ({waiting} ટ્રકનું કારખાનાનું વજન બાકી)") if waiting else ("", "")
-        raise PaymentError("amount", (f"Exceeds the outstanding receivable (₹{outstanding}){hint[0]}", f"બાકી લેણાં (₹{outstanding}) થી વધુ{hint[1]}")) from None
+        raise PaymentError("amount", (f"Exceeds the outstanding receivable (₹ {outstanding}){hint[0]}", f"બાકી લેણાં (₹ {outstanding}) થી વધુ{hint[1]}")) from None
     receipt = Receipt(industry_id=industry_id, business_year=year, created_by=user.id, **data)
     db.add(receipt)
     await db.flush()

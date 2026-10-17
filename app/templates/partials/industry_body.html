@@ -9,8 +9,8 @@
 <div class="meta">
   <div>{{ t('Industry', 'ઉદ્યોગ') }}: <b>{{ industry.industrialist_name }}</b>{% if industry.industrialist_name_gu %} <span class="gu">({{ industry.industrialist_name_gu }})</span>{% endif %}</div>
   <div>{{ t('Location', 'સ્થળ') }}: {{ industry.location }}</div>
-  <div>{{ t('Owner', 'માલિક') }}: {{ industry.owner_name }} ({{ industry.owner_mobile }})</div>
-  <div>{{ t('Supervisor', 'સુપરવાઇઝર') }}: {{ industry.supervisor_name }} ({{ industry.supervisor_mobile }})</div>
+  <div>{{ t('Owner', 'માલિક') }}: {{ industry.owner_name }} ({{ industry.owner_mobile | mobhtml }})</div>
+  <div>{{ t('Supervisor', 'સુપરવાઇઝર') }}: {{ industry.supervisor_name }} ({{ industry.supervisor_mobile | mobhtml }})</div>
 </div>
 <div class="sum">
   <div>{{ t('Billed', 'બિલ') }}<b>{{ summary.billed | inr }}</b></div>

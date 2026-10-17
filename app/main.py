@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -35,6 +37,13 @@ async def load_grains(request: Request, call_next):
     """Grain and village names for the toolbar dropdowns (page loads only)."""
     request.state.grains = []
     request.state.villages = []
+    if request.method == "GET" and request.url.query:
+        # the toolbar's "Village" / "Grain" placeholder submits village_id= / grain_id= (empty): treat blank (or non-numeric id) filters as "not chosen"
+        # instead of letting the integer parsing fail
+        kept = [(k, v) for k, v in request.query_params.multi_items() if v.strip() and (k not in ("village_id", "grain_id") or v.strip().isdigit())]
+        if len(kept) != len(request.query_params.multi_items()):
+            request.scope["query_string"] = urlencode(kept).encode()
+            request._query_params = request.query_params.__class__(kept)  # keep request.query_params in step for templates
     if request.method == "GET" and not request.url.path.startswith("/static") and "hx-request" not in request.headers:
         try:
             async with SessionLocal() as db:
@@ -65,12 +74,12 @@ async def csrf_error_handler(request: Request, exc: CsrfProtectError):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
 
-@app.get("/purchases")
+@app.get("/Purchases")
 async def old_purchases_url():
     return RedirectResponse("/PurchaseFarmersEntries", status_code=307)
 
 
-@app.get("/purchases/{rest:path}")
+@app.get("/Purchases/{rest:path}")
 async def old_purchase_urls(rest: str):
     return RedirectResponse(f"/PurchaseGroup/{rest}", status_code=307)
 

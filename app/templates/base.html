@@ -36,6 +36,11 @@
     .menu li > a { justify-content: space-between; }
     .btn { font-weight: 600; }
     .toolbar-select { field-sizing: content; }
+    /* a toolbar filter button that has a value chosen is coloured like the active tab */
+    .filter-btn.on { background-color: oklch(var(--p)); color: oklch(var(--pc)); border-color: oklch(var(--p)); }
+    /* (older rule for the plain drop-down version, kept harmless) */
+    .toolbar-select.filter-on { background-color: oklch(var(--p)); color: oklch(var(--pc)); border-color: oklch(var(--p)); font-weight: 600; }
+    .toolbar-select.filter-on option { background-color: oklch(var(--b1)); color: oklch(var(--bc)); font-weight: 400; }
     .soft-light, .menu li > a.soft-light, .menu li > a.soft-light.active { background: oklch(var(--b2)) !important; color: #000 !important; border: 1px solid oklch(var(--b3)); }
     .soft-light:hover, .menu li > a.soft-light:hover { background: oklch(var(--b3)) !important; }
     .btn-primary { box-shadow: 0 2px 0 oklch(var(--p) / .4) inset; }
@@ -50,13 +55,140 @@
     /* sidebar: an entry with a sub-list opens it on hover / keyboard focus (and stays open on its own pages) */
     .hover-sub > ul { display: none; }
     .hover-sub:hover > ul, .hover-sub:focus-within > ul, .hover-sub.open > ul { display: block; }
-    /* page headings and buttons on the farmers-entries / purchase pages: English above, Gujarati below */
-    .stackbi h1 .gu, .stackbi .btn .gu { display: block; font-size: .8em; }
-    .stackbi .btn .bi { display: inline-flex; flex-direction: column; text-align: left; }
-    .stackbi .btn:has(.gu) { gap: .4rem; height: auto; min-height: 2rem; padding-block: .25rem; line-height: 1.2; }
+    /* headings on the farmers-entries / purchase pages: English above, Gujarati below */
+    .stackbi h1 .gu { display: block; font-size: .8em; }
+    /* year report: titles, card headings, tile titles and the footnote read English above, Gujarati below */
+    .stackall .stat { align-content: start; }  /* tiles of different height keep their value and notes on the same lines */
+    .stackall .stat-desc .sub-row + .sub-row { border-top: 1px dashed oklch(var(--b3)); }
+    .stackall :is(h1, h2, .stat-title, p.text-xs) .gu { display: block; font-size: .8em; }
+    /* every button: icon (+, ←, ▾) on the left, text on the right with English above and Gujarati below */
+    .btn .gu { display: block; font-size: .8em; }
+    /* summary pills: label (English above, Gujarati below) on the left, the number on the right */
+    .badge-lg .bi { display: inline-flex; flex-direction: column; text-align: left; line-height: 1.15; }
+    .badge-lg .gu { display: block; font-size: .8em; }
+    /* Payables table: even rows tinted */
+    /* form fields are never highlighted: no focus ring, glow or coloured border on inputs, selects and text areas (errors keep their red border) */
+    .input:focus, .input:focus-within, .select:focus, .textarea:focus,
+    .input:focus-visible, .select:focus-visible, .textarea:focus-visible { outline: none !important; box-shadow: none !important; }
+    .input-bordered:not(.input-error):focus, .input-bordered:not(.input-error):focus-within, .select-bordered:not(.select-error):focus,
+    .textarea-bordered:not(.textarea-error):focus { border-color: oklch(var(--bc) / .2) !important; }
+    /* the browser's autofill tint (the pale blue on remembered names and emails) is never shown: autofilled fields look like any other field */
+    input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, input:-webkit-autofill:active,
+    textarea:-webkit-autofill, select:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 1000px oklch(var(--b1)) inset !important; box-shadow: 0 0 0 1000px oklch(var(--b1)) inset !important;
+      -webkit-text-fill-color: oklch(var(--bc)) !important; caret-color: oklch(var(--bc)); transition: background-color 9999s ease-in-out 0s;
+    }
+    input:autofill, textarea:autofill, select:autofill { background-color: oklch(var(--b1)) !important; color: oklch(var(--bc)) !important; box-shadow: 0 0 0 1000px oklch(var(--b1)) inset !important; }
+    /* every table: a 3px rule in the page background colour (base-200) over white just under the column titles */
+    .table thead th { border-bottom: 3px solid color-mix(in srgb, oklch(var(--b2)) 100%, white); }
+    .even-tint tbody tr:nth-child(odd) td { background-color: transparent; }
+    .even-tint tbody tr:nth-child(even) td { background-color: color-mix(in srgb, oklch(var(--p)) 14%, white); }
+    .btn .bi { display: inline-flex; flex-direction: column; text-align: left; }
+    .btn:has(.gu):not(.flex-col) { gap: .4rem; height: auto; min-height: 2rem; padding-block: .25rem; line-height: 1.2; }
+    /* icon (+, ←, ▾) always on the left, the label on its right: English above, Gujarati below, left-aligned */
+    .btn:has(.bi):not(.flex-col) { flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; text-align: left; white-space: nowrap; }
+    .btn:has(.bi) .bi > span { white-space: nowrap; }
+      /* a mobile number on screen: double click selects the whole number (98765 43210); copying it drops the space */
+    .mob { user-select: all; cursor: text; white-space: nowrap; }
   </style>
 </head>
 <body class="min-h-screen bg-base-200" hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
   {% block body %}{% endblock %}
+<script>
+  // a field that holds the default 0 empties when you click into it, so the 0 is never glued to what you type;
+  // left empty, it goes back to 0 when you leave (an empty number would not save)
+  // mobile numbers: a double click selects the whole number, and copying a whole number gives the 10 digits without the space.
+  // On screen the number is a .mob span; in a form it is the mobile box (a double click there selects all of it too)
+  document.addEventListener('dblclick', function (e) {
+    var el = e.target;
+    if (el.dataset && (el.dataset.fmt === 'mobile' || el.dataset.fmt === 'account')) el.select();
+  });
+  document.addEventListener('copy', function (e) {
+    var text = '', a = document.activeElement;
+    if (a && a.dataset && a.dataset.fmt === 'account' && typeof a.selectionStart === 'number') {  // a bank account number: the digits, without the spaces
+      var picked = a.value.slice(a.selectionStart, a.selectionEnd);
+      if (/^[\d ]+$/.test(picked)) { e.clipboardData.setData('text/plain', picked.replace(/ /g, '')); e.preventDefault(); }
+      return;
+    }
+    if (a && a.dataset && a.dataset.fmt === 'mobile' && typeof a.selectionStart === 'number') text = a.value.slice(a.selectionStart, a.selectionEnd);
+    else { var s = window.getSelection(); text = s ? s.toString() : ''; }
+    var m = /^\s*(\d{5}) (\d{5})\s*$/.exec(text);
+    if (m) { e.clipboardData.setData('text/plain', m[1] + m[2]); e.preventDefault(); }
+  });
+  // head of family: ticking Self switches the name and father's-name boxes off (and clears them); unticked, both are needed
+  function headSync(box) {
+    var parts = box.closest('[data-head]').querySelectorAll('[data-head-part]');
+    parts.forEach(function (p) { p.disabled = box.checked; p.required = !box.checked; if (box.checked) p.value = ''; });
+  }
+  document.addEventListener('change', function (e) { if (e.target.matches && e.target.matches('[data-head-self]')) headSync(e.target); });
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-head-self]').forEach(function (b) {
+      b.closest('[data-head]').querySelectorAll('[data-head-part]').forEach(function (p) { p.required = !b.checked; });
+    });
+  });
+  document.addEventListener('focusin', function (e) {
+    var el = e.target;
+    if (el.tagName === 'INPUT' && !el.readOnly && !el.disabled && el.value === '0' && /^(number|text|tel)?$/.test(el.type)) {
+      el.dataset.zeroDefault = '1';
+      el.value = '';
+    }
+  });
+  document.addEventListener('focusout', function (e) {
+    var el = e.target;
+    if (el.dataset && el.dataset.zeroDefault === '1') {
+      if (el.value === '') el.value = '0';
+      delete el.dataset.zeroDefault;
+    }
+  });
+</script>
+<script>
+  // truck numbers are typed freely and shown as GJ 01 DG 3345 / GJ 14  X 6720: capitals, with the spaces added as you type
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (el.dataset && el.dataset.fmt === 'account') {  // bank account numbers: digits only, a space after every five (12345 67890 12345 678)
+      var ad = el.value.replace(/\D/g, '').slice(0, 18);
+      el.value = ad.replace(/(\d{5})(?=\d)/g, '$1 ');
+      return;
+    }
+    if (el.dataset && el.dataset.fmt === 'mobile') {
+      // +918756564532, 08756564532, +91 8756564532 and 8756564532 are one number. A typed or pasted country code (+91 / 91 / 0091) or
+      // trunk 0 moves into the code box beside the field; the field keeps the 10 digits as 98765 43210
+      var raw = el.value.trim(), d = raw.replace(/\D/g, ''), cc = null;
+      if (raw.charAt(0) === '+') { cc = '+91'; d = d.replace(/^91/, ''); }
+      else if (d.length > 10 && d.indexOf('0091') === 0) { cc = '+91'; d = d.slice(4); }
+      else if (d.length > 10 && d.indexOf('91') === 0) { cc = '+91'; d = d.slice(2); }
+      else if (d.length > 10 && d.charAt(0) === '0') { cc = '0'; d = d.slice(1); }
+      d = d.slice(0, 10);
+      el.value = d.length > 5 ? d.slice(0, 5) + ' ' + d.slice(5) : d;
+      var sel = cc && el.parentElement.querySelector('select[data-cc]');
+      if (sel) sel.value = cc;
+      return;
+    }
+    if (el.dataset && (el.dataset.fmt === 'email-local' || el.dataset.fmt === 'email-domain') && el.value.indexOf('@') > -1) {
+      // a whole address (pasted, or chosen from the browser's own suggestions) lands in one box: before the @ goes left, after it goes right
+      var pair = el.parentElement.querySelectorAll('[data-fmt^="email-"]'), l = pair[0], d = pair[1];
+      var whole = el.value.trim(), cut = whole.lastIndexOf('@');
+      l.value = whole.slice(0, cut).replace(/@/g, '').toLowerCase();
+      d.value = whole.slice(cut + 1).replace(/^@+/, '').replace(/\s/g, '').toLowerCase();
+      d.focus();
+      return;
+    }
+    if (el.dataset && el.dataset.fmt === 'email-domain') {  // inline completion from the known endings; Tab keeps it (typing on, or Backspace, drops it)
+      var typed = el.value.replace(/^@+/, '').replace(/\s/g, '').toLowerCase();
+      el.value = typed;
+      if (e.inputType && e.inputType.indexOf('delete') === 0 || !typed) return;
+      var list = document.getElementById(el.getAttribute('list'));
+      var hit = list && Array.prototype.map.call(list.options, function (o) { return o.value; }).filter(function (v) { return v.indexOf(typed) === 0 && v !== typed; })[0];
+      if (hit) { el.value = hit; el.setSelectionRange(typed.length, hit.length); }
+      return;
+    }
+    if (!el.dataset || el.dataset.fmt !== 'truck') return;
+    var s = el.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    var m = /^([A-Z]{0,2})([0-9]{0,2})([A-Z]{0,2})([0-9]{0,4})/.exec(s);
+    var series = m[3];
+    if (series.length === 1 && m[4]) series = ' ' + series;   // a one-letter series is padded once digits follow: GJ 14  X 6720
+    el.value = [m[1], m[2], series, m[4]].filter(Boolean).join(' ');
+  });
+</script>
 </body>
 </html>

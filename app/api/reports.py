@@ -17,7 +17,7 @@ from app.services.payables import PARTIES
 from app.services.stock import stock_by_entry, stock_by_purchase_group
 from app.services.years import allowed_years, current_year_label
 
-router = APIRouter(prefix="/reports")
+router = APIRouter(prefix="/Reports")
 
 
 async def _years(db: AsyncSession, user: User) -> list[str]:
@@ -27,7 +27,7 @@ async def _years(db: AsyncSession, user: User) -> list[str]:
     return allowed_years(user, found)
 
 
-@router.get("/year", response_class=HTMLResponse)
+@router.get("/Year", response_class=HTMLResponse)
 async def year_report(request: Request, year: str = "", user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     years = await _years(db, user)
     year = year if year in years else current_year_label()

@@ -50,7 +50,7 @@ Rules enforced by the application (app/services/years.py):
   2. A year closes automatically on 1 October; nobody locks or unlocks it.
      The old business_years lock table was dropped (migration b7d3f0a91c42).
   3. Only the owner can view past business years (lists, detail pages, year
-     report, /years). Accountants only see the current year.
+     report, /Years). Accountants only see the current year.
   4. Each year's data stays in the same tables, told apart by business_year.
   5. business_year is never typed by the user. The application sets it from the
      record's own date (purchase_group_date, purchase_entry_date, booking_date,

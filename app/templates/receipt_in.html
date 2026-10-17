@@ -3,9 +3,9 @@
 {% block title %}Receipt #{{ receipt.id }}{% endblock %}
 {% block content %}
 <div class="flex flex-wrap items-center gap-2 mb-3">
-  <a href="/industries/{{ industry.id }}/account" class="btn btn-ghost btn-sm">←</a>
+  <a href="/Industries/{{ industry.id }}/Account" class="btn btn-ghost btn-sm">←</a>
   <span class="flex-1"></span>
-  <a class="btn btn-primary btn-sm" href="/receipts/{{ receipt.id }}/voucher.pdf" target="_blank">{{ t('Print voucher (PDF)', 'વાઉચર છાપો (PDF)') }}</a>
+  <a class="btn btn-primary btn-sm" href="/Receipts/{{ receipt.id }}/Voucher.pdf" target="_blank">{{ t('Print voucher (PDF)', 'વાઉચર છાપો (PDF)') }}</a>
 </div>
 <div class="bg-white rounded-box shadow p-4 overflow-x-auto max-w-3xl">{% include "partials/doc_css.html" %}<div class="doc">{% include "partials/receipt_in_body.html" %}</div></div>
 {% endblock %}

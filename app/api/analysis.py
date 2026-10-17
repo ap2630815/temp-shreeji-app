@@ -14,7 +14,7 @@ from app.models import BagSupply, Bilty, PurchaseIndividual, LabourWork, Payment
 from app.services import analysis
 from app.services.years import allowed_years, current_year_label
 
-router = APIRouter(prefix="/analysis")
+router = APIRouter(prefix="/Analysis")
 
 
 async def _years(db: AsyncSession, user: User) -> list[str]:

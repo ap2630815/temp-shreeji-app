@@ -3,10 +3,10 @@
 <tr data-farmer-row="{{ f.id }}">
   <td>{{ f.farmer_name }}{% if f.farmer_name_gu %}<div class="gu text-xs opacity-70">{{ f.farmer_name_gu }}</div>{% endif %}</td>
   <td>{{ f.village.village_name }}</td>
-  <td>{{ f.mobile }}</td>
+  <td>{{ f.mobile | mobhtml }}</td>
   <td>{% for d in deals.get(f.id, []) %}<span class="badge badge-warning badge-sm" title="{{ d.village.village_name }} · {{ d.grain.grain_name }} · {{ d.purchase_group_date }}">#{{ d.id }} {{ d.grain.grain_name }}</span> {% endfor %}</td>
   <td class="text-right"><button type="button" class="btn btn-xs btn-outline whitespace-nowrap" data-id="{{ f.id }}" data-name="{{ f.farmer_name }}" data-village="{{ f.village.village_name }}"
-      data-mobile="{{ f.mobile }}" onclick="pickFarmer(this)">+ Add</button></td>
+      data-mobile="{{ f.mobile | mob }}" onclick="pickFarmer(this)">+ <span class="bi"><span>Add</span> <span class="gu">ઉમેરો</span></span></button></td>
 </tr>
 {% else %}
 <tr><td colspan="5" class="text-center opacity-60">No farmers match / કોઈ ખેડૂત મળ્યા નથી</td></tr>

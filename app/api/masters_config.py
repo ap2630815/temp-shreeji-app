@@ -12,8 +12,10 @@ from app import models
 
 MOBILE = r"^[0-9]{10}$"
 IFSC = r"^[A-Z]{4}0[A-Z0-9]{6}$"
-TRUCK_NO = r"^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$"
+TRUCK_NO = r"^[A-Z]{2} [0-9]{2} (?: [A-Z]|[A-Z]{2}) [0-9]{4}$"
 EMAIL = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+NAME3 = r"^\S+( \S+){2,}$"            # surname, name, father (grandfather optional): at least three words
+HEAD = r"^(Self|\S+( \S+){2,})$"      # 'Self', or surname (the farmer's own) + name + father's name
 BANK_ACCOUNT = r"^[0-9]{9,18}$"
 
 REQUIRED_MSG = ("Required", "જરૂરી")
@@ -41,6 +43,15 @@ class F:
     help: tuple[str, str] | None = None
     locked: bool = False  # shown but not editable; the handler keeps the stored value
     fk: str | None = None  # for kind="fk": key into app.api.masters.FK_SOURCES
+    @property
+    def is_account(self) -> bool:
+        """A bank account number: digits only in the column, shown in groups of five (12345 67890 12345 678)."""
+        return self.kind == "tel" and self.pattern == BANK_ACCOUNT
+
+    @property
+    def is_mobile(self) -> bool:
+        """A mobile / UPI number field (10 digits, shown as 98765 43210 with a country-code box). Other numeric text, like a bank account, is not."""
+        return self.kind == "tel" and self.pattern == MOBILE
 
 
 @dataclass(frozen=True)
@@ -68,6 +79,13 @@ def _upi():
     return _mobile("upi_number", "UPI number (if different from mobile)", "UPI નંબર (મોબાઇલથી અલગ હોય તો)", required=False)
 
 
+def _name4_pair(en, gu, name, max_length=120):
+    """A full name in four parts (surname, name, father, grandfather), stored joined by single spaces in one column; plus its Gujarati twin."""
+    hint = ("Surname, name and father's name are needed", "અટક, નામ અને પિતાનું નામ જરૂરી છે")
+    return [F(name, en, gu, kind="name4", required=True, pattern=NAME3, hint=hint, max_length=max_length),
+            F(f"{name}_gu", f"{en} (Gujarati)", f"{gu} (ગુજરાતી)", kind="name4", pattern=NAME3, hint=hint, max_length=max_length)]
+
+
 def _name_pair(en="Name", gu="નામ", name="name", required=True, max_length=200):
     return [F(name, en, gu, required=required, max_length=max_length), F(f"{name}_gu", f"{en} (Gujarati)", f"{gu} (ગુજરાતી)", max_length=max_length)]
 
@@ -85,7 +103,7 @@ def _fk(name, en, gu, source, required=True):
 
 # ---- file1-master1.txt
 _add(Spec(
-    slug="villages", model=models.Village, label=("Village", "ગામ"),
+    slug="Villages", model=models.Village, label=("Village", "ગામ"),
     fields=(
         F("village_name", "Village name", "ગામનું નામ", required=True, max_length=30),
         F("village_name_gu", "Village name (Gujarati)", "ગામનું નામ (ગુજરાતી)", max_length=30),
@@ -97,7 +115,7 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="grains", model=models.Grain, label=("Grain", "અનાજ"),
+    slug="Grains", model=models.Grain, label=("Grain", "અનાજ"),
     fields=(
         F("grain_name", "Grain name", "અનાજનું નામ", required=True, max_length=30),
         F("grain_name_gu", "Grain name (Gujarati)", "અનાજનું નામ (ગુજરાતી)", max_length=30),
@@ -113,7 +131,7 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="labour-groups", model=models.LabourGroup, label=("Labour Group", "મજૂર જૂથ"),
+    slug="LabourGroups", model=models.LabourGroup, label=("Labour Group", "મજૂર જૂથ"),
     fields=(
         F("group_name", "Group name", "જૂથનું નામ", required=True, max_length=30),
         F("group_name_gu", "Group name (Gujarati)", "જૂથનું નામ (ગુજરાતી)", max_length=30),
@@ -125,7 +143,7 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="bag-suppliers", model=models.BagSupplier, label=("Bag Supplier", "બારદાન સપ્લાયર"),
+    slug="BagSuppliers", model=models.BagSupplier, label=("Bag Supplier", "બારદાન સપ્લાયર"),
     fields=(
         *_name_pair("Full name (surname, name, father)", "પૂરું નામ (અટક, નામ, પિતા)", max_length=120),
         F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=30),
@@ -138,7 +156,7 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="transporters", model=models.Transporter, label=("Transport", "ટ્રાન્સપોર્ટ"),
+    slug="Transporters", model=models.Transporter, label=("Transport", "ટ્રાન્સપોર્ટ"),
     fields=(
         F("transporter_name", "Transport name", "ટ્રાન્સપોર્ટનું નામ", required=True, max_length=120),
         F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=30),
@@ -155,10 +173,10 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="trucks", model=models.Truck, label=("Truck", "ટ્રક"),
+    slug="Trucks", model=models.Truck, label=("Truck", "ટ્રક"),
     fields=(
         F("truck_number", "Truck number", "ટ્રક નંબર", required=True, pattern=TRUCK_NO,
-          hint=("e.g. GJ03AB1234", "દા.ત. GJ03AB1234"), max_length=10, normalize="truck_no"),
+          hint=("e.g. GJ 03 AB 1234 or GJ 14  X 6720 (spaces are added as you type)", "દા.ત. GJ 03 AB 1234 અથવા GJ 14  X 6720 (ટાઇપ કરતાં જગ્યા આપોઆપ ઉમેરાશે)"), max_length=13, normalize="truck_no"),
         F("truck_owner_name", "Owner name (surname, name, father)", "માલિકનું નામ (અટક, નામ, પિતા)", required=True, max_length=120),
         _mobile("truck_owner_mobile", "Owner mobile (payments go to the owner)", "માલિકનો મોબાઇલ (ચુકવણી માલિકને)"),
         F("driver_name", "Driver name (surname, name, father)", "ડ્રાઇવરનું નામ (અટક, નામ, પિતા)", required=True, max_length=120),
@@ -172,7 +190,7 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="industries", model=models.Industry, label=("Industry", "ઉદ્યોગ"),
+    slug="Industries", model=models.Industry, label=("Industry", "ઉદ્યોગ"),
     fields=(
         *_name_pair("Industry name", "ઉદ્યોગનું નામ", name="industrialist_name", max_length=120),
         F("owner_name", "Owner name", "માલિકનું નામ", required=True, max_length=120),
@@ -190,7 +208,7 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="brokers", model=models.Broker, label=("Broker", "દલાલ"),
+    slug="Brokers", model=models.Broker, label=("Broker", "દલાલ"),
     fields=(
         *_name_pair("Broker name", "દલાલનું નામ", name="broker_name", max_length=120),
         _mobile("mobile", "Mobile", "મોબાઇલ"),
@@ -204,10 +222,11 @@ _add(Spec(
 
 # ---- file2-master2.txt
 _add(Spec(
-    slug="farmers", model=models.Farmer, label=("Farmer", "ખેડૂત"),
+    slug="Farmers", model=models.Farmer, label=("Farmer", "ખેડૂત"),
     fields=(
-        *_name_pair("Full name (surname, name, father, grandfather)", "પૂરું નામ (અટક, નામ, પિતા, દાદા)", name="farmer_name", max_length=120),
-        F("head_of_family", "Head of family (verify before payment)", "કુટુંબના વડા (ચુકવણી પહેલાં ચકાસો)", max_length=60),
+        *_name4_pair("Full name (surname, name, father, grandfather)", "પૂરું નામ (અટક, નામ, પિતા, દાદા)", name="farmer_name", max_length=120),
+        F("head_of_family", "Head of family (ask him before any payment)", "કુટુંબના વડા (ચુકવણી પહેલાં તેમને પૂછો)", kind="head", required=True, pattern=HEAD, max_length=100,
+          hint=("Tick Self, or enter the head's name and father's name", "સ્વયં પસંદ કરો, અથવા વડાનું નામ અને પિતાનું નામ લખો")),
         _mobile("mobile", "Mobile", "મોબાઇલ"),
         F("email", "Email", "ઈમેલ", kind="email", pattern=EMAIL, hint=("name@example.com", "name@example.com"), max_length=60),
         _fk("village_id", "Village", "ગામ", "village"),
@@ -222,13 +241,13 @@ _add(Spec(
         F("public_figure", "Public figure / influence", "જાહેર વ્યક્તિ / પ્રભાવ", kind="textarea"),
         F("description", "Private note (owner only)", "ખાનગી નોંધ (ફક્ત માલિક)", kind="textarea", owner_only=True),
     ),
-    list_columns=("farmer_name", "village.village_name", "mobile"),
+    list_columns=("farmer_name", "village.village_name", "mobile", "head_of_family"),
     search_columns=("farmer_name", "farmer_name_gu", "mobile"),
     order_by="farmer_name",
 ))
 
 _add(Spec(
-    slug="labours", model=models.Labour, label=("Labour", "મજૂર"),
+    slug="Labours", model=models.Labour, label=("Labour", "મજૂર"),
     fields=(
         *_name_pair("Labour name", "મજૂરનું નામ", name="labour_name", max_length=120),
         _fk("labour_group_id", "Labour group", "મજૂર જૂથ", "labour_group"),
@@ -242,7 +261,7 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="labour-wages", model=models.LabourGroupWage, label=("Labour Wages", "મજૂરી દર"),
+    slug="LabourWages", model=models.LabourGroupWage, label=("Labour Wages", "મજૂરી દર"),
     fields=(
         _fk("labour_group_id", "Labour group", "મજૂર જૂથ", "labour_group"),
         _fk("grain_id", "Grain", "અનાજ", "grain"),
@@ -259,7 +278,7 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="brokerages", model=models.Brokerage, label=("Brokerage", "દલાલી"),
+    slug="Brokerages", model=models.Brokerage, label=("Brokerage", "દલાલી"),
     fields=(
         _fk("broker_id", "Broker", "દલાલ", "broker"),
         _fk("grain_id", "Grain", "અનાજ", "grain"),
@@ -272,6 +291,34 @@ _add(Spec(
 ))
 
 
+def compose_email(local: str | None, domain: str | None) -> str:
+    """The two sections of the email field -> the stored address, lower-case: ('dfgh', '@gmail.com') -> 'dfgh@gmail.com'. A full address pasted into the
+    first section is split at its '@'; nothing typed in either section means no email."""
+    local, domain = (local or "").strip(), (domain or "").strip().lstrip("@").strip()
+    if "@" in local:
+        local, pasted = local.split("@", 1)
+        domain = domain or pasted.strip().lstrip("@")
+    return f"{local}@{domain}".lower() if (local or domain) else ""
+
+
+def national_mobile(value: str) -> str:
+    """+918756564532, 08756564532, +91 87565 64532, 0091 8756564532 and 8756564532 all mean 8756564532: strip the country code / trunk 0,
+    keep the 10 digits. Anything that does not look like one of those is returned as plain digits (for validation to refuse)."""
+    digits = re.sub(r"\D", "", value)
+    for prefix, length in (("0091", 14), ("91", 12), ("0", 11)):
+        if len(digits) == length and digits.startswith(prefix):
+            return digits[len(prefix):]
+    return digits or value
+
+
+def format_truck_no(value: str) -> str:
+    """'gj03ab1234' / 'GJ-03 AB-1234' -> 'GJ 03 AB 1234'; 'gj14x6720' -> 'GJ 14  X 6720' (a one-letter series is padded to two columns,
+    so the numbers line up). Anything that does not fit stays as typed, upper-cased, for validation."""
+    cleaned = re.sub(r"[^A-Za-z0-9]", "", value).upper()
+    m = re.fullmatch(r"([A-Z]{2})([0-9]{2})([A-Z]{1,2})([0-9]{4})", cleaned)
+    return f"{m[1]} {m[2]} {m[3].rjust(2)} {m[4]}" if m else value.strip().upper()
+
+
 def normalize(spec: Spec, raw: dict[str, str], include_owner_only: bool) -> dict[str, Any]:
     """Strip, blank -> None, apply per-field normalisation, parse ints. Skips fields the caller may not edit."""
     out: dict[str, Any] = {}
@@ -279,8 +326,24 @@ def normalize(spec: Spec, raw: dict[str, str], include_owner_only: bool) -> dict
         if f.owner_only and not include_owner_only:
             continue
         value = (raw.get(f.name) or "").strip()
+        if f.kind == "name4" and any(f"{f.name}__{i}" in raw for i in range(1, 5)):
+            value = " ".join(" ".join((raw.get(f"{f.name}__{i}") or "").split()) for i in range(1, 5)).strip()
+            value = " ".join(value.split())  # parts left empty leave no gaps
+        if f.kind == "head" and any(f"{f.name}__{k}" in raw for k in ("self", "name", "father")):
+            # 'Self' (the farmer himself), or the farmer's own surname + the head's name + his father's name, joined by spaces
+            if raw.get(f"{f.name}__self"):
+                value = "Self"
+            else:
+                surname = (out.get("farmer_name") or "").split(" ")[0]
+                value = " ".join(" ".join(p.split()) for p in (surname, raw.get(f"{f.name}__name") or "", raw.get(f"{f.name}__father") or "") if p.strip())
+        if f.kind == "email" and (f"{f.name}__local" in raw or f"{f.name}__domain" in raw):
+            value = compose_email(raw.get(f"{f.name}__local"), raw.get(f"{f.name}__domain"))
+        if f.is_account:
+            value = re.sub(r"\s", "", value)  # '12345 67890 12345' -> '123456789012345'
+        if f.is_mobile:
+            value = national_mobile(value)  # '+91 98765 43210' / '098765 43210' / '98765 43210' -> '9876543210'
         if f.normalize == "truck_no":
-            value = re.sub(r"[\s\-]", "", value).upper()
+            value = format_truck_no(value)
         elif f.normalize == "upper":
             value = value.upper()
         if value == "":

@@ -1,8 +1,10 @@
+import re
 from pathlib import Path
 
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadData, URLSafeTimedSerializer
+from markupsafe import Markup, escape
 
 from app.core.config import settings
 from app.core.labels import LABELS
@@ -54,7 +56,7 @@ templates.env.globals["MASTERS"] = SPECS  # {{ L['farmer'][0]}} {{ L['farmer'][1
 
 
 def inr(value) -> str:
-    """Whole rupees with Indian digit grouping: 1234567 -> ₹12,34,567."""
+    """Whole rupees with Indian digit grouping: 1234567 -> ₹ 12,34,567."""
     n = int(value)
     sign = "-" if n < 0 else ""
     digits = str(abs(n))
@@ -67,10 +69,50 @@ def inr(value) -> str:
         if head:
             groups.insert(0, head)
         tail = ",".join(groups) + "," + tail
-    return f"{sign}₹{tail}"
+    return f"{sign}₹ {tail}"
 
 
 templates.env.filters["inr"] = inr
+
+
+def format_mobile(value) -> str:
+    """9876543210 -> '98765 43210' (stored as 10 digits, shown as 5 + 5); anything else is returned as it is."""
+    s = "" if value is None else str(value)
+    return f"{s[:5]} {s[5:]}" if re.fullmatch(r"[0-9]{10}", s) else s
+
+
+templates.env.filters["mob"] = format_mobile
+
+
+def format_account(value) -> str:
+    """123456789012345 -> '12345 67890 12345' (stored as plain digits, shown in groups of five)."""
+    s = "" if value is None else str(value)
+    return " ".join(s[i:i + 5] for i in range(0, len(s), 5)) if s.isdigit() else s
+
+
+templates.env.filters["acct"] = format_account
+
+
+def mobile_html(value):
+    """A mobile number to read on screen: '98765 43210' in one span, so a double click selects the whole number and copying it gives
+    9876543210 without the space (see the copy handler in base.html). Plain text (for attributes and inputs) is the `mob` filter."""
+    shown = format_mobile(value)
+    if value is None or shown == str(value):
+        return escape(shown)
+    return Markup(f'<span class="mob" data-digits="{escape(str(value))}">{escape(shown)}</span>')
+
+
+templates.env.filters["mobhtml"] = mobile_html
+
+
+def _keep_double_spaces(value):
+    """HTML collapses a double space; truck numbers like 'GJ 14  X 6720' keep theirs visible (space + no-break space)."""
+    if isinstance(value, str) and not isinstance(value, Markup) and "  " in value:
+        return value.replace("  ", " \u00a0")
+    return value
+
+
+templates.env.finalize = _keep_double_spaces
 
 
 def render(request: Request, name: str, status_code: int = 200, **context):

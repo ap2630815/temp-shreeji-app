@@ -16,7 +16,7 @@
       <ul id="picked" class="flex flex-col gap-1">
         {% for f in selected %}
         <li class="flex items-center gap-2 bg-base-200 rounded px-2 py-1 text-sm" data-id="{{ f.id }}"><input type="hidden" name="farmer_ids" value="{{ f.id }}">
-          <span class="flex-1">{{ f.farmer_name }} <span class="opacity-60">· {{ f.village.village_name }} · {{ f.mobile }}</span></span>
+          <span class="flex-1">{{ f.farmer_name }} <span class="opacity-60">· {{ f.village.village_name }} · {{ f.mobile | mobhtml }}</span></span>
           <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('li').remove()">✕</button></li>
         {% endfor %}
       </ul>
@@ -29,17 +29,17 @@
         <input type="hidden" name="pinfo" value="{{ p_id or '' }}">
         <input type="hidden" name="pg" value="{{ picker_grain }}">
         <input type="hidden" name="pfree_seen" value="1">
-        <select name="pv" class="select select-bordered select-sm" hx-get="/PurchaseGroup/farmer-search" hx-target="#farmer-results" hx-swap="innerHTML" hx-include="#picker-filters" hx-trigger="change">
+        <select name="pv" class="select select-bordered select-sm" hx-get="/PurchaseGroup/FarmerSearch" hx-target="#farmer-results" hx-swap="innerHTML" hx-include="#picker-filters" hx-trigger="change">
           <option value="">{{ t('All villages', 'બધા ગામ') }}</option>
           {% for v in picker_villages %}<option value="{{ v.id }}" {{ 'selected' if picker_village|string == v.id|string }}>{{ v.village_name }}</option>{% endfor %}
         </select>
-        <input type="search" name="pq" onkeydown="if (event.key === 'Enter') event.preventDefault()" placeholder="Name / mobile  નામ / મોબાઇલ" class="input input-bordered input-sm flex-1 min-w-32" hx-get="/PurchaseGroup/farmer-search" hx-target="#farmer-results" hx-swap="innerHTML"
+        <input type="search" name="pq" onkeydown="if (event.key === 'Enter') event.preventDefault()" placeholder="Name / mobile  નામ / મોબાઇલ" class="input input-bordered input-sm flex-1 min-w-32" hx-get="/PurchaseGroup/FarmerSearch" hx-target="#farmer-results" hx-swap="innerHTML"
                hx-include="#picker-filters" hx-trigger="input changed delay:300ms, search">
-        <label class="label cursor-pointer gap-1 p-0"><input type="checkbox" name="pfree" value="1" {{ 'checked' if picker_free }} class="checkbox checkbox-sm" hx-get="/PurchaseGroup/farmer-search" hx-target="#farmer-results" hx-swap="innerHTML" hx-include="#picker-filters">
+        <label class="label cursor-pointer gap-1 p-0"><input type="checkbox" name="pfree" value="1" {{ 'checked' if picker_free }} class="checkbox checkbox-sm" hx-get="/PurchaseGroup/FarmerSearch" hx-target="#farmer-results" hx-swap="innerHTML" hx-include="#picker-filters">
           <span class="text-xs">{{ t('Not in another purchase of this grain', 'આ અનાજની બીજી ખરીદીમાં નથી') }}</span></label>
       </div>
       <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-300 rounded">
-        <table class="table table-sm"><tbody id="farmer-results" hx-target="this" hx-swap="innerHTML" hx-get="/PurchaseGroup/farmer-search?pinfo={{ p_id or '' }}&pv={{ picker_village }}&pg={{ picker_grain }}{{ '&pfree=1' if picker_free }}" hx-trigger="load"></tbody></table>
+        <table class="table table-sm"><tbody id="farmer-results" hx-target="this" hx-swap="innerHTML" hx-get="/PurchaseGroup/FarmerSearch?pinfo={{ p_id or '' }}&pv={{ picker_village }}&pg={{ picker_grain }}{{ '&pfree=1' if picker_free }}" hx-trigger="load"></tbody></table>
       </div>
       <p class="text-xs opacity-60">{{ t('Yellow tags: already in another purchase of the selected grain this business year.', 'પીળા ટેગ: પસંદ કરેલા અનાજની આ વર્ષની બીજી ખરીદીમાં પહેલેથી છે.') }}</p>
     </div>
@@ -60,7 +60,7 @@
         <h3 class="font-bold text-lg">{{ t('Farmer already in another purchase', 'ખેડૂત બીજી ખરીદીમાં પહેલેથી છે') }}</h3>
         <p class="py-2 text-sm">{{ t('These farmers are already listed in another purchase of the same grain this business year. Adding them again may duplicate their ledger. The owner must verify to continue.', 'આ ખેડૂતો આ વર્ષે એ જ અનાજની બીજી ખરીદીમાં પહેલેથી છે. ફરી ઉમેરવાથી ખાતું બેવડાઈ શકે. ચાલુ રાખવા માલિકે ચકાસવું.') }}</p>
         <table class="table table-sm"><thead><tr><th>Farmer</th><th>Already in</th></tr></thead><tbody>
-        {% for farmer, infos in modal.rows %}<tr><td>{{ farmer.farmer_name }} <span class="opacity-60">· {{ farmer.mobile }}</span></td>
+        {% for farmer, infos in modal.rows %}<tr><td>{{ farmer.farmer_name }} <span class="opacity-60">· {{ farmer.mobile | mobhtml }}</span></td>
           <td>{% for d in infos %}<div>#{{ d.id }} · {{ d.village.village_name }} · {{ d.grain.grain_name }} · {{ d.purchase_group_date }}</div>{% endfor %}</td></tr>{% endfor %}
         </tbody></table>
         <div class="modal-action">

@@ -14,10 +14,69 @@
           <option value="">—</option>
           {% for c in f.choices %}<option value="{{ c }}" {{ 'selected' if v|string == c|string }}>{{ c }}</option>{% endfor %}
         </select>
+      {% elif f.kind == 'name4' %}
+        {# four parts, stored joined by single spaces: surname, name, father's name, grandfather's name (a stored name is split on its spaces) #}
+        {% set gj = f.name.endswith('_gu') %}
+        {% set words = values.get(f.name, '').split() %}
+        {% set stored = [words[0] if words|length > 0 else '', words[1] if words|length > 1 else '', words[2] if words|length > 2 else '', words[3:]|join(' ')] %}
+        {% set labels = [('Surname', 'અટક'), ('Name', 'નામ'), ("Father's name", 'પિતાનું નામ'), ("Grandfather's name", 'દાદાનું નામ')] %}
+        {% set hints = [('પટેલ', 'રમેશ', 'ભીમજીભાઈ', 'દેવજીભાઈ'), ('Patel', 'Ramesh', 'Bhimjibhai', 'Devjibhai')][0 if gj else 1] %}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {% for i in range(4) %}
+          <div class="flex flex-col gap-1">
+            <span class="text-xs leading-tight">{{ labels[i][0] }}<span class="gu block">{{ labels[i][1] }}</span></span>
+            <input name="{{ f.name }}__{{ i + 1 }}" value="{{ values.get(f.name ~ '__' ~ (i + 1), stored[i]) }}" placeholder="{{ hints[i] }}" maxlength="30" autocomplete="off"
+                   list="{{ f.name }}-p{{ i + 1 }}" title="Names already saved in this section are offered; type a new one if needed"
+                   class="input input-bordered w-full min-w-0 {{ 'input-error' if f.name in errors }}" {{ 'required' if i < 3 and not gj }} {{ 'disabled' if f.locked }}>
+          </div>
+          {% endfor %}
+        </div>
+        {% for i in range(4) %}<datalist id="{{ f.name }}-p{{ i + 1 }}">{% for n in (name_parts | default({})).get(f.name, [[], [], [], []])[i] %}<option value="{{ n }}">{% endfor %}</datalist>{% endfor %}
+      {% elif f.kind == 'head' %}
+        {# Self (the farmer himself), or the head's name + father's name; the surname is the farmer's own and is added when saving #}
+        {% set farmer = values.get('farmer_name', '') %}
+        {% set farmer_surname = (farmer.split()[0] | lower) if farmer.split() else '' %}
+        {% set posted = (f.name ~ '__name') in values or (f.name ~ '__self') in values or (f.name ~ '__father') in values %}
+        {% set stored = values.get(f.name, '') %}
+        {% set sw = stored.split() %}
+        {% set sw = sw[1:] if (sw and stored | lower != 'self' and (sw[0] | lower == farmer_surname or sw | length >= 3)) else sw %}
+        {% set is_self = ((f.name ~ '__self') in values) if posted else (stored | lower == 'self') %}
+        {% set hn = values.get(f.name ~ '__name', '') if posted else ('' if stored | lower == 'self' else (sw[0] if sw else '')) %}
+        {% set hf = values.get(f.name ~ '__father', '') if posted else ('' if stored | lower == 'self' else (sw[1:] | join(' '))) %}
+        <div class="flex flex-wrap items-end gap-2" data-head>
+          <label class="flex items-center gap-2 h-12 px-3 rounded-btn border border-base-300 cursor-pointer bg-base-100">
+            <input type="checkbox" name="{{ f.name }}__self" value="1" class="checkbox checkbox-sm" data-head-self {{ 'checked' if is_self }} {{ 'disabled' if f.locked }}>
+            <span class="leading-tight text-sm">Self<span class="gu block text-xs">સ્વયં</span></span>
+          </label>
+          <div class="flex flex-col gap-1 flex-1 min-w-32">
+            <span class="text-xs leading-tight">Name<span class="gu block">નામ</span></span>
+            <input name="{{ f.name }}__name" value="{{ hn }}" maxlength="25" autocomplete="off" data-head-part class="input input-bordered w-full min-w-0 {{ 'input-error' if f.name in errors }}" {{ 'disabled' if is_self or f.locked }}>
+          </div>
+          <div class="flex flex-col gap-1 flex-1 min-w-32">
+            <span class="text-xs leading-tight">Father's name<span class="gu block">પિતાનું નામ</span></span>
+            <input name="{{ f.name }}__father" value="{{ hf }}" maxlength="25" autocomplete="off" data-head-part class="input input-bordered w-full min-w-0 {{ 'input-error' if f.name in errors }}" {{ 'disabled' if is_self or f.locked }}>
+          </div>
+        </div>
+      {% elif f.kind == 'email' %}
+        {# two sections: what comes before the @ and the ending (pick a known one, hover/click the arrow, or type a new one; Tab completes it) #}
+        {% set raw = values.get(f.name, '') %}
+        {% set local = values.get(f.name ~ '__local', raw.split('@')[0] if '@' in raw else raw) %}
+        {% set domain = values.get(f.name ~ '__domain', raw.split('@')[1] if '@' in raw else '') %}
+        <div class="join w-full">
+          <input name="{{ f.name }}__local" value="{{ local }}" maxlength="{{ f.max_length }}" placeholder="name" inputmode="email" autocomplete="off" autocapitalize="none" data-fmt="email-local"
+                 class="input input-bordered join-item flex-1 min-w-0 {{ 'input-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
+          <span class="join-item flex items-center px-3 bg-base-100 border-y text-base" style="border-color: oklch(var(--bc) / .2)">@</span>
+          <input name="{{ f.name }}__domain" value="{{ domain }}" maxlength="{{ f.max_length }}" placeholder="gmail.com" list="{{ f.name }}-domains" autocomplete="off" autocapitalize="none" data-fmt="email-domain"
+                 title="Pick an ending, or type a new one. Tab completes the suggestion"
+                 class="input input-bordered join-item w-56 shrink-0 {{ 'input-error' if f.name in errors }}" {{ 'disabled' if f.locked }}>
+        </div>
+        <datalist id="{{ f.name }}-domains">{% for d in email_domains | default([]) %}<option value="{{ d }}">{% endfor %}</datalist>
       {% else %}
-        <input name="{{ f.name }}" value="{{ v }}" maxlength="{{ f.max_length }}"
+        {% if f.is_mobile %}<div class="join w-full"><select class="select select-bordered join-item w-24 shrink-0" data-cc aria-label="Country code" title="Country code / trunk prefix (+91 or 0): the number is the same" {{ 'disabled' if f.locked }}><option>+91</option><option>0</option></select>{% endif %}
+        <input name="{{ f.name }}" autocomplete="off" value="{{ v | mob if f.is_mobile else (v | acct if f.is_account else v) }}" maxlength="{{ 24 if (f.is_mobile or f.is_account) else f.max_length }}" {% if f.is_mobile %}placeholder="98765 43210" {% endif %} {% if f.normalize == 'truck_no' %}data-fmt="truck" autocapitalize="characters"{% elif f.is_mobile %}data-fmt="mobile"{% elif f.is_account %}data-fmt="account"{% endif %}
                {% if f.kind == 'tel' %}inputmode="numeric"{% elif f.kind == 'int' %}type="number" min="0" inputmode="numeric"{% elif f.kind == 'date' %}type="date"{% endif %}
-               class="input input-bordered {{ 'input-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
+               class="input input-bordered {{ 'join-item flex-1 min-w-0' if f.is_mobile }} {{ 'input-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
+        {% if f.is_mobile %}</div>{% endif %}
       {% endif %}
       {% if f.help %}<span class="text-xs opacity-60 mt-1">{{ f.help[0] }} <span class="gu">{{ f.help[1] }}</span></span>{% endif %}
       {% if f.name in errors %}

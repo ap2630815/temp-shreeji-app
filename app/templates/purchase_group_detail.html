@@ -6,8 +6,8 @@
 <div class="flex flex-wrap items-center gap-3 mb-4">
   <a href="/PurchaseGroup?year={{ p.business_year }}" class="btn btn-ghost btn-sm">←</a>
   <h1 class="text-xl font-semibold flex-1">{{ p.village.village_name }} · {{ p.grain.grain_name }} <span class="gu text-base">{{ p.grain.grain_name_gu or '' }}</span></h1>
-  <a href="/PurchaseGroup/{{ p.id }}/edit" class="btn btn-sm">{{ t('Edit purchase / farmers', 'ખરીદી / ખેડૂતો સુધારો') }}</a>
-  <a href="/PurchaseGroup/{{ p.id }}/entries/new" class="btn btn-primary btn-sm">+ {{ t('Add farmer entry', 'ખેડૂત એન્ટ્રી ઉમેરો') }}</a>
+  <a href="/PurchaseGroup/{{ p.id }}/Edit" class="btn btn-sm">{{ t('Edit purchase / farmers', 'ખરીદી / ખેડૂતો સુધારો') }}</a>
+  <a href="/PurchaseGroup/{{ p.id }}/Entries/New" class="btn btn-primary btn-sm">+ {{ t('Add farmer entry', 'ખેડૂત એન્ટ્રી ઉમેરો') }}</a>
 </div>
 
 <div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
@@ -32,9 +32,9 @@
     <thead><tr>{{ th('Farmer', 'ખેડૂત') }}{{ th('Village', 'ગામ') }}{{ th('Entries', 'નોંધ') }}{{ th('Net payable', 'ચોખ્ખું') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Due', 'બાકી') }}<th></th></tr></thead>
     <tbody>
     {% for x in people %}
-      <tr><td><a class="link" href="/farmers/{{ x.farmer.id }}/statement">{{ x.farmer.farmer_name }}</a></td><td>{{ x.farmer.village.village_name }}</td><td>{{ x.entries }}</td>
+      <tr><td><a class="link" href="/Farmers/{{ x.farmer.id }}/Statement">{{ x.farmer.farmer_name }}</a></td><td>{{ x.farmer.village.village_name }}</td><td>{{ x.entries }}</td>
           <td>{{ x.totals.net_payable | inr }}</td><td>{{ x.totals.paid | inr }}</td><td class="font-semibold">{{ x.totals.due | inr }}</td>
-          <td class="text-right"><a class="btn btn-ghost btn-xs" href="/PurchaseGroup/{{ p.id }}/entries/new?farmer_id={{ x.farmer.id }}">+ {{ t('Entry', 'નોંધ') }}</a></td></tr>
+          <td class="text-right"><a class="btn btn-ghost btn-xs" href="/PurchaseGroup/{{ p.id }}/Entries/New?farmer_id={{ x.farmer.id }}">+ {{ t('Entry', 'નોંધ') }}</a></td></tr>
     {% else %}<tr><td colspan="7" class="opacity-60">{{ t('No farmer listed yet — use Edit to add the farmers who joined.', 'હજી કોઈ ખેડૂત નથી — સુધારો દબાવી જોડાયેલા ખેડૂતો ઉમેરો.') }}</td></tr>{% endfor %}
     </tbody>
   </table></div>
@@ -50,7 +50,7 @@
     {% for v in views %}{% set e = v.entry %}
       <tr>
         <td class="whitespace-nowrap">{{ e.purchase_entry_date }}</td>
-        <td><a class="link" href="/farmers/{{ e.farmer_id }}/statement">{{ e.farmer.farmer_name }}</a>{% if e.description %}<div class="text-xs opacity-60">{{ e.description }}</div>{% endif %}</td>
+        <td><a class="link" href="/Farmers/{{ e.farmer_id }}/Statement">{{ e.farmer.farmer_name }}</a>{% if e.description %}<div class="text-xs opacity-60">{{ e.description }}</div>{% endif %}</td>
         <td>{{ e.labour_group.group_name }}</td>
         <td>{{ e.no_of_filled_bags }}</td>
         <td>{{ e.no_of_handful_bags }}</td>
@@ -63,7 +63,7 @@
         <td class="whitespace-nowrap {{ 'text-error' if v.is_overdue(today) }}">{{ e.due_date }}</td>
         <td>{{ badge(v.status, v.is_overdue(today)) }}</td>
         <td class="text-right whitespace-nowrap">
-          <a class="btn btn-ghost btn-xs" href="/PurchaseGroup/entries/{{ e.id }}/edit">{{ t('Edit', 'સુધારો') }}</a>
+          <a class="btn btn-ghost btn-xs" href="/PurchaseGroup/Entries/{{ e.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a>
         </td>
       </tr>
     {% else %}

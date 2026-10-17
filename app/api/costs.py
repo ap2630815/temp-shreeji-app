@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, toolbar_ids, today
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
@@ -65,7 +65,7 @@ def labour_snapshot(w: LabourWork) -> dict:
                 petrol=w.petrol, meal=w.meal, description=w.description)
 
 
-@router.get("/labour-work", response_class=HTMLResponse)
+@router.get("/LabourWork", response_class=HTMLResponse)
 async def labour_list(request: Request, year: str = "", user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     years = await _years(db, LabourWork, user)
     year = year if year in years else current_year_label()
@@ -74,30 +74,30 @@ async def labour_list(request: Request, year: str = "", user: User = Depends(cur
     return render_with_csrf(request, csrf, "labour_list.html", user=user, rows=rows, paid=paid, year=year, years=years, year_locked=year != current_year_label())
 
 
-@router.get("/labour-work/new", response_class=HTMLResponse)
+@router.get("/LabourWork/New", response_class=HTMLResponse)
 async def labour_new(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     ctx = form_context(fields=await labour_fields(db), values=dict(work_date=today().isoformat(), payable_amount="0", borrowing_amount="0", petrol="0", meal="0"),
-                       errors={}, action="/labour-work", heading=("Labour work", "મજૂર કામ"), back_url="/labour-work")
+                       errors={}, action="/LabourWork", heading=("Labour work", "મજૂર કામ"), back_url="/LabourWork")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
 
 
-@router.get("/labour-work/{work_id}/edit", response_class=HTMLResponse)
+@router.get("/LabourWork/{work_id}/Edit", response_class=HTMLResponse)
 async def labour_edit(request: Request, work_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     w = await db.get(LabourWork, work_id)
     if w is None:
         raise HTTPException(404)
-    ctx = form_context(fields=await labour_fields(db), values=labour_values(w), errors={}, action=f"/labour-work/{w.id}",
-                       heading=("Edit labour work", "મજૂર કામ સુધારો"), back_url="/labour-work")
+    ctx = form_context(fields=await labour_fields(db), values=labour_values(w), errors={}, action=f"/LabourWork/{w.id}",
+                       heading=("Edit labour work", "મજૂર કામ સુધારો"), back_url="/LabourWork")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
 
 
-@router.post("/labour-work", response_class=HTMLResponse)
+@router.post("/LabourWork", response_class=HTMLResponse)
 async def labour_create(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     await csrf.validate_csrf(request)
     return await _save_labour(request, None, user, db)
 
 
-@router.post("/labour-work/{work_id}", response_class=HTMLResponse)
+@router.post("/LabourWork/{work_id}", response_class=HTMLResponse)
 async def labour_update(request: Request, work_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     await csrf.validate_csrf(request)
     w = await db.get(LabourWork, work_id)
@@ -110,9 +110,9 @@ async def _save_labour(request: Request, w: LabourWork | None, user: User, db: A
     w_id = w.id if w else None
     fields = await labour_fields(db)
     raw = await read_form(request)
-    action = f"/labour-work/{w_id}" if w_id else "/labour-work"
+    action = f"/LabourWork/{w_id}" if w_id else "/LabourWork"
     rerender = lambda errs: render(request, "partials/master_form.html", **form_context(  # noqa: E731
-        fields=fields, values=raw, errors=errs, action=action, heading=("Labour work", "મજૂર કામ"), back_url="/labour-work"))
+        fields=fields, values=raw, errors=errs, action=action, heading=("Labour work", "મજૂર કામ"), back_url="/LabourWork"))
     clean, errors = run_validation(LabourIn, fields, normalize_fields(fields, raw))
     if errors:
         return rerender(errors)
@@ -121,7 +121,7 @@ async def _save_labour(request: Request, w: LabourWork | None, user: User, db: A
     if await db.get(LabourGroup, clean["labour_group_id"]) is None:
         return rerender({"labour_group_id": ("Unknown labour group", "અજ્ઞાત મજૂર જૂથ")})
     if clean["borrowing_amount"] > clean["payable_amount"]:
-        return rerender({"borrowing_amount": (f"Cannot exceed the wages (₹{clean['payable_amount']}); record the rest on another day", f"મજૂરી (₹{clean['payable_amount']}) થી વધુ ન હોઈ શકે; બાકીનું બીજા દિવસે નોંધો")})
+        return rerender({"borrowing_amount": (f"Cannot exceed the wages (₹ {clean['payable_amount']}); record the rest on another day", f"મજૂરી (₹ {clean['payable_amount']}) થી વધુ ન હોઈ શકે; બાકીનું બીજા દિવસે નોંધો")})
     try:
         clean["business_year"] = await assert_year_open(db, clean["work_date"])
         if w is not None:
@@ -133,7 +133,7 @@ async def _save_labour(request: Request, w: LabourWork | None, user: User, db: A
         paid = await paid_for(db, "labour_group", w.id)
         net = clean["payable_amount"] - clean["borrowing_amount"]
         if net < paid:
-            return rerender({"payable_amount": (f"₹{paid} is already paid for this day; wages cannot go below that", f"આ દિવસ માટે ₹{paid} ચૂકવાઈ ગયા છે; મજૂરી તેથી ઓછી ન થઈ શકે")})
+            return rerender({"payable_amount": (f"₹ {paid} is already paid for this day; wages cannot go below that", f"આ દિવસ માટે ₹ {paid} ચૂકવાઈ ગયા છે; મજૂરી તેથી ઓછી ન થઈ શકે")})
         before = labour_snapshot(w)
         for name, value in clean.items():
             setattr(w, name, value)
@@ -147,7 +147,7 @@ async def _save_labour(request: Request, w: LabourWork | None, user: User, db: A
     except IntegrityError:
         await db.rollback()
         return rerender({"payable_amount": GENERIC_ERROR})
-    return Response(status_code=204, headers={"HX-Redirect": "/labour-work"})
+    return Response(status_code=204, headers={"HX-Redirect": "/LabourWork"})
 
 
 # ================================================================== bag supplies
@@ -161,9 +161,12 @@ class BagIn(BaseModel):
     description: str | None = None
 
 
-async def bag_fields(db: AsyncSession) -> list[F]:
+async def bag_fields(db: AsyncSession, village_id: int = 0) -> list[F]:
     suppliers = list((await db.scalars(select(BagSupplier).order_by(BagSupplier.pet_name))).all())
-    farmers = list((await db.scalars(select(Farmer).order_by(Farmer.farmer_name))).unique().all())
+    stmt = select(Farmer).order_by(Farmer.farmer_name)
+    if village_id:  # the toolbar village
+        stmt = stmt.where(Farmer.village_id == village_id)
+    farmers = list((await db.scalars(stmt)).unique().all())
     farmers.sort(key=lambda f: (f.village.village_name, f.farmer_name))
     return [
         F("supplier_id", "Bag supplier", "બારદાન સપ્લાયર", kind="select", required=True, options=tuple((str(s.id), f"{s.pet_name} — {s.name}") for s in suppliers)),
@@ -184,7 +187,7 @@ def bag_snapshot(b: BagSupply) -> dict:
     return dict(supplier_id=b.supplier_id, farmer_id=b.farmer_id, supply_date=b.supply_date, rate_per_bag=b.rate_per_bag, no_of_bags=b.no_of_bags, payable_amount=b.payable_amount, description=b.description)
 
 
-@router.get("/bag-supplies", response_class=HTMLResponse)
+@router.get("/BagSupplies", response_class=HTMLResponse)
 async def bag_list(request: Request, year: str = "", view: str = "supplies", village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     years = await _years(db, BagSupply, user)
     year = year if year in years else current_year_label()
@@ -204,30 +207,30 @@ async def bag_list(request: Request, year: str = "", view: str = "supplies", vil
                             total_units=sum(r.no_of_bags for r in rows), total_amount=sum(r.payable_amount for r in rows), year_locked=year != current_year_label())
 
 
-@router.get("/bag-supplies/new", response_class=HTMLResponse)
+@router.get("/BagSupplies/New", response_class=HTMLResponse)
 async def bag_new(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
-    ctx = form_context(fields=await bag_fields(db), values=dict(supply_date=today().isoformat()), errors={}, action="/bag-supplies",
-                       heading=("Bag supply", "બારદાન સપ્લાય"), back_url="/bag-supplies")
+    ctx = form_context(fields=await bag_fields(db, toolbar_ids(request)[0]), values=dict(supply_date=today().isoformat()), errors={}, action="/BagSupplies",
+                       heading=("Bag supply", "બારદાન સપ્લાય"), back_url="/BagSupplies")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
 
 
-@router.get("/bag-supplies/{supply_id}/edit", response_class=HTMLResponse)
+@router.get("/BagSupplies/{supply_id}/Edit", response_class=HTMLResponse)
 async def bag_edit(request: Request, supply_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     b = await db.get(BagSupply, supply_id)
     if b is None:
         raise HTTPException(404)
-    ctx = form_context(fields=await bag_fields(db), values=bag_values(b), errors={}, action=f"/bag-supplies/{b.id}",
-                       heading=("Edit bag supply", "બારદાન સપ્લાય સુધારો"), back_url="/bag-supplies")
+    ctx = form_context(fields=await bag_fields(db), values=bag_values(b), errors={}, action=f"/BagSupplies/{b.id}",
+                       heading=("Edit bag supply", "બારદાન સપ્લાય સુધારો"), back_url="/BagSupplies")
     return render_with_csrf(request, csrf, "master_form_page.html", user=user, **ctx)
 
 
-@router.post("/bag-supplies", response_class=HTMLResponse)
+@router.post("/BagSupplies", response_class=HTMLResponse)
 async def bag_create(request: Request, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     await csrf.validate_csrf(request)
     return await _save_bag(request, None, user, db)
 
 
-@router.post("/bag-supplies/{supply_id}", response_class=HTMLResponse)
+@router.post("/BagSupplies/{supply_id}", response_class=HTMLResponse)
 async def bag_update(request: Request, supply_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     await csrf.validate_csrf(request)
     b = await db.get(BagSupply, supply_id)
@@ -240,9 +243,9 @@ async def _save_bag(request: Request, b: BagSupply | None, user: User, db: Async
     b_id = b.id if b else None
     fields = await bag_fields(db)
     raw = await read_form(request)
-    action = f"/bag-supplies/{b_id}" if b_id else "/bag-supplies"
+    action = f"/BagSupplies/{b_id}" if b_id else "/BagSupplies"
     rerender = lambda errs: render(request, "partials/master_form.html", **form_context(  # noqa: E731
-        fields=fields, values=raw, errors=errs, action=action, heading=("Bag supply", "બારદાન સપ્લાય"), back_url="/bag-supplies"))
+        fields=fields, values=raw, errors=errs, action=action, heading=("Bag supply", "બારદાન સપ્લાય"), back_url="/BagSupplies"))
     clean, errors = run_validation(BagIn, fields, normalize_fields(fields, raw))
     if errors:
         return rerender(errors)
@@ -260,7 +263,7 @@ async def _save_bag(request: Request, b: BagSupply | None, user: User, db: Async
     if b is not None:
         paid = await paid_for(db, "bag_supplier", b.id)
         if clean["payable_amount"] < paid:
-            return rerender({"no_of_bags": (f"₹{paid} is already paid for this supply; the amount cannot go below that", f"આ સપ્લાય માટે ₹{paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
+            return rerender({"no_of_bags": (f"₹ {paid} is already paid for this supply; the amount cannot go below that", f"આ સપ્લાય માટે ₹ {paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
         before = bag_snapshot(b)
         for name, value in clean.items():
             setattr(b, name, value)
@@ -274,4 +277,4 @@ async def _save_bag(request: Request, b: BagSupply | None, user: User, db: Async
     except IntegrityError:
         await db.rollback()
         return rerender({"no_of_bags": GENERIC_ERROR})
-    return Response(status_code=204, headers={"HX-Redirect": "/bag-supplies"})
+    return Response(status_code=204, headers={"HX-Redirect": "/BagSupplies"})

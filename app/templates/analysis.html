@@ -16,7 +16,7 @@
 </div>
 <div class="tabs tabs-boxed bg-base-100 mb-4 w-fit flex-wrap">
   {% for key, label in ledgers.items() %}
-  <a href="/analysis?ledger={{ key }}{{ '&' ~ keep if keep }}" class="tab {{ 'tab-active' if key == ledger }}">{{ label[0] }} <span class="gu ml-1">{{ label[1] }}</span></a>
+  <a href="/Analysis?ledger={{ key }}{{ '&' ~ keep if keep }}" class="tab {{ 'tab-active' if key == ledger }}">{{ label[0] }} <span class="gu ml-1">{{ label[1] }}</span></a>
   {% endfor %}
 </div>
 {% for n in report.notes %}<p class="text-xs opacity-70 mb-2">{{ n[0] }} <span class="gu">{{ n[1] }}</span></p>{% endfor %}
