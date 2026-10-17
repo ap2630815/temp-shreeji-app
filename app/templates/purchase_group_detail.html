@@ -2,11 +2,12 @@
 {% from "partials/bilabel.html" import t, th, badge %}
 {% block title %}{{ p.village.village_name }}{% endblock %}
 {% block content %}
+<div class="stackbi">
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <a href="/purchases?year={{ p.business_year }}" class="btn btn-ghost btn-sm">←</a>
+  <a href="/PurchaseGroup?year={{ p.business_year }}" class="btn btn-ghost btn-sm">←</a>
   <h1 class="text-xl font-semibold flex-1">{{ p.village.village_name }} · {{ p.grain.grain_name }} <span class="gu text-base">{{ p.grain.grain_name_gu or '' }}</span></h1>
-  <a href="/purchases/{{ p.id }}/edit" class="btn btn-sm">{{ t('Edit', 'સુધારો') }}</a>
-  <a href="/purchases/{{ p.id }}/entries/new" class="btn btn-primary btn-sm">+ {{ t('Add farmer entry', 'ખેડૂત એન્ટ્રી ઉમેરો') }}</a>
+  <a href="/PurchaseGroup/{{ p.id }}/edit" class="btn btn-sm">{{ t('Edit purchase / farmers', 'ખરીદી / ખેડૂતો સુધારો') }}</a>
+  <a href="/PurchaseGroup/{{ p.id }}/entries/new" class="btn btn-primary btn-sm">+ {{ t('Add farmer entry', 'ખેડૂત એન્ટ્રી ઉમેરો') }}</a>
 </div>
 
 <div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
@@ -20,9 +21,24 @@
     <div class="stat-desc">{{ t('Overdue', 'મુદત વીતી') }} {{ totals.overdue | inr }}</div></div>
 </div>
 
-<p class="text-sm mb-1">{{ t('Date', 'તારીખ') }}: {{ p.purchase_info_date }} · {{ t('Business year', 'વ્યવસાય વર્ષ') }}: {{ p.business_year }}</p>
-{% if p.purchase_info_terms %}<p class="text-sm mb-1"><b>{{ t('Terms', 'શરતો') }}:</b> {{ p.purchase_info_terms }}</p>{% endif %}
+<p class="text-sm mb-1">{{ t('Date', 'તારીખ') }}: {{ p.purchase_group_date }} · {{ t('Business year', 'વ્યવસાય વર્ષ') }}: {{ p.business_year }}</p>
+{% if p.purchase_group_terms %}<p class="text-sm mb-1"><b>{{ t('Terms', 'શરતો') }}:</b> {{ p.purchase_group_terms }}</p>{% endif %}
 {% if p.description %}<p class="text-sm mb-3 opacity-80">{{ p.description }}</p>{% endif %}
+
+<div class="card bg-base-100 shadow mb-4"><div class="card-body p-4">
+  <h2 class="font-semibold">{{ t('Farmers in this purchase', 'આ ખરીદીમાં ખેડૂતો') }} ({{ people | length }})</h2>
+  <p class="text-xs opacity-60">{{ t('Each farmer has his own ledger in this purchase. The same village can have other purchases with other farmers.', 'દરેક ખેડૂતનું આ ખરીદીમાં પોતાનું ખાતું છે. એ જ ગામની બીજી ખરીદીમાં બીજા ખેડૂતો હોઈ શકે.') }}</p>
+  <div class="overflow-x-auto"><table class="table table-sm">
+    <thead><tr>{{ th('Farmer', 'ખેડૂત') }}{{ th('Village', 'ગામ') }}{{ th('Entries', 'નોંધ') }}{{ th('Net payable', 'ચોખ્ખું') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Due', 'બાકી') }}<th></th></tr></thead>
+    <tbody>
+    {% for x in people %}
+      <tr><td><a class="link" href="/farmers/{{ x.farmer.id }}/statement">{{ x.farmer.farmer_name }}</a></td><td>{{ x.farmer.village.village_name }}</td><td>{{ x.entries }}</td>
+          <td>{{ x.totals.net_payable | inr }}</td><td>{{ x.totals.paid | inr }}</td><td class="font-semibold">{{ x.totals.due | inr }}</td>
+          <td class="text-right"><a class="btn btn-ghost btn-xs" href="/PurchaseGroup/{{ p.id }}/entries/new?farmer_id={{ x.farmer.id }}">+ {{ t('Entry', 'નોંધ') }}</a></td></tr>
+    {% else %}<tr><td colspan="7" class="opacity-60">{{ t('No farmer listed yet — use Edit to add the farmers who joined.', 'હજી કોઈ ખેડૂત નથી — સુધારો દબાવી જોડાયેલા ખેડૂતો ઉમેરો.') }}</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div></div>
 
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
   <table class="table table-zebra table-sm">
@@ -47,7 +63,7 @@
         <td class="whitespace-nowrap {{ 'text-error' if v.is_overdue(today) }}">{{ e.due_date }}</td>
         <td>{{ badge(v.status, v.is_overdue(today)) }}</td>
         <td class="text-right whitespace-nowrap">
-          <a class="btn btn-ghost btn-xs" href="/purchases/entries/{{ e.id }}/edit">{{ t('Edit', 'સુધારો') }}</a>
+          <a class="btn btn-ghost btn-xs" href="/PurchaseGroup/entries/{{ e.id }}/edit">{{ t('Edit', 'સુધારો') }}</a>
         </td>
       </tr>
     {% else %}
@@ -55,5 +71,6 @@
     {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 {% endblock %}

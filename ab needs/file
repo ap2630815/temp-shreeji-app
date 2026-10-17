@@ -11,12 +11,29 @@ just for understanding of core bussiness rules,
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 (handle by app logic)
 
+Screens: /PurchaseFarmersEntries = all farmers' ledger entries of the business year; buttons beside the title lead to
+  /PurchaseIndividual, /PurchaseGroup (purchase groups: the deals) and /PurchaseGroup/<num> (one deal: its farmers + their ledger, the "Group Ledger" button/dropdown).
+  /PurchaseIndividual (sidebar: opens under "Purchase Farmers Entries" on hover) = purchase_individuals: ONE form (+add / +edit, "Save & add another") with the purchase_group columns (date, village, grain,
+  rate, pay after, terms) and the purchase_farmers_entries columns (farmer, labour group, bags, kilos, handful bags, raw weight, quality, store, borrowed)
+  together and ONE description. One row per farmer entry, no purchase_group. It is part of the farmer ledger: shown on /PurchaseFarmersEntries, in the
+  farmer statement, in dues and payments (allocations of type 'purchase_individual'), in the year report and in the farmer analysis.
+  (Not yet: loading a purchase individual's bags on a truck.)
 
-purchase_farmer_entries.total_available_bags = purchase_farmer_entries.no_of_filled_bags + purchase_farmer_entries.no_of_handful_bags  
+purchase_group (deal) and its farmers:
+  one village can have many purchase_group; each is a deal between the business owner and the few farmers who gathered
+  Add / edit purchase_group screen: purchase_group fields on the left; on the right the owner filters the existing farmers (village, name, mobile)
+  and picks the farmers taking part -> purchase_group_farmers. purchase_farmers_entries (the farmer ledger) can only be made for a listed farmer.
+  If a picked farmer is already listed in another purchase_group of the SAME GRAIN (same business year) -> pop-up naming those deals; the owner must verify to go on.
+  If, while editing, a listed farmer is removed -> his purchase_farmers_entries in this purchase_group are deleted with him (no pop-up, no confirmation:
+  only ledger entries exist at this stage). The only refusal: an entry that is already loaded on a truck or has a payment cannot be deleted, so that farmer stays.
+
+
+
+purchase_farmers_entries.total_available_bags = purchase_farmers_entries.no_of_filled_bags + purchase_farmers_entries.no_of_handful_bags  
 
 total_remaining_bags <= total_available_bags
 if purchase_farmer_entry_id does not exist in truck_load_lines ledger 
-then truck_load_lines.total_remaining_bags = purchase_farmer_entries.total_available_bags AND truck_load_lines.no_of_loaded_bags is (initialize automatically as purchase_farmer_entries selected from select input data in UI) 
+then truck_load_lines.total_remaining_bags = purchase_farmers_entries.total_available_bags AND truck_load_lines.no_of_loaded_bags is (initialize automatically as purchase_farmers_entries selected from select input data in UI) 
 truck_load_lines.total_remaining_bags = truck_load_lines.total_remaining_bags - truck_load_lines.no_of_loaded_bags
  
 bilties.total_bags_in_truck = sum of truck_load_lines.no_of_loaded_bags, for particular trip_id from different purchase_farmer_entry_id

@@ -19,7 +19,7 @@ from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
 from app.models import (
-    Bilty, BrokerBooking, Brokerage, LabourGroup, PurchaseFarmerEntry, PurchaseInfo, Transporter, Truck, TruckLoadLine, TruckTrip, User,
+    Bilty, BrokerBooking, Brokerage, LabourGroup, PurchaseFarmerEntry, PurchaseGroup, Transporter, Truck, TruckLoadLine, TruckTrip, User,
 )
 from app.services import audit, money
 from app.services.locks import advisory_lock
@@ -161,12 +161,12 @@ class LineIn(BaseModel):
 async def line_fields(db: AsyncSession, trip: TruckTrip) -> list[F]:
     on_trip = {line.purchase_farmer_entry_id for line in trip.load_lines}
     entries = list((await db.scalars(
-        select(PurchaseFarmerEntry).join(PurchaseInfo, PurchaseInfo.id == PurchaseFarmerEntry.purchase_info_id)
-        .where(PurchaseInfo.grain_id == trip.grain.id).order_by(PurchaseFarmerEntry.purchase_entry_date.desc(), PurchaseFarmerEntry.id.desc()).limit(500)
+        select(PurchaseFarmerEntry).join(PurchaseGroup, PurchaseGroup.id == PurchaseFarmerEntry.purchase_group_id)
+        .where(PurchaseGroup.grain_id == trip.grain.id).order_by(PurchaseFarmerEntry.purchase_entry_date.desc(), PurchaseFarmerEntry.id.desc()).limit(500)
     )).unique().all())
     stock = await stock_by_entry(db, [e.id for e in entries])
     options = tuple(
-        (str(e.id), f"{e.purchase_info.village.village_name} · {e.farmer.farmer_name} · {e.purchase_entry_date} — {stock[e.id].available} bags left")
+        (str(e.id), f"{e.purchase_group.village.village_name} · {e.farmer.farmer_name} · {e.purchase_entry_date} — {stock[e.id].available} bags left")
         for e in entries if e.id in stock and stock[e.id].available > 0 and e.id not in on_trip
     )
     return [
@@ -209,7 +209,7 @@ async def _years_with_trips(db: AsyncSession, user: User) -> list[str]:
 
 @router.get("", response_class=HTMLResponse)
 async def list_page(
-    request: Request, year: str = "", grain_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
+    request: Request, year: str = "", grain_id: int = 0, village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
     years = await _years_with_trips(db, user)
     year = year if year in years else current_year_label()
@@ -217,6 +217,14 @@ async def list_page(
     if grain_id:
         stmt = (stmt.join(BrokerBooking, BrokerBooking.id == TruckTrip.broker_booking_id)
                 .join(Brokerage, Brokerage.id == BrokerBooking.brokerage_id).where(Brokerage.grain_id == grain_id))
+    if village_id:  # trips that loaded bags bought in that village
+        from_village = (
+            select(TruckLoadLine.trip_id)
+            .join(PurchaseFarmerEntry, PurchaseFarmerEntry.id == TruckLoadLine.purchase_farmer_entry_id)
+            .join(PurchaseGroup, PurchaseGroup.id == PurchaseFarmerEntry.purchase_group_id)
+            .where(PurchaseGroup.village_id == village_id)
+        )
+        stmt = stmt.where(TruckTrip.id.in_(from_village))
     trips = list((await db.scalars(stmt.order_by(TruckTrip.trip_date.desc(), TruckTrip.id.desc()))).unique().all())
     return render_with_csrf(request, csrf, "trip_list.html", user=user, trips=trips, grain_id=grain_id, year=year, years=years,
                             year_locked=year != current_year_label(), warn_pct=SHORT_WARN_PCT)
@@ -343,7 +351,7 @@ async def add_line(request: Request, trip_id: int, user: User = Depends(current_
     except YearLockedError as exc:
         return form({"no_of_loaded_bags": YEAR_LOCKED(exc.label)})
     entry = await db.get(PurchaseFarmerEntry, clean["purchase_farmer_entry_id"])
-    if entry is None or entry.purchase_info.grain_id != trip.grain.id:
+    if entry is None or entry.purchase_group.grain_id != trip.grain.id:
         return form({"purchase_farmer_entry_id": ("Pick an entry with the same grain as this trip", "આ ટ્રીપના અનાજવાળી એન્ટ્રી પસંદ કરો")})
     if any(line.purchase_farmer_entry_id == entry.id for line in trip.load_lines):
         return form({"purchase_farmer_entry_id": ("This entry is already loaded on this trip", "આ એન્ટ્રી આ ટ્રીપમાં પહેલેથી ભરાઈ ગઈ છે")})

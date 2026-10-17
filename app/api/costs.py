@@ -185,10 +185,13 @@ def bag_snapshot(b: BagSupply) -> dict:
 
 
 @router.get("/bag-supplies", response_class=HTMLResponse)
-async def bag_list(request: Request, year: str = "", view: str = "supplies", user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
+async def bag_list(request: Request, year: str = "", view: str = "supplies", village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     years = await _years(db, BagSupply, user)
     year = year if year in years else current_year_label()
-    rows = list((await db.scalars(select(BagSupply).where(BagSupply.business_year == year).order_by(BagSupply.supply_date.desc(), BagSupply.id.desc()))).unique().all())
+    stmt = select(BagSupply).where(BagSupply.business_year == year)
+    if village_id:  # supplies delivered to a farmer of that village
+        stmt = stmt.join(Farmer, Farmer.id == BagSupply.farmer_id).where(Farmer.village_id == village_id)
+    rows = list((await db.scalars(stmt.order_by(BagSupply.supply_date.desc(), BagSupply.id.desc()))).unique().all())
     paid = {p.payable_id: p.paid for p in await load_payables(db, "bag_supplier")}
     storage: dict[int, dict] = {}
     for r in rows:  # bags held at each farmer's place for the year

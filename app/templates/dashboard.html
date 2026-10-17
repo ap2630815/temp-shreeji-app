@@ -7,7 +7,9 @@
 {% macro card(href, en, gu) %}<a href="{{ href }}" class="card bg-base-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary transition"><div class="card-body p-4"><span>{{ en }}</span> <span class="gu text-sm">{{ gu }}</span></div></a>{% endmacro %}
 <h2 class="font-semibold mb-2">{{ t('Buying (villages)', 'ખરીદી (ગામ)') }}</h2>
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-  {{ card('/purchases', 'Purchases', 'ખરીદી') }}
+  {{ card('/PurchaseFarmersEntries', 'Purchase Farmers Entries', 'ખરીદી ખેડૂત નોંધ') }}
+  {{ card('/PurchaseIndividual', 'Purchase Individual', 'ખરીદી વ્યક્તિગત') }}
+  {{ card('/PurchaseGroup', 'Purchase Group', 'ખરીદી જૂથ') }}
   {{ card('/dues?type=farmer', 'Farmer dues', 'ખેડૂતોની બાકી ચુકવણી') }}
   {{ card('/bag-supplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
   {{ card('/labour-work', 'Labour work', 'મજૂર કામ') }}

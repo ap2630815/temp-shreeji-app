@@ -39,13 +39,13 @@ column       | type        | constraints
 -----------------------------------------------------------------
 id           | INTEGER     | PRIMARY KEY, AUTO INCREMENT
 payment_id   | INTEGER     | NOT NULL, FOREIGN KEY -> payments.id
-payable_type | VARCHAR(15) | NOT NULL, DEFAULT 'farmer'
+payable_type | VARCHAR(25) | NOT NULL, DEFAULT 'farmer'
 payable_id   | INTEGER     | NOT NULL
 amount       | BIGINT      | NOT NULL
 
 Table constraints / indexes:
   CHECK ck_alloc_amount_positive: amount > 0
-  CHECK ck_alloc_payable_type: payable_type IN ('farmer', 'truck', 'labour_group', 'bag_supplier', 'broker')
+  CHECK ck_alloc_payable_type: payable_type IN ('farmer', 'purchase_individual', 'truck', 'labour_group', 'bag_supplier', 'broker')
   INDEX ix_alloc_payable (payable_type, payable_id)
 
 ==============================================================================

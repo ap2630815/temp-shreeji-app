@@ -10,11 +10,11 @@ from app.api.deps import current_user
 from app.api.formkit import today
 from app.core.db import get_db
 from app.core.templating import render_with_csrf
-from app.models import BagSupply, LabourWork, Payment, PurchaseFarmerEntry, PurchaseInfo, Receipt, TruckTrip, User
+from app.models import BagSupply, PurchaseIndividual, LabourWork, Payment, PurchaseFarmerEntry, PurchaseGroup, Receipt, TruckTrip, User
 from app.services import payables as pay_svc
 from app.services import receivables as rec_svc
 from app.services.payables import PARTIES
-from app.services.stock import stock_by_purchase_info
+from app.services.stock import stock_by_entry, stock_by_purchase_group
 from app.services.years import allowed_years, current_year_label
 
 router = APIRouter(prefix="/reports")
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/reports")
 
 async def _years(db: AsyncSession, user: User) -> list[str]:
     found: set[str] = set()
-    for model in (PurchaseInfo, TruckTrip, Payment, Receipt):
+    for model in (PurchaseGroup, PurchaseIndividual, TruckTrip, Payment, Receipt):
         found |= set((await db.scalars(select(model.business_year).distinct())).all())
     return allowed_years(user, found)
 
@@ -40,6 +40,7 @@ async def year_report(request: Request, year: str = "", user: User = Depends(cur
 
     # ---- costs (accrual, by document date)
     farmer_cost = int(await db.scalar(select(func.coalesce(func.sum(PurchaseFarmerEntry.payable_amount), 0)).where(PurchaseFarmerEntry.business_year == year)))
+    farmer_cost += int(await db.scalar(select(func.coalesce(func.sum(PurchaseIndividual.payable_amount), 0)).where(PurchaseIndividual.business_year == year)))
     trips = list((await db.scalars(select(TruckTrip).where(TruckTrip.business_year == year))).unique().all())
     freight_cost = sum(max(t.trip_total + t.other_payable - t.other_deduction, 0) for t in trips)
     labour = list((await db.scalars(select(LabourWork).where(LabourWork.business_year == year))).unique().all())
@@ -68,19 +69,17 @@ async def year_report(request: Request, year: str = "", user: User = Depends(cur
     receivable_now = rec_svc.summarize(await rec_svc.bilty_views(db))["due"]
 
     # ---- stock
-    infos = list((await db.scalars(select(PurchaseInfo).where(PurchaseInfo.business_year == year).order_by(PurchaseInfo.purchase_info_date, PurchaseInfo.id))).unique().all())
-    stock = await stock_by_purchase_info(db, [p.id for p in infos]) if infos else {}
+    infos = list((await db.scalars(select(PurchaseGroup).where(PurchaseGroup.business_year == year).order_by(PurchaseGroup.purchase_group_date, PurchaseGroup.id))).unique().all())
+    stock = await stock_by_purchase_group(db, [p.id for p in infos]) if infos else {}
+    year_entries = list((await db.scalars(select(PurchaseFarmerEntry).where(PurchaseFarmerEntry.business_year == year))).unique().all())
+    entry_stock = await stock_by_entry(db, [e.id for e in year_entries]) if year_entries else {}
 
     # grain bought but not yet loaded is stock (an asset at purchase cost), not an expense of this period
     stock_value = 0
-    if infos:
-        bought_rows = await db.execute(
-            select(PurchaseFarmerEntry.purchase_info_id, func.sum(PurchaseFarmerEntry.payable_amount), func.sum(PurchaseFarmerEntry.total_available_bags))
-            .where(PurchaseFarmerEntry.purchase_info_id.in_([p.id for p in infos])).group_by(PurchaseFarmerEntry.purchase_info_id)
-        )
-        for pid, amount, bags in bought_rows.all():
-            if bags and stock.get(pid) and stock[pid].available > 0:
-                stock_value += -(-int(amount) * stock[pid].available // int(bags))
+    for e in year_entries:
+        s_ = entry_stock.get(e.id)
+        if s_ and e.total_available_bags and s_.available > 0:
+            stock_value += -(-e.payable_amount * s_.available // e.total_available_bags)
     net_costs = total_costs - stock_value
 
     return render_with_csrf(

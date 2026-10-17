@@ -19,7 +19,7 @@ from app.core.pdf import render_pdf
 from app.core.templating import render, render_with_csrf
 from app.models import Payment, User
 from app.services import payables as pay_svc
-from app.services.ledger import entry_views, totals
+from app.services.ledger import all_entry_views, totals
 from app.services.payables import PARTIES, PaymentError
 from app.services.years import YearLockedError
 
@@ -69,7 +69,7 @@ def party_label(party_type: str) -> tuple[str, str]:
 
 async def farmer_statement_data(db: AsyncSession, farmer_id: int) -> dict:
     farmer = await _party(db, "farmer", farmer_id)
-    views = await entry_views(db, farmer_id=farmer_id)
+    views = await all_entry_views(db, farmer_id=farmer_id)  # purchase entries and direct entries
     now = today()
     return dict(farmer=farmer, views=views, payments=await pay_svc.payments_of(db, "farmer", farmer_id), totals=totals(views, now), today=now)
 
@@ -206,7 +206,7 @@ async def receipt_pdf(payment_id: int, user: User = Depends(current_user), db: A
 
 @router.get("/dues", response_class=HTMLResponse)
 async def dues_page(
-    request: Request, type: str = "farmer", village: str = "", user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
+    request: Request, type: str = "farmer", village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
     if type not in PARTIES:
         raise HTTPException(404)
@@ -221,20 +221,18 @@ async def dues_page(
         row["earliest"] = min(row["earliest"], p.sort_key[0])
         if p.is_overdue(now):
             row["overdue"] += p.due
-    villages: list[str] = []
     if type == "farmer":
         from sqlalchemy import select
         from app.models import Farmer
         farmers = {f.id: f for f in (await db.scalars(select(Farmer).where(Farmer.id.in_(per_party)))).unique().all()} if per_party else {}
         for pid, row in per_party.items():
-            row["village"], row["mobile"] = farmers[pid].village.village_name, farmers[pid].mobile
-        villages = sorted({r["village"] for r in per_party.values()})
+            row["village"], row["mobile"], row["village_id"] = farmers[pid].village.village_name, farmers[pid].mobile, farmers[pid].village_id
     else:
         for pid, row in per_party.items():
             party = await pay_svc.get_party(db, type, pid)
-            row["village"], row["mobile"] = "", PARTIES[type].mobile(party)
-    rows = [r for r in per_party.values() if not village or r["village"] == village]
+            row["village"], row["mobile"], row["village_id"] = "", PARTIES[type].mobile(party), None
+    rows = [r for r in per_party.values() if not village_id or r["village_id"] == village_id]  # the toolbar village filters farmers
     rows.sort(key=lambda r: (-r["overdue"], r["earliest"], r["name"]))
     summary = dict(due=sum(r["due"] for r in rows), overdue=sum(r["overdue"] for r in rows))
-    return render_with_csrf(request, csrf, "dues.html", user=user, rows=rows, villages=villages, village=village, summary=summary,
+    return render_with_csrf(request, csrf, "dues.html", user=user, rows=rows, summary=summary,
                             today=now, type=type, parties=PARTIES)

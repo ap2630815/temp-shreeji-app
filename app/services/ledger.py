@@ -6,14 +6,15 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import PaymentAllocation, PurchaseFarmerEntry
+from app.models import PurchaseIndividual, PaymentAllocation, PurchaseFarmerEntry
 
-FARMER = "farmer"  # payments.party_type / payment_allocations.payable_type for farmers
+FARMER = "farmer"  # payments.party_type for farmers; payment_allocations.payable_type for purchase_farmers_entries
+DIRECT = "purchase_individual"  # payment_allocations.payable_type for purchase_individuals
 
 
 @dataclass
 class EntryView:
-    entry: PurchaseFarmerEntry
+    entry: PurchaseFarmerEntry | PurchaseIndividual  # both kinds of farmer entry
     paid: int
 
     @property
@@ -55,17 +56,17 @@ def allocate(amount: int, dues: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return out
 
 
-def _paid_subquery():
+def _paid_subquery(payable_type: str = FARMER):
     return (
         select(PaymentAllocation.payable_id.label("entry_id"), func.sum(PaymentAllocation.amount).label("paid"))
-        .where(PaymentAllocation.payable_type == FARMER)
+        .where(PaymentAllocation.payable_type == payable_type)
         .group_by(PaymentAllocation.payable_id)
         .subquery()
     )
 
 
 async def entry_views(
-    db: AsyncSession, *, purchase_info_ids: list[int] | None = None, farmer_id: int | None = None
+    db: AsyncSession, *, purchase_group_ids: list[int] | None = None, farmer_id: int | None = None
 ) -> list[EntryView]:
     paid = _paid_subquery()
     stmt = (
@@ -73,11 +74,40 @@ async def entry_views(
         .outerjoin(paid, paid.c.entry_id == PurchaseFarmerEntry.id)
         .order_by(PurchaseFarmerEntry.due_date, PurchaseFarmerEntry.id)
     )
-    if purchase_info_ids is not None:
-        stmt = stmt.where(PurchaseFarmerEntry.purchase_info_id.in_(purchase_info_ids))
+    if purchase_group_ids is not None:
+        stmt = stmt.where(PurchaseFarmerEntry.purchase_group_id.in_(purchase_group_ids))
     if farmer_id is not None:
         stmt = stmt.where(PurchaseFarmerEntry.farmer_id == farmer_id)
     return [EntryView(e, int(p)) for e, p in (await db.execute(stmt)).unique().all()]
+
+
+async def direct_entry_views(db: AsyncSession, *, farmer_id: int | None = None) -> list[EntryView]:
+    """The farmer's direct entries (one flat table, own id space) with what has been paid against each."""
+    paid = _paid_subquery(DIRECT)
+    stmt = (
+        select(PurchaseIndividual, func.coalesce(paid.c.paid, 0))
+        .outerjoin(paid, paid.c.entry_id == PurchaseIndividual.id)
+        .order_by(PurchaseIndividual.due_date, PurchaseIndividual.id)
+    )
+    if farmer_id is not None:
+        stmt = stmt.where(PurchaseIndividual.farmer_id == farmer_id)
+    return [EntryView(e, int(p)) for e, p in (await db.execute(stmt)).unique().all()]
+
+
+async def all_entry_views(db: AsyncSession, *, farmer_id: int | None = None) -> list[EntryView]:
+    """The whole farmer ledger: purchase entries and direct entries together, oldest due date first."""
+    views = await entry_views(db, farmer_id=farmer_id) + await direct_entry_views(db, farmer_id=farmer_id)
+    return sorted(views, key=lambda v: (v.entry.due_date, v.entry.is_direct, v.entry.id))
+
+
+async def paid_for_direct(db: AsyncSession, entry_id: int) -> int:
+    return int(
+        await db.scalar(
+            select(func.coalesce(func.sum(PaymentAllocation.amount), 0)).where(
+                PaymentAllocation.payable_type == DIRECT, PaymentAllocation.payable_id == entry_id
+            )
+        )
+    )
 
 
 async def paid_for_entry(db: AsyncSession, entry_id: int) -> int:
@@ -90,8 +120,8 @@ async def paid_for_entry(db: AsyncSession, entry_id: int) -> int:
     )
 
 
-async def purchase_info_entries(db: AsyncSession, purchase_info_id: int) -> list[EntryView]:
-    return await entry_views(db, purchase_info_ids=[purchase_info_id])
+async def purchase_group_entries(db: AsyncSession, purchase_group_id: int) -> list[EntryView]:
+    return await entry_views(db, purchase_group_ids=[purchase_group_id])
 
 
 def totals(views: list[EntryView], today: date) -> dict[str, int]:

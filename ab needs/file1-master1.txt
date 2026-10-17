@@ -70,10 +70,10 @@ TABLE: industries
 column                | type                     | constraints
 --------------------------------------------------------------------------
 id                    | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-industrialist_name    | VARCHAR(120)             | NOT NULL, UNIQUE
-industrialist_name_gu | VARCHAR(120)             | -
-owner_name            | VARCHAR(120)             | NOT NULL
-owner_mobile          | VARCHAR(10)              | NOT NULL
+industry_name         | VARCHAR(120)             | NOT NULL, UNIQUE
+industry_name_gu      | VARCHAR(120)             | -
+industry_owner_name   | VARCHAR(120)             | NOT NULL
+industry_owner_mobile | VARCHAR(10)              | NOT NULL
 supervisor_name       | VARCHAR(120)             | NOT NULL
 supervisor_mobile     | VARCHAR(10)              | NOT NULL
 grain                 | VARCHAR(60)              | NOT NULL

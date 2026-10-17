@@ -26,7 +26,7 @@
     <table class="table table-sm"><tbody>
       {% for line in trip.load_lines %}
       <tr>
-        <td><a class="link" href="/purchases/{{ line.entry.purchase_info_id }}">{{ line.entry.purchase_info.village.village_name }}</a> · {{ line.entry.farmer.farmer_name }}
+        <td><a class="link" href="/PurchaseGroup/{{ line.entry.purchase_group_id }}">{{ line.entry.purchase_group.village.village_name }}</a> · {{ line.entry.farmer.farmer_name }}
           <span class="opacity-60 text-xs">{{ line.entry.purchase_entry_date }}</span></td>
         <td class="text-right">{{ line.no_of_loaded_bags }}<div class="text-xs opacity-60">{{ t('left', 'બાકી') }} {{ line.total_remaining_bags }}</div></td>
         <td class="text-right"><button class="btn btn-ghost btn-xs text-error" hx-post="/trips/lines/{{ line.id }}/delete" hx-target="#flash"

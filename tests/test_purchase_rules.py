@@ -170,3 +170,50 @@ def test_only_owner_browses_past_years(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         years_svc.require_year_visible(accountant, "2024-25")
     assert exc.value.status_code == 403
+
+
+# ---------------------------------------------------------------- the purchase form's farmer picker
+
+def test_picked_ids_are_read_once_in_order():
+    from app.api.purchase_group import _ints
+
+    assert _ints(["3", "1", "3", "x", "", "2"]) == [3, 1, 2]
+
+
+# ---------------------------------------------------------------- purchase individuals (one flat table, one form)
+
+def test_direct_and_purchase_entries_answer_to_the_same_names():
+    from app.models import PurchaseIndividual, Farmer, Grain, PurchaseFarmerEntry, PurchaseGroup, Village
+
+    grain = Grain(net_bag_weight=50)
+    direct = PurchaseIndividual(village=Village(village_name="Makudi"), grain=grain, grain_rate_per_20kg=255, purchase_individual_date=date(2026, 10, 5), no_of_filled_bags=10, extra_kilos=5,
+                                payable_amount=1000, borrowed_amount=100)
+    assert direct.is_direct and direct.purchase_group is None and direct.purchase_group_id is None
+    assert (direct.entry_date, direct.village.village_name, direct.grain_rate_per_20kg, direct.total_kg, direct.net_payable) == (date(2026, 10, 5), "Makudi", 255, 505, 900)  # its own village column
+
+    deal = PurchaseGroup(village=Village(village_name="Vanthali"), grain=Grain(net_bag_weight=35), grain_rate_per_20kg=300, pay_after_no_of_days=10)
+    bought = PurchaseFarmerEntry(purchase_group=deal, purchase_group_id=1, farmer=Farmer(), purchase_entry_date=date(2026, 10, 6), no_of_filled_bags=2, extra_kilos=0,
+                                 payable_amount=500, borrowed_amount=0)
+    assert not bought.is_direct and (bought.entry_date, bought.grain_rate_per_20kg, bought.pay_after_no_of_days, bought.total_kg) == (date(2026, 10, 6), 300, 10, 70)
+    assert bought.purchase_group.village.village_name == "Vanthali"  # reached through the purchase (its # link); the ledger shows the farmer's village instead
+    assert not hasattr(PurchaseFarmerEntry, "village")
+
+
+def test_a_direct_entry_has_one_description_and_no_purchase_link():
+    from app.models import PurchaseIndividual, PurchaseFarmerEntry, PurchaseGroup
+
+    columns = set(PurchaseIndividual.__table__.columns.keys())
+    assert "description" in columns and "purchase_group_id" not in columns
+    assert sum(1 for c in columns if "description" in c) == 1
+    # the purchase_group columns and the entry columns are both there, side by side
+    assert {"purchase_individual_date", "village_id", "grain_id", "grain_rate_per_20kg", "pay_after_no_of_days", "terms"} <= columns
+    assert {"farmer_id", "labour_group_id", "no_of_filled_bags", "payable_amount", "borrowed_amount", "due_date", "total_available_bags"} <= columns
+    assert "description" in PurchaseGroup.__table__.columns and "description" in PurchaseFarmerEntry.__table__.columns  # the purchase flow is untouched
+
+
+def test_payment_keys_keep_purchase_and_direct_entries_apart():
+    from app.services.ledger import allocate
+
+    # entry 3 of each table owes something: the keys carry the table, so neither is mistaken for the other
+    plan = allocate(150, [(("farmer", 3), 100), (("purchase_individual", 3), 100)])
+    assert plan == [(("farmer", 3), 100), (("purchase_individual", 3), 50)]

@@ -33,11 +33,19 @@
     </div>
     <div class="px-3 pt-2">
       <form method="get" class="flex flex-wrap items-center gap-3 bg-base-100 border border-base-300 rounded-box px-4 py-2">
-        {% for k, v in request.query_params.multi_items() if k != 'grain_id' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        {% for k, v in request.query_params.multi_items() if k not in ('grain_id', 'village_id') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <select name="village_id" aria-label="Village" class="select select-bordered select-sm w-auto min-w-0 toolbar-select" onchange="this.form.submit()">
+          <option value="">{{ L['village'][0] }}&nbsp;&nbsp;&nbsp;{{ L['village'][1] }}</option>
+          {% for v in request.state.villages %}<option value="{{ v.id }}" {{ 'selected' if request.query_params.get('village_id') == v.id|string }}>{{ v.name }}&nbsp;&nbsp;&nbsp;{{ v.name_gu or '' }}</option>{% endfor %}
+        </select>
         <select name="grain_id" aria-label="Grain" class="select select-bordered select-sm w-auto min-w-0 toolbar-select" onchange="this.form.submit()">
           <option value="">{{ L['grain'][0] }}&nbsp;&nbsp;&nbsp;{{ L['grain'][1] }}</option>
           {% for g in request.state.grains %}<option value="{{ g.id }}" {{ 'selected' if request.query_params.get('grain_id') == g.id|string }}>{{ g.name }}&nbsp;&nbsp;&nbsp;{{ g.name_gu }}</option>{% endfor %}
         </select>
+        <span class="flex-1"></span>
+        {# the report keeps whatever year / village / grain is chosen here #}
+        {% set keep = [] %}{% for k in ('year', 'village_id', 'grain_id') %}{% if request.query_params.get(k) %}{% set _ = keep.append(k ~ '=' ~ request.query_params.get(k)) %}{% endif %}{% endfor %}
+        <a href="/analysis{{ '?' ~ keep|join('&') if keep }}" class="btn btn-sm btn-primary h-auto min-h-0 py-1 flex-col gap-0 leading-tight {{ 'btn-active' if request.url.path.startswith('/analysis') }}"><span>Analysis</span><span class="gu text-xs">વિશ્લેષણ</span></a>
       </form>
     </div>
     <main class="p-4 w-full max-w-6xl mx-auto">
@@ -53,7 +61,14 @@
       <ul class="menu w-full p-0 gap-1">
         {{ item('/', 'Dashboard', 'ડેશબોર્ડ', cls='py-4 soft-light font-semibold') }}
         <li class="menu-title">{{ title('Buying', 'ખરીદી') }}</li>
-        {{ item('/purchases', 'Purchases', 'ખરીદી', '/purchases') }}
+        {% set pp = request.url.path %}
+        <li class="hover-sub {{ 'open' if pp.startswith(('/PurchaseFarmersEntries', '/PurchaseIndividual', '/PurchaseGroup')) }}">
+          <a href="/PurchaseFarmersEntries" class="{{ 'active' if pp.startswith('/PurchaseFarmersEntries') else '' }}"><span>Purchase Farmers Entries</span><span class="gu text-xs">ખરીદી ખેડૂત નોંધ</span></a>
+          <ul>
+            {{ item('/PurchaseIndividual', 'Purchase Individual', 'ખરીદી વ્યક્તિગત', '/PurchaseIndividual') }}
+            {{ item('/PurchaseGroup', 'Purchase Group', 'ખરીદી જૂથ', '/PurchaseGroup') }}
+          </ul>
+        </li>
         {{ item('/bag-supplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
         {{ item('/labour-work', 'Labour work', 'મજૂર કામ') }}
         <li class="menu-title">{{ title('Selling', 'વેચાણ') }}</li>

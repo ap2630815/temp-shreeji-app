@@ -2,6 +2,7 @@
 {% from "partials/bilabel.html" import t, th %}
 {% block title %}Years{% endblock %}
 {% block content %}
+<div class="stackbi">
 <h1 class="text-xl font-semibold mb-1">{{ t('Business years', 'વ્યવસાય વર્ષ') }}</h1>
 <p class="text-sm opacity-70 mb-4">{{ t('Oct–Sep. Only the current year accepts entries and payments; earlier years close automatically on 1 October and only the owner can view them.', 'ઓક્ટો–સપ્ટે. ફક્ત ચાલુ વર્ષમાં એન્ટ્રી અને ચુકવણી થઈ શકે છે; પાછલા વર્ષો 1 ઓક્ટોબરે આપોઆપ બંધ થાય છે અને ફક્ત માલિક જોઈ શકે છે.') }}</p>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow max-w-2xl">
@@ -14,5 +15,6 @@
       <td class="text-right"><a class="btn btn-sm btn-outline" href="/reports/year?year={{ y.label }}">{{ t('Report', 'અહેવાલ') }}</a></td>
     </tr>{% endfor %}
   </tbody></table>
+</div>
 </div>
 {% endblock %}

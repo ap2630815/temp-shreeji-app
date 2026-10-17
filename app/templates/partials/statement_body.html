@@ -29,11 +29,11 @@
   <tbody>
   {% for v in views %}{% set e = v.entry %}
     <tr>
-      <td>{{ e.purchase_entry_date }}</td>
-      <td>{{ e.purchase_info.village.village_name }} · {{ e.purchase_info.grain.grain_name }}</td>
+      <td>{{ e.entry_date }}</td>
+      <td>{{ e.farmer.village.village_name }} · {{ e.grain.grain_name }} <span class="opacity-70">({% if e.purchase_group %}#{{ e.purchase_group_id }}, {{ e.purchase_group.purchase_group_date }}{% else %}{{ t('direct', 'સીધી') }}{% endif %})</span></td>
       <td class="n">{{ e.no_of_filled_bags }}</td>
       <td class="n">{{ e.total_kg }}</td>
-      <td class="n">{{ e.purchase_info.grain_rate_per_20kg }}</td>
+      <td class="n">{{ e.grain_rate_per_20kg }}</td>
       <td class="n">{{ e.payable_amount | inr }}</td>
       <td class="n">{{ e.borrowed_amount | inr if e.borrowed_amount else '' }}</td>
       <td class="{{ 'over' if v.is_overdue(today) }}">{{ e.due_date }}</td>

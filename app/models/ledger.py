@@ -12,7 +12,7 @@ from app.models.transactions import BUSINESS_YEAR
 
 class Payment(TimestampMixin, Base):
     """Every rupee paid out, with who received it. party_type picks the table party_id points to:
-    farmer -> farmers, truck -> trucks (paid to the truck owner), labour_group -> labour_groups,
+    farmer -> farmers (his payments are allocated to purchase_farmers_entries or, as 'purchase_individual', to purchase_individuals), truck -> trucks (paid to the truck owner), labour_group -> labour_groups,
     bag_supplier -> bag_suppliers, broker -> brokers."""
 
     __tablename__ = "payments"
@@ -48,13 +48,13 @@ class PaymentAllocation(Base):
     __tablename__ = "payment_allocations"
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_alloc_amount_positive"),
-        CheckConstraint("payable_type IN ('farmer', 'truck', 'labour_group', 'bag_supplier', 'broker')", name="ck_alloc_payable_type"),
+        CheckConstraint("payable_type IN ('farmer', 'purchase_individual', 'truck', 'labour_group', 'bag_supplier', 'broker')", name="ck_alloc_payable_type"),
         Index("ix_alloc_payable", "payable_type", "payable_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     payment_id: Mapped[int] = mapped_column(ForeignKey("payments.id"))
-    payable_type: Mapped[str] = mapped_column(String(15), default="farmer", server_default="farmer")
+    payable_type: Mapped[str] = mapped_column(String(25), default="farmer", server_default="farmer")
     payable_id: Mapped[int] = mapped_column(Integer)
     amount: Mapped[int] = mapped_column(BigInteger)
 

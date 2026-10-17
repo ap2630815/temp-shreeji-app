@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_role
 from app.core.db import get_db
 from app.core.templating import render_with_csrf
-from app.models import BagSupply, BrokerBooking, LabourWork, Payment, PurchaseFarmerEntry, PurchaseInfo, Receipt, TruckTrip, User
+from app.models import BagSupply, BrokerBooking, PurchaseIndividual, LabourWork, Payment, PurchaseFarmerEntry, PurchaseGroup, Receipt, TruckTrip, User
 from app.services.years import allowed_years, current_year_label, year_bounds
 
 router = APIRouter(prefix="/years")
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/years")
 @router.get("", response_class=HTMLResponse)
 async def years_page(request: Request, user: User = Depends(require_role("owner")), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     found: set[str] = set()
-    for model in (PurchaseInfo, PurchaseFarmerEntry, BrokerBooking, TruckTrip, LabourWork, BagSupply, Payment, Receipt):
+    for model in (PurchaseGroup, PurchaseFarmerEntry, PurchaseIndividual, BrokerBooking, TruckTrip, LabourWork, BagSupply, Payment, Receipt):
         found |= set((await db.scalars(select(model.business_year).distinct())).all())
     current = current_year_label()
     rows = [dict(label=y, current=y == current, bounds=year_bounds(y)) for y in allowed_years(user, found)]

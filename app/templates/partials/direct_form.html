@@ -1,0 +1,69 @@
+{% from "partials/bilabel.html" import t %}
+<form id="direct-form" hx-post="{{ action }}" hx-target="#direct-form" hx-swap="outerHTML" class="flex flex-col gap-4" data-nets='{{ nets | tojson | forceescape }}' data-farmer-villages='{{ farmer_villages | tojson | forceescape }}'>
+  <div class="grid lg:grid-cols-2 gap-4 items-start">
+    {# ---------------- the purchase columns #}
+    <div class="card bg-base-100 shadow">
+      <div class="card-body gap-3">
+        <h2 class="font-semibold">{{ t('Purchase', 'ખરીદી') }}</h2>
+        {% with fields=purchase_fields %}{% include "partials/form_fields.html" %}{% endwith %}
+      </div>
+    </div>
+    {# ---------------- the farmer entry columns, ending with the single description #}
+    <div class="card bg-base-100 shadow">
+      <div class="card-body gap-3">
+        <h2 class="font-semibold">{{ t('Farmer entry', 'ખેડૂત નોંધ') }}</h2>
+        {% with fields=entry_fields %}{% include "partials/form_fields.html" %}{% endwith %}
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-3">
+    <button class="btn btn-primary"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
+    {% if not editing %}<button class="btn btn-outline" type="submit" name="again" value="1">{{ t('Save & add another', 'સાચવો અને બીજી ઉમેરો') }}</button>{% endif %}
+    <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
+    <span class="flex-1"></span>
+    <span class="text-sm">{{ t('Payable amount', 'ચૂકવવાપાત્ર રકમ') }}: <b id="pv-amount">—</b> <span class="opacity-60">· {{ t('after borrowing', 'ઉધાર બાદ') }}: <b id="pv-net">—</b></span></span>
+  </div>
+</form>
+<script>
+  (function () {
+    var form = document.getElementById('direct-form');
+    var nets = JSON.parse(form.dataset.nets);
+    var num = function (v) { return parseInt(v || '0', 10) || 0; };
+    var fmt = function (n) { return '₹' + n.toLocaleString('en-IN'); };
+    function recompute() {
+      var net = nets[form.grain_id.value] || 0;
+      var amount = Math.ceil((num(form.no_of_filled_bags.value) * net + num(form.extra_kilos.value)) * num(form.grain_rate_per_20kg.value) / 20);
+      document.getElementById('pv-amount').textContent = fmt(amount);
+      document.getElementById('pv-net').textContent = fmt(amount - num(form.borrowed_amount.value));
+    }
+    // the farmer list only offers the farmers of the selected village (all of them while no village is chosen)
+    var farmerVillage = JSON.parse(form.dataset.farmerVillages);
+    var villageSel = form.village_id, farmerSel = form.farmer_id;
+    var allFarmers = Array.prototype.map.call(farmerSel.options, function (o) { return { value: o.value, text: o.textContent }; });
+    function filterFarmers() {
+      if (farmerSel.disabled) return;  // a farmer already paid is fixed
+      var village = villageSel.value, current = farmerSel.value;
+      farmerSel.innerHTML = '';
+      allFarmers.forEach(function (f) {
+        if (f.value === '' || f.value === current || !village || String(farmerVillage[f.value]) === village) {  // the chosen one stays visible so a mismatch can be seen and fixed
+          var opt = document.createElement('option');
+          opt.value = f.value; opt.textContent = f.text; opt.selected = f.value === current;
+          farmerSel.appendChild(opt);
+        }
+      });
+    }
+    villageSel.addEventListener('change', function () {
+      var current = farmerSel.value;
+      if (current && villageSel.value && String(farmerVillage[current]) !== villageSel.value) farmerSel.value = '';  // that farmer is not from this village
+      filterFarmers();
+    });
+    farmerSel.addEventListener('change', function () {
+      if (farmerSel.value && !villageSel.value) { villageSel.value = String(farmerVillage[farmerSel.value]); filterFarmers(); }  // farmer first: his village follows
+    });
+    filterFarmers();
+    form.addEventListener('input', recompute);
+    form.addEventListener('change', recompute);
+    recompute();
+  })();
+</script>

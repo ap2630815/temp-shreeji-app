@@ -47,6 +47,13 @@
     @font-face { font-family: "Noto Sans Gujarati"; src: url("/static/NotoSansGujarati-Bold.ttf"); font-weight: 700; }
     body { font-family: system-ui, "Noto Sans Gujarati", sans-serif; }
     .gu { font-family: "Noto Sans Gujarati", sans-serif; opacity: .75; }
+    /* sidebar: an entry with a sub-list opens it on hover / keyboard focus (and stays open on its own pages) */
+    .hover-sub > ul { display: none; }
+    .hover-sub:hover > ul, .hover-sub:focus-within > ul, .hover-sub.open > ul { display: block; }
+    /* page headings and buttons on the farmers-entries / purchase pages: English above, Gujarati below */
+    .stackbi h1 .gu, .stackbi .btn .gu { display: block; font-size: .8em; }
+    .stackbi .btn .bi { display: inline-flex; flex-direction: column; text-align: left; }
+    .stackbi .btn:has(.gu) { gap: .4rem; height: auto; min-height: 2rem; padding-block: .25rem; line-height: 1.2; }
   </style>
 </head>
 <body class="min-h-screen bg-base-200" hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>

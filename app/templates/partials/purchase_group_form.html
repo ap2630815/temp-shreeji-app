@@ -1,0 +1,107 @@
+{% from "partials/bilabel.html" import t %}
+<form id="purchase-form" hx-post="{{ action }}" hx-target="#purchase-form" hx-swap="outerHTML" class="grid lg:grid-cols-2 gap-4 items-start">
+  {# ---------------- left: the purchase_group itself #}
+  <div class="card bg-base-100 shadow">
+    <div class="card-body gap-3">
+      <h2 class="font-semibold">{{ t('Purchase details', 'ખરીદીની વિગત') }}</h2>
+      <p class="text-xs opacity-70">{{ t('One deal with the farmers who gathered. The same village can have many purchases.', 'એકઠા થયેલા ખેડૂતો સાથે એક સોદો. એક જ ગામની અનેક ખરીદી થઈ શકે.') }}</p>
+      {% include "partials/form_fields.html" %}
+    </div>
+  </div>
+
+  {# ---------------- right: the farmers who joined this deal #}
+  <div class="card bg-base-100 shadow">
+    <div class="card-body gap-3">
+      <h2 class="font-semibold">{{ t('Farmers in this purchase', 'આ ખરીદીમાં ખેડૂતો') }} <span class="text-error">*</span></h2>
+      <ul id="picked" class="flex flex-col gap-1">
+        {% for f in selected %}
+        <li class="flex items-center gap-2 bg-base-200 rounded px-2 py-1 text-sm" data-id="{{ f.id }}"><input type="hidden" name="farmer_ids" value="{{ f.id }}">
+          <span class="flex-1">{{ f.farmer_name }} <span class="opacity-60">· {{ f.village.village_name }} · {{ f.mobile }}</span></span>
+          <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('li').remove()">✕</button></li>
+        {% endfor %}
+      </ul>
+      <p id="picked-empty" class="text-sm opacity-60 {{ 'hidden' if selected }}">{{ t('No farmer listed yet. Find farmers below and add them.', 'હજી કોઈ ખેડૂત નથી. નીચે શોધીને ઉમેરો.') }}</p>
+      {% if 'farmer_ids' in errors %}<span class="text-error text-sm">{{ errors['farmer_ids'][0] }} <span class="gu">{{ errors['farmer_ids'][1] }}</span></span>{% endif %}
+
+      <div class="divider my-0"></div>
+      {# the filters (pv / pq / pfree / pinfo / pg = the selected grain) only drive the search below; the save ignores them #}
+      <div id="picker-filters" class="flex flex-wrap gap-2 items-center">
+        <input type="hidden" name="pinfo" value="{{ p_id or '' }}">
+        <input type="hidden" name="pg" value="{{ picker_grain }}">
+        <input type="hidden" name="pfree_seen" value="1">
+        <select name="pv" class="select select-bordered select-sm" hx-get="/PurchaseGroup/farmer-search" hx-target="#farmer-results" hx-swap="innerHTML" hx-include="#picker-filters" hx-trigger="change">
+          <option value="">{{ t('All villages', 'બધા ગામ') }}</option>
+          {% for v in picker_villages %}<option value="{{ v.id }}" {{ 'selected' if picker_village|string == v.id|string }}>{{ v.village_name }}</option>{% endfor %}
+        </select>
+        <input type="search" name="pq" onkeydown="if (event.key === 'Enter') event.preventDefault()" placeholder="Name / mobile  નામ / મોબાઇલ" class="input input-bordered input-sm flex-1 min-w-32" hx-get="/PurchaseGroup/farmer-search" hx-target="#farmer-results" hx-swap="innerHTML"
+               hx-include="#picker-filters" hx-trigger="input changed delay:300ms, search">
+        <label class="label cursor-pointer gap-1 p-0"><input type="checkbox" name="pfree" value="1" {{ 'checked' if picker_free }} class="checkbox checkbox-sm" hx-get="/PurchaseGroup/farmer-search" hx-target="#farmer-results" hx-swap="innerHTML" hx-include="#picker-filters">
+          <span class="text-xs">{{ t('Not in another purchase of this grain', 'આ અનાજની બીજી ખરીદીમાં નથી') }}</span></label>
+      </div>
+      <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-300 rounded">
+        <table class="table table-sm"><tbody id="farmer-results" hx-target="this" hx-swap="innerHTML" hx-get="/PurchaseGroup/farmer-search?pinfo={{ p_id or '' }}&pv={{ picker_village }}&pg={{ picker_grain }}{{ '&pfree=1' if picker_free }}" hx-trigger="load"></tbody></table>
+      </div>
+      <p class="text-xs opacity-60">{{ t('Yellow tags: already in another purchase of the selected grain this business year.', 'પીળા ટેગ: પસંદ કરેલા અનાજની આ વર્ષની બીજી ખરીદીમાં પહેલેથી છે.') }}</p>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2 flex gap-2">
+    <button class="btn btn-primary"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
+    <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
+  </div>
+
+  {% if confirm_dupes and not (modal and modal.kind == 'dupes') %}<input type="hidden" name="confirm_dupes" value="1">{% endif %}
+
+  {# ---------------- pop-ups #}
+  {% if modal %}
+  <div class="modal modal-open" role="dialog">
+    <div class="modal-box max-w-3xl">
+      {% if modal.kind == 'dupes' %}
+        <h3 class="font-bold text-lg">{{ t('Farmer already in another purchase', 'ખેડૂત બીજી ખરીદીમાં પહેલેથી છે') }}</h3>
+        <p class="py-2 text-sm">{{ t('These farmers are already listed in another purchase of the same grain this business year. Adding them again may duplicate their ledger. The owner must verify to continue.', 'આ ખેડૂતો આ વર્ષે એ જ અનાજની બીજી ખરીદીમાં પહેલેથી છે. ફરી ઉમેરવાથી ખાતું બેવડાઈ શકે. ચાલુ રાખવા માલિકે ચકાસવું.') }}</p>
+        <table class="table table-sm"><thead><tr><th>Farmer</th><th>Already in</th></tr></thead><tbody>
+        {% for farmer, infos in modal.rows %}<tr><td>{{ farmer.farmer_name }} <span class="opacity-60">· {{ farmer.mobile }}</span></td>
+          <td>{% for d in infos %}<div>#{{ d.id }} · {{ d.village.village_name }} · {{ d.grain.grain_name }} · {{ d.purchase_group_date }}</div>{% endfor %}</td></tr>{% endfor %}
+        </tbody></table>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost" onclick="this.closest('.modal').remove()">{{ t('Cancel', 'રદ કરો') }}</button>
+          <button type="submit" name="confirm_dupes" value="1" class="btn btn-warning">{{ t('Owner verified, continue', 'માલિકે ચકાસ્યું, આગળ વધો') }}</button>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</form>
+<script>
+  window.pickFarmer = function (btn) {
+    var list = document.getElementById('picked');
+    if (!list.querySelector('[data-id="' + btn.dataset.id + '"]')) {
+      var li = document.createElement('li');
+      li.className = 'flex items-center gap-2 bg-base-200 rounded px-2 py-1 text-sm';
+      li.dataset.id = btn.dataset.id;
+      var hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'farmer_ids'; hidden.value = btn.dataset.id;
+      var label = document.createElement('span'); label.className = 'flex-1';
+      label.textContent = btn.dataset.name + ' · ' + btn.dataset.village + ' · ' + btn.dataset.mobile;
+      var x = document.createElement('button'); x.type = 'button'; x.className = 'btn btn-ghost btn-xs text-error'; x.textContent = '✕';
+      x.onclick = function () { li.remove(); toggleEmpty(); };
+      li.append(hidden, label, x); list.append(li);
+    }
+    toggleEmpty();
+  };
+  function toggleEmpty() {
+    document.getElementById('picked-empty').classList.toggle('hidden', document.querySelectorAll('#picked li').length > 0);
+  }
+  var grainSelect = document.querySelector('#purchase-form [name="grain_id"]');
+  if (grainSelect) grainSelect.addEventListener('change', function () {
+    document.querySelector('#picker-filters [name="pg"]').value = grainSelect.value;
+    htmx.trigger(document.querySelector('#picker-filters [name="pv"]'), 'change');
+  });
+  // the village chosen on the left becomes the default village filter on the right (still editable)
+  var villageSelect = document.querySelector('#purchase-form [name="village_id"]');
+  if (villageSelect) villageSelect.addEventListener('change', function () {
+    var pv = document.querySelector('#picker-filters [name="pv"]');
+    pv.value = villageSelect.value;
+    htmx.trigger(pv, 'change');
+  });
+  document.querySelectorAll('#picked li button').forEach(function (b) { b.addEventListener('click', toggleEmpty); });
+</script>

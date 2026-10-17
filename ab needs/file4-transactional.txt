@@ -2,39 +2,62 @@ FORM TABLES (records entered through the data-entry forms)
 Structure only - no data rows.
 ==============================================================================
 
-TABLE: purchase_info
+TABLE: purchase_group
 -------------------------------------------------------------------------------
 column                | type                     | constraints
 -------------------------------------------------------------------------------
 id                    | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-purchase_info_date    | DATE                     | NOT NULL
+purchase_group_date    | DATE                     | NOT NULL
 village_id            | INTEGER                  | NOT NULL, FOREIGN KEY -> villages.id
 grain_id              | INTEGER                  | NOT NULL, FOREIGN KEY -> grains.id
 grain_rate_per_20kg   | INTEGER                  | NOT NULL
 pay_after_no_of_days  | INTEGER                  | NOT NULL
-purchase_info_terms   | TEXT                     | -
+purchase_group_terms   | TEXT                     | -
 business_year         | VARCHAR(7)               | NOT NULL
 description           | TEXT                     | -
 created_by            | INTEGER                  | FOREIGN KEY -> users.id
 created_at            | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_purchase_info_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
-  INDEX ix_purchase_info_business_year (business_year)
-  CHECK ck_purchase_info_rate_positive: grain_rate_per_20kg > 0
-  CHECK ck_purchase_info_pay_after: pay_after_no_of_days >= 0
-  INDEX ix_purchase_info_village_id (village_id)
-  INDEX ix_purchase_info_grain_id (grain_id)
+  CHECK ck_purchase_group_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_purchase_group_business_year (business_year)
+  CHECK ck_purchase_group_rate_positive: grain_rate_per_20kg > 0
+  CHECK ck_purchase_group_pay_after: pay_after_no_of_days >= 0
+  INDEX ix_purchase_group_village_id (village_id)
+  INDEX ix_purchase_group_grain_id (grain_id)
+
+A purchase_group is ONE deal: a few farmers of a village gather and agree one grain, one rate and the terms.
+A village has many purchase_group rows over time: next time other farmers gather in the same village and make a new one.
 
 ==============================================================================
 
-TABLE: purchase_farmer_entries
+TABLE: purchase_group_farmers
+-------------------------------------------------------------------------------
+column           | type                     | constraints
+-------------------------------------------------------------------------------
+id               | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+purchase_group_id | INTEGER                  | NOT NULL, FOREIGN KEY -> purchase_group.id
+farmer_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
+created_by       | INTEGER                  | FOREIGN KEY -> users.id
+created_at       | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  UNIQUE uq_purchase_group_farmers_info_farmer (purchase_group_id, farmer_id)
+  INDEX ix_purchase_group_farmers_farmer_id (farmer_id)
+
+The owner lists the farmers who joined the deal (picked from the existing farmers). A farmer ledger is kept per
+(purchase_group, farmer): purchase_farmers_entries can only be made for a farmer listed here.
+The farmer's own village need not be the deal's village.
+
+==============================================================================
+
+TABLE: purchase_farmers_entries
 --------------------------------------------------------------------------------------
 column                      | type                     | constraints
 --------------------------------------------------------------------------------------
 id                          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 purchase_entry_date         | DATE                     | NOT NULL
-purchase_info_id            | INTEGER                  | NOT NULL, FOREIGN KEY -> purchase_info.id
+purchase_group_id            | INTEGER                  | NOT NULL, FOREIGN KEY -> purchase_group.id
 farmer_id                   | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
 labour_group_id             | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
 no_of_filled_bags           | INTEGER                  | NOT NULL
@@ -49,23 +72,75 @@ no_of_handful_bags          | INTEGER                  | NOT NULL, DEFAULT 0
 total_available_bags        | INTEGER                  | NOT NULL, DEFAULT 0
 business_year               | VARCHAR(7)               | NOT NULL
 description                 | TEXT                     | -
+created_by                 | INTEGER                  | FOREIGN KEY -> users.id
+created_at                  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_purchase_farmers_entries_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_purchase_farmers_entries_business_year (business_year)
+  CHECK ck_purchase_farmers_entries_extra_kilos: extra_kilos >= 0
+  CHECK ck_purchase_farmers_entries_no_of_filled_bags: no_of_filled_bags >= 0
+  CHECK ck_purchase_farmers_entries_payable_amount: payable_amount >= 0
+  CHECK ck_purchase_farmers_entries_borrowed_amount: borrowed_amount >= 0
+  CHECK ck_purchase_farmers_entries_borrowed_amount_le_payable_amount: borrowed_amount <= payable_amount
+  CHECK ck_purchase_farmers_entries_expected_raw_weight_per_bag: expected_raw_weight_per_bag IS NULL OR expected_raw_weight_per_bag >= 0
+  CHECK ck_purchase_farmers_entries_no_of_handful_bags: no_of_handful_bags >= 0
+  CHECK ck_purchase_farmers_entries_total_available_bags: total_available_bags >= 0
+  INDEX ix_purchase_farmers_entries_purchase_group_id (purchase_group_id)
+  INDEX ix_purchase_farmers_entries_farmer_id (farmer_id)
+  INDEX ix_purchase_farmers_entries_labour_group_id (labour_group_id)
+  FOREIGN KEY fk_purchase_farmers_entries_listed_farmer (purchase_group_id, farmer_id) -> purchase_group_farmers (purchase_group_id, farmer_id)
+
+==============================================================================
+
+TABLE: purchase_individuals
+------------------------------------------------------------------------------------------
+column                      | type                     | constraints
+------------------------------------------------------------------------------------------
+id                          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+purchase_individual_date           | DATE                     | NOT NULL
+village_id                  | INTEGER                  | NOT NULL, FOREIGN KEY -> villages.id
+grain_id                    | INTEGER                  | NOT NULL, FOREIGN KEY -> grains.id
+grain_rate_per_20kg         | INTEGER                  | NOT NULL
+pay_after_no_of_days        | INTEGER                  | NOT NULL
+terms                       | TEXT                     | -
+farmer_id                   | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
+labour_group_id             | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
+no_of_filled_bags           | INTEGER                  | NOT NULL
+extra_kilos                 | INTEGER                  | NOT NULL, DEFAULT 0
+no_of_handful_bags          | INTEGER                  | NOT NULL, DEFAULT 0
+total_available_bags        | INTEGER                  | NOT NULL, DEFAULT 0
+payable_amount              | BIGINT                   | NOT NULL
+borrowed_amount             | BIGINT                   | NOT NULL, DEFAULT 0
+due_date                    | DATE                     | NOT NULL
+expected_raw_weight_per_bag | INTEGER                  | -
+grain_quality_code          | TEXT                     | -
+grain_store_at              | TEXT                     | -
+business_year               | VARCHAR(7)               | NOT NULL
+description                 | TEXT                     | -
 created_by                  | INTEGER                  | FOREIGN KEY -> users.id
 created_at                  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_purchase_farmer_entries_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
-  INDEX ix_purchase_farmer_entries_business_year (business_year)
-  CHECK ck_purchase_farmer_entries_extra_kilos: extra_kilos >= 0
-  CHECK ck_purchase_farmer_entries_no_of_filled_bags: no_of_filled_bags >= 0
-  CHECK ck_purchase_farmer_entries_payable_amount: payable_amount >= 0
-  CHECK ck_purchase_farmer_entries_borrowed_amount: borrowed_amount >= 0
-  CHECK ck_purchase_farmer_entries_borrowed_amount_le_payable_amount: borrowed_amount <= payable_amount
-  CHECK ck_purchase_farmer_entries_expected_raw_weight_per_bag: expected_raw_weight_per_bag IS NULL OR expected_raw_weight_per_bag >= 0
-  CHECK ck_purchase_farmer_entries_no_of_handful_bags: no_of_handful_bags >= 0
-  CHECK ck_purchase_farmer_entries_total_available_bags: total_available_bags >= 0
-  INDEX ix_purchase_farmer_entries_purchase_info_id (purchase_info_id)
-  INDEX ix_purchase_farmer_entries_farmer_id (farmer_id)
-  INDEX ix_purchase_farmer_entries_labour_group_id (labour_group_id)
+  CHECK ck_purchase_individuals_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
+  INDEX ix_purchase_individuals_business_year (business_year)
+  CHECK ck_purchase_individuals_rate_positive: grain_rate_per_20kg > 0
+  CHECK ck_purchase_individuals_pay_after: pay_after_no_of_days >= 0
+  CHECK ck_purchase_individuals_extra_kilos: extra_kilos >= 0
+  CHECK ck_purchase_individuals_no_of_filled_bags: no_of_filled_bags >= 0
+  CHECK ck_purchase_individuals_payable_amount: payable_amount >= 0
+  CHECK ck_purchase_individuals_borrowed_amount: borrowed_amount >= 0
+  CHECK ck_purchase_individuals_borrowed_amount_le_payable_amount: borrowed_amount <= payable_amount
+  CHECK ck_purchase_individuals_expected_raw_weight_per_bag: expected_raw_weight_per_bag IS NULL OR expected_raw_weight_per_bag >= 0
+  CHECK ck_purchase_individuals_no_of_handful_bags: no_of_handful_bags >= 0
+  CHECK ck_purchase_individuals_total_available_bags: total_available_bags >= 0
+  INDEX ix_purchase_individuals_farmer_id (farmer_id)
+  INDEX ix_purchase_individuals_village_id (village_id)
+  INDEX ix_purchase_individuals_grain_id (grain_id)
+
+One flat table = the purchase_group columns + the purchase_farmers_entries columns in one row, filled on ONE form, with ONE description
+(the description of purchase_group and of purchase_farmers_entries is not repeated: there is just this one). The purchase columns are part of the row
+itself, so there is no purchase_group_id. A purchase individual is part of the farmer ledger: payments are allocated to it with payment_allocations.payable_type = 'purchase_individual'.
 
 ==============================================================================
 
@@ -130,7 +205,7 @@ column                   | type    | constraints
 -----------------------------------------------------------------
 id                       | INTEGER | PRIMARY KEY, AUTO INCREMENT
 trip_id                  | INTEGER | NOT NULL, FOREIGN KEY -> truck_trips.id
-purchase_farmer_entry_id | INTEGER | NOT NULL, FOREIGN KEY -> purchase_farmer_entries.id
+purchase_farmer_entry_id | INTEGER | NOT NULL, FOREIGN KEY -> purchase_farmers_entries.id
 no_of_loaded_bags        | INTEGER | NOT NULL
 total_remaining_bags     | INTEGER | NOT NULL
 

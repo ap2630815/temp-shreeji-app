@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th %}
+{% macro fmt(value, kind) -%}
+{%- if value is none or value == '' -%}—
+{%- elif kind == 'inr' -%}{{ value | inr }}
+{%- elif kind in ('int', 'kg') -%}{{ '{:,}'.format(value) if value is number else value }}
+{%- elif kind == 'pct' -%}{{ value }}%
+{%- else -%}{{ value }}{%- endif -%}
+{%- endmacro %}
+{% block title %}Analysis{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-3">
+  <h1 class="text-xl font-semibold flex-1">{{ t('Analysis', 'વિશ્લેષણ') }} · {{ ledgers[ledger][0] }} <span class="gu text-base">{{ ledgers[ledger][1] }}</span>
+    <span class="text-sm font-normal opacity-70">· {{ year }}</span></h1>
+  {% if filtered %}<span class="badge badge-info">{{ t('Filtered by the toolbar', 'ટૂલબાર ફિલ્ટર લાગુ') }}</span>{% endif %}
+</div>
+<div class="tabs tabs-boxed bg-base-100 mb-4 w-fit flex-wrap">
+  {% for key, label in ledgers.items() %}
+  <a href="/analysis?ledger={{ key }}{{ '&' ~ keep if keep }}" class="tab {{ 'tab-active' if key == ledger }}">{{ label[0] }} <span class="gu ml-1">{{ label[1] }}</span></a>
+  {% endfor %}
+</div>
+{% for n in report.notes %}<p class="text-xs opacity-70 mb-2">{{ n[0] }} <span class="gu">{{ n[1] }}</span></p>{% endfor %}
+
+<div class="stats stats-vertical lg:stats-horizontal shadow bg-base-100 w-full mb-4 overflow-x-auto">
+  {% for s in report.stats %}
+  <div class="stat py-2 px-4"><div class="stat-title text-xs">{{ s.en }} <span class="gu">{{ s.gu }}</span></div>
+    <div class="stat-value text-xl">{{ fmt(s.value, s.kind) }}{% if s.kind == 'kg' %} <span class="text-sm">kg</span>{% endif %}</div>
+    {% if s.sub %}<div class="stat-desc">{{ s.sub }}</div>{% endif %}</div>
+  {% endfor %}
+</div>
+
+{% for b in report.bars %}
+{% set top = (b.items | map(attribute=1) | max) if b.items else 0 %}
+<div class="card bg-base-100 shadow mb-4"><div class="card-body p-4">
+  <h2 class="font-semibold">{{ b.title[0] }} <span class="gu">{{ b.title[1] }}</span></h2>
+  {% for label, value in b.items %}
+  <div class="flex items-center gap-2 text-sm">
+    <span class="w-32 shrink-0">{{ label }}</span>
+    <div class="flex-1 bg-base-200 rounded h-4"><div class="bg-primary h-4 rounded" style="width: {{ ((value * 100 / top) if top else 0) | round(1) }}%"></div></div>
+    <span class="w-28 text-right">{{ fmt(value, b.kind) }}</span>
+  </div>
+  {% else %}<p class="text-sm opacity-60">{{ t('No data', 'ડેટા નથી') }}</p>{% endfor %}
+</div></div>
+{% endfor %}
+
+<div class="grid xl:grid-cols-2 gap-4">
+{% for tb in report.tables %}
+<div class="card bg-base-100 shadow {{ 'xl:col-span-2' if tb.headers | length > 6 }}"><div class="card-body p-4">
+  <h2 class="font-semibold">{{ tb.title[0] }} <span class="gu">{{ tb.title[1] }}</span></h2>
+  <div class="overflow-x-auto"><table class="table table-zebra table-sm">
+    <thead><tr>{% for en, gu, kind in tb.headers %}<th class="whitespace-nowrap {{ 'text-right' if kind != 'text' }}">{{ en }}<br><span class="gu text-xs font-normal">{{ gu }}</span></th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in tb.rows %}<tr>{% for cell in row %}{% set kind = tb.headers[loop.index0][2] %}<td class="{{ 'text-right whitespace-nowrap' if kind != 'text' }}">{{ fmt(cell, kind) }}</td>{% endfor %}</tr>
+    {% else %}<tr><td colspan="{{ tb.headers | length }}" class="text-center opacity-60">{{ t('No data', 'ડેટા નથી') }}</td></tr>{% endfor %}
+    </tbody>
+    {% if tb.total %}<tfoot><tr class="font-semibold">{% for cell in tb.total %}{% set kind = tb.headers[loop.index0][2] %}<td class="{{ 'text-right whitespace-nowrap' if kind != 'text' }}">{% if cell == 'Total' %}{{ t('Total', 'કુલ') }}{% elif cell != '' %}{{ fmt(cell, kind) }}{% endif %}</td>{% endfor %}</tr></tfoot>{% endif %}
+  </table></div>
+</div></div>
+{% endfor %}
+</div>
+{% endblock %}

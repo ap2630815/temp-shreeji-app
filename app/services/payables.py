@@ -28,7 +28,7 @@ from app.models import (
     User,
 )
 from app.services import audit
-from app.services.ledger import allocate, entry_views
+from app.services.ledger import DIRECT, FARMER, all_entry_views, allocate
 from app.services.locks import advisory_lock
 from app.services.years import assert_year_open
 
@@ -93,7 +93,7 @@ class Payable:
 
     @property
     def sort_key(self) -> tuple:
-        return (self.due_date or self.doc_date, self.doc_date, self.payable_id)
+        return (self.due_date or self.doc_date, self.doc_date, self.payable_type, self.payable_id)
 
 
 async def _paid_map(db: AsyncSession, payable_type: str, ids: list[int]) -> dict[int, int]:
@@ -107,16 +107,20 @@ async def _paid_map(db: AsyncSession, payable_type: str, ids: list[int]) -> dict
     return {pid: int(total) for pid, total in rows.all()}
 
 
+paid_map = _paid_map  # public alias for reports
+
+
 async def load_payables(db: AsyncSession, party_type: str, party_id: int | None = None) -> list[Payable]:
     """Everything we owe (or have owed) to one party, or to all parties of a type when party_id is None."""
     pt = party_type  # allocation payable_type
     out: list[Payable] = []
 
     if party_type == "farmer":
-        for v in await entry_views(db, farmer_id=party_id):
+        for v in await all_entry_views(db, farmer_id=party_id):  # purchase entries and direct entries
             e = v.entry
-            out.append(Payable(pt, e.id, party_type, e.farmer_id, e.farmer.farmer_name, e.purchase_entry_date, e.due_date,
-                               f"{e.purchase_info.village.village_name} · {e.purchase_info.grain.grain_name}, {e.no_of_filled_bags} bags", e.net_payable, v.paid))
+            source = "direct" if e.is_direct else f"#{e.purchase_group_id}, {e.purchase_group.purchase_group_date}"
+            out.append(Payable(DIRECT if e.is_direct else FARMER, e.id, party_type, e.farmer_id, e.farmer.farmer_name, e.entry_date, e.due_date,
+                               f"{e.farmer.village.village_name} · {e.grain.grain_name} ({source}), {e.no_of_filled_bags} bags", e.net_payable, v.paid))
     elif party_type == "truck":
         stmt = select(TruckTrip).order_by(TruckTrip.trip_date, TruckTrip.id)
         if party_id:
@@ -198,7 +202,7 @@ async def record_payment(db: AsyncSession, user: User, party_type: str, party_id
     payables = await load_payables(db, party_type, party_id)
     outstanding = sum(max(p.due, 0) for p in payables)
     try:
-        plan = allocate(data["amount"], [(p.payable_id, p.due) for p in payables])
+        plan = allocate(data["amount"], [((p.payable_type, p.payable_id), p.due) for p in payables])  # (type, id): two tables can share an id
     except ValueError:
         raise PaymentError("amount", (f"Exceeds the outstanding amount (₹{outstanding})", f"બાકી રકમ (₹{outstanding}) થી વધુ")) from None
     earlier = int(await db.scalar(select(func.count()).select_from(Payment).where(Payment.party_type == party_type, Payment.party_id == party_id)))
@@ -206,10 +210,10 @@ async def record_payment(db: AsyncSession, user: User, party_type: str, party_id
     payment = Payment(party_type=party_type, party_id=party_id, business_year=year, status=status, created_by=user.id, **data)
     db.add(payment)
     await db.flush()
-    db.add_all(PaymentAllocation(payment_id=payment.id, payable_type=party_type, payable_id=pid, amount=amt) for pid, amt in plan)
+    db.add_all(PaymentAllocation(payment_id=payment.id, payable_type=ptype, payable_id=pid, amount=amt) for (ptype, pid), amt in plan)
     audit.log(db, user, "create", "payments", payment.id, dict(
         party=party_type, party_id=party_id, amount=data["amount"], method=data["method"], receiver=data["receiver_name"], status=status,
-        allocations=[[pid, amt] for pid, amt in plan]))
+        allocations=[[ptype, pid, amt] for (ptype, pid), amt in plan]))
     return payment
 
 
@@ -220,13 +224,17 @@ async def payments_of(db: AsyncSession, party_type: str, party_id: int) -> list[
 
 async def payment_lines(db: AsyncSession, payment: Payment) -> list[dict]:
     """What a payment settled, and what each of those items still owed right after it (payments up to and including it)."""
-    by_id = {p.payable_id: p for p in await load_payables(db, payment.party_type, payment.party_id)}
+    by_key = {(p.payable_type, p.payable_id): p for p in await load_payables(db, payment.party_type, payment.party_id)}
+    types = {a.payable_type for a in payment.allocations}
     ids = [a.payable_id for a in payment.allocations]
-    pt = payment.party_type
     rows = await db.execute(
-        select(PaymentAllocation.payable_id, func.sum(PaymentAllocation.amount))
-        .where(PaymentAllocation.payable_type == pt, PaymentAllocation.payable_id.in_(ids), PaymentAllocation.payment_id <= payment.id)
-        .group_by(PaymentAllocation.payable_id)
+        select(PaymentAllocation.payable_type, PaymentAllocation.payable_id, func.sum(PaymentAllocation.amount))
+        .where(PaymentAllocation.payable_type.in_(types), PaymentAllocation.payable_id.in_(ids), PaymentAllocation.payment_id <= payment.id)
+        .group_by(PaymentAllocation.payable_type, PaymentAllocation.payable_id)
     )
-    upto = {pid: int(total) for pid, total in rows.all()}
-    return [dict(payable=by_id[a.payable_id], amount=a.amount, remaining=by_id[a.payable_id].amount - upto[a.payable_id]) for a in payment.allocations]
+    upto = {(ptype, pid): int(total) for ptype, pid, total in rows.all()}
+    out = []
+    for a in payment.allocations:
+        key = (a.payable_type, a.payable_id)
+        out.append(dict(payable=by_key[key], amount=a.amount, remaining=by_key[key].amount - upto[key]))
+    return out

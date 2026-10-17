@@ -61,7 +61,7 @@
     <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Village', 'ગામ') }}{{ th('Grain', 'અનાજ') }}{{ th('Bought', 'ખરીદી') }}{{ th('Loaded', 'ભર્યું') }}{{ th('In stock', 'સ્ટોકમાં') }}</tr></thead>
     <tbody>
     {% for c in infos %}{% set s = stock.get(c.id) %}
-      <tr><td>{{ c.purchase_info_date }}</td><td><a class="link" href="/purchases/{{ c.id }}">{{ c.village.village_name }}</a></td><td>{{ c.grain.grain_name }}</td>
+      <tr><td>{{ c.purchase_group_date }}</td><td><a class="link" href="/PurchaseGroup/{{ c.id }}">{{ c.village.village_name }}</a></td><td>{{ c.grain.grain_name }}</td>
           <td>{{ s.bought if s else 0 }}</td><td>{{ s.loaded if s else 0 }}</td><td class="font-semibold {{ 'text-warning' if s and s.available > 0 }}">{{ s.available if s else 0 }}</td></tr>
     {% else %}<tr><td colspan="6" class="text-center opacity-60">{{ t('No purchases this year', 'આ વર્ષે કોઈ ખરીદી નથી') }}</td></tr>{% endfor %}
     </tbody>

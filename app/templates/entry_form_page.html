@@ -3,7 +3,7 @@
 {% block pre_form %}
 <div class="alert bg-base-100 shadow-sm mb-3 text-sm flex-wrap">
   <span>{{ p.village.village_name }} · {{ t('Rate', 'ભાવ') }} <b>{{ p.grain_rate_per_20kg | inr }}</b> / 20 kg · {{ t('bag', 'બેગ') }} <b>{{ p.grain.net_bag_weight }}</b> kg · {{ t('pay after', 'ચુકવણી') }} {{ p.pay_after_no_of_days }} {{ t('days', 'દિવસ') }}</span>
-  {% if village_filtered %}<a class="link" href="{{ show_all_url }}">{{ t('Farmer not listed? Show all villages', 'ખેડૂત નથી? બધા ગામ બતાવો') }}</a>{% endif %}
+  <a class="link" href="/PurchaseGroup/{{ p.id }}/edit">{{ t('Farmer not listed? Add him to this purchase', 'ખેડૂત નથી? તેને આ ખરીદીમાં ઉમેરો') }}</a>
 </div>
 <div class="mb-3 text-sm" id="payable-preview" data-rate="{{ p.grain_rate_per_20kg }}" data-net="{{ p.grain.net_bag_weight }}">
   {{ t('Payable amount', 'ચૂકવવાપાત્ર રકમ') }}: <b id="pv-amount">—</b>

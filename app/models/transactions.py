@@ -5,7 +5,7 @@ set by the application from the record's own date (file9-database.txt, rule 5)."
 
 from datetime import date
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Date, Float, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,26 +25,27 @@ def _year_index(table: str) -> Index:
     return Index(f"ix_{table}_business_year", "business_year")
 
 
-class PurchaseInfo(TimestampMixin, Base):
-    """A village deal: the whole village sells one grain at one rate on agreed terms."""
+class PurchaseGroup(TimestampMixin, Base):
+    """One deal: a few farmers of a village gather and agree one grain, one rate and the terms (listed in
+    purchase_group_farmers). A village has many of these over time."""
 
-    __tablename__ = "purchase_info"
+    __tablename__ = "purchase_group"
     __table_args__ = (
-        _year_check("purchase_info"),
-        _year_index("purchase_info"),
-        CheckConstraint("grain_rate_per_20kg > 0", name="ck_purchase_info_rate_positive"),
-        CheckConstraint("pay_after_no_of_days >= 0", name="ck_purchase_info_pay_after"),
-        Index("ix_purchase_info_village_id", "village_id"),
-        Index("ix_purchase_info_grain_id", "grain_id"),
+        _year_check("purchase_group"),
+        _year_index("purchase_group"),
+        CheckConstraint("grain_rate_per_20kg > 0", name="ck_purchase_group_rate_positive"),
+        CheckConstraint("pay_after_no_of_days >= 0", name="ck_purchase_group_pay_after"),
+        Index("ix_purchase_group_village_id", "village_id"),
+        Index("ix_purchase_group_grain_id", "grain_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    purchase_info_date: Mapped[date] = mapped_column(Date)
+    purchase_group_date: Mapped[date] = mapped_column(Date)
     village_id: Mapped[int] = mapped_column(ForeignKey("villages.id"))
     grain_id: Mapped[int] = mapped_column(ForeignKey("grains.id"))
     grain_rate_per_20kg: Mapped[int] = mapped_column(Integer)
     pay_after_no_of_days: Mapped[int] = mapped_column(Integer)
-    purchase_info_terms: Mapped[str | None] = mapped_column(Text)
+    purchase_group_terms: Mapped[str | None] = mapped_column(Text)
     business_year: Mapped[str] = mapped_column(String(7))
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
@@ -53,32 +54,55 @@ class PurchaseInfo(TimestampMixin, Base):
     grain: Mapped[Grain] = relationship(lazy="joined")
 
 
-class PurchaseFarmerEntry(TimestampMixin, Base):
-    """One farmer's weighed grain inside a purchase_info."""
+class PurchaseGroupFarmer(TimestampMixin, Base):
+    """A farmer who took part in one purchase_group (deal). His ledger for that deal is his purchase_farmers_entries."""
 
-    __tablename__ = "purchase_farmer_entries"
+    __tablename__ = "purchase_group_farmers"
     __table_args__ = (
-        _year_check("purchase_farmer_entries"),
-        _year_index("purchase_farmer_entries"),
-        CheckConstraint("extra_kilos >= 0", name="ck_purchase_farmer_entries_extra_kilos"),
-        CheckConstraint("no_of_filled_bags >= 0", name="ck_purchase_farmer_entries_no_of_filled_bags"),
-        CheckConstraint("payable_amount >= 0", name="ck_purchase_farmer_entries_payable_amount"),
-        CheckConstraint("borrowed_amount >= 0", name="ck_purchase_farmer_entries_borrowed_amount"),
-        CheckConstraint("borrowed_amount <= payable_amount", name="ck_purchase_farmer_entries_borrowed_amount_le_payable_amount"),
+        UniqueConstraint("purchase_group_id", "farmer_id", name="uq_purchase_group_farmers_info_farmer"),
+        Index("ix_purchase_group_farmers_farmer_id", "farmer_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    purchase_group_id: Mapped[int] = mapped_column(ForeignKey("purchase_group.id"))
+    farmer_id: Mapped[int] = mapped_column(ForeignKey("farmers.id"))
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    purchase_group: Mapped[PurchaseGroup] = relationship(lazy="joined")
+    farmer: Mapped[Farmer] = relationship(lazy="joined")
+
+
+class PurchaseFarmerEntry(TimestampMixin, Base):
+    """One farmer's weighed grain inside a purchase_group. Rate, grain and pay-after come from the purchase_group."""
+
+    __tablename__ = "purchase_farmers_entries"
+    __table_args__ = (
+        _year_check("purchase_farmers_entries"),
+        _year_index("purchase_farmers_entries"),
+        CheckConstraint("extra_kilos >= 0", name="ck_purchase_farmers_entries_extra_kilos"),
+        CheckConstraint("no_of_filled_bags >= 0", name="ck_purchase_farmers_entries_no_of_filled_bags"),
+        CheckConstraint("payable_amount >= 0", name="ck_purchase_farmers_entries_payable_amount"),
+        CheckConstraint("borrowed_amount >= 0", name="ck_purchase_farmers_entries_borrowed_amount"),
+        CheckConstraint("borrowed_amount <= payable_amount", name="ck_purchase_farmers_entries_borrowed_amount_le_payable_amount"),
         CheckConstraint(
             "expected_raw_weight_per_bag IS NULL OR expected_raw_weight_per_bag >= 0",
-            name="ck_purchase_farmer_entries_expected_raw_weight_per_bag",
+            name="ck_purchase_farmers_entries_expected_raw_weight_per_bag",
         ),
-        CheckConstraint("no_of_handful_bags >= 0", name="ck_purchase_farmer_entries_no_of_handful_bags"),
-        CheckConstraint("total_available_bags >= 0", name="ck_purchase_farmer_entries_total_available_bags"),
-        Index("ix_purchase_farmer_entries_purchase_info_id", "purchase_info_id"),
-        Index("ix_purchase_farmer_entries_farmer_id", "farmer_id"),
-        Index("ix_purchase_farmer_entries_labour_group_id", "labour_group_id"),
+        CheckConstraint("no_of_handful_bags >= 0", name="ck_purchase_farmers_entries_no_of_handful_bags"),
+        CheckConstraint("total_available_bags >= 0", name="ck_purchase_farmers_entries_total_available_bags"),
+        Index("ix_purchase_farmers_entries_purchase_group_id", "purchase_group_id"),
+        Index("ix_purchase_farmers_entries_farmer_id", "farmer_id"),
+        Index("ix_purchase_farmers_entries_labour_group_id", "labour_group_id"),
+        ForeignKeyConstraint(
+            ["purchase_group_id", "farmer_id"],
+            ["purchase_group_farmers.purchase_group_id", "purchase_group_farmers.farmer_id"],
+            name="fk_purchase_farmers_entries_listed_farmer",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     purchase_entry_date: Mapped[date] = mapped_column(Date)
-    purchase_info_id: Mapped[int] = mapped_column(ForeignKey("purchase_info.id"))
+    purchase_group_id: Mapped[int] = mapped_column(ForeignKey("purchase_group.id"))
     farmer_id: Mapped[int] = mapped_column(ForeignKey("farmers.id"))
     labour_group_id: Mapped[int] = mapped_column(ForeignKey("labour_groups.id"))
     no_of_filled_bags: Mapped[int] = mapped_column(Integer)
@@ -95,7 +119,7 @@ class PurchaseFarmerEntry(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
-    purchase_info: Mapped[PurchaseInfo] = relationship(lazy="joined")
+    purchase_group: Mapped[PurchaseGroup] = relationship(lazy="joined")
     farmer: Mapped[Farmer] = relationship(lazy="joined")
     labour_group: Mapped[LabourGroup] = relationship(lazy="joined")
 
@@ -106,7 +130,101 @@ class PurchaseFarmerEntry(TimestampMixin, Base):
 
     @property
     def total_kg(self) -> int:
-        return self.no_of_filled_bags * self.purchase_info.grain.net_bag_weight + self.extra_kilos
+        return self.no_of_filled_bags * self.purchase_group.grain.net_bag_weight + self.extra_kilos
+
+    # ---- the same names a PurchaseIndividual has, so the farmer ledger can list both kinds of entry together
+    is_direct = False
+
+    @property
+    def entry_date(self) -> date:
+        return self.purchase_entry_date
+
+    @property
+    def grain(self) -> Grain:
+        return self.purchase_group.grain
+
+    @property
+    def grain_rate_per_20kg(self) -> int:
+        return self.purchase_group.grain_rate_per_20kg
+
+    @property
+    def pay_after_no_of_days(self) -> int:
+        return self.purchase_group.pay_after_no_of_days
+
+
+class PurchaseIndividual(TimestampMixin, Base):
+    """A farmer entry made directly on the farmer ledger, on one form, without a purchase_group.
+
+    It carries the purchase_group columns (date, village, grain, rate, pay-after, terms) and the purchase_farmers_entries
+    columns (farmer, labour group, bags, amounts...) in one row, with ONE description. Its money is paid through the
+    same farmer payments as any other entry (payment_allocations.payable_type = 'purchase_individual')."""
+
+    __tablename__ = "purchase_individuals"
+    __table_args__ = (
+        _year_check("purchase_individuals"),
+        _year_index("purchase_individuals"),
+        CheckConstraint("grain_rate_per_20kg > 0", name="ck_purchase_individuals_rate_positive"),
+        CheckConstraint("pay_after_no_of_days >= 0", name="ck_purchase_individuals_pay_after"),
+        CheckConstraint("extra_kilos >= 0", name="ck_purchase_individuals_extra_kilos"),
+        CheckConstraint("no_of_filled_bags >= 0", name="ck_purchase_individuals_no_of_filled_bags"),
+        CheckConstraint("payable_amount >= 0", name="ck_purchase_individuals_payable_amount"),
+        CheckConstraint("borrowed_amount >= 0", name="ck_purchase_individuals_borrowed_amount"),
+        CheckConstraint("borrowed_amount <= payable_amount", name="ck_purchase_individuals_borrowed_amount_le_payable_amount"),
+        CheckConstraint("expected_raw_weight_per_bag IS NULL OR expected_raw_weight_per_bag >= 0", name="ck_purchase_individuals_expected_raw_weight_per_bag"),
+        CheckConstraint("no_of_handful_bags >= 0", name="ck_purchase_individuals_no_of_handful_bags"),
+        CheckConstraint("total_available_bags >= 0", name="ck_purchase_individuals_total_available_bags"),
+        Index("ix_purchase_individuals_farmer_id", "farmer_id"),
+        Index("ix_purchase_individuals_village_id", "village_id"),
+        Index("ix_purchase_individuals_grain_id", "grain_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # ---- the purchase_group columns
+    purchase_individual_date: Mapped[date] = mapped_column(Date)
+    village_id: Mapped[int] = mapped_column(ForeignKey("villages.id"))
+    grain_id: Mapped[int] = mapped_column(ForeignKey("grains.id"))
+    grain_rate_per_20kg: Mapped[int] = mapped_column(Integer)
+    pay_after_no_of_days: Mapped[int] = mapped_column(Integer)
+    terms: Mapped[str | None] = mapped_column(Text)
+    # ---- the purchase_farmers_entries columns
+    farmer_id: Mapped[int] = mapped_column(ForeignKey("farmers.id"))
+    labour_group_id: Mapped[int] = mapped_column(ForeignKey("labour_groups.id"))
+    no_of_filled_bags: Mapped[int] = mapped_column(Integer)
+    extra_kilos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    no_of_handful_bags: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    total_available_bags: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    payable_amount: Mapped[int] = mapped_column(BigInteger)
+    borrowed_amount: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    due_date: Mapped[date] = mapped_column(Date)
+    expected_raw_weight_per_bag: Mapped[int | None] = mapped_column(Integer)
+    grain_quality_code: Mapped[str | None] = mapped_column(Text)
+    grain_store_at: Mapped[str | None] = mapped_column(Text)
+    # ---- shared by both
+    business_year: Mapped[str] = mapped_column(String(7))
+    description: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    village: Mapped[Village] = relationship(lazy="joined")
+    grain: Mapped[Grain] = relationship(lazy="joined")
+    farmer: Mapped[Farmer] = relationship(lazy="joined")
+    labour_group: Mapped[LabourGroup] = relationship(lazy="joined")
+
+    is_direct = True
+
+    @property
+    def entry_date(self) -> date:
+        return self.purchase_individual_date
+
+    purchase_group = None  # a direct entry belongs to no purchase
+    purchase_group_id = None
+
+    @property
+    def net_payable(self) -> int:
+        return self.payable_amount - self.borrowed_amount
+
+    @property
+    def total_kg(self) -> int:
+        return self.no_of_filled_bags * self.grain.net_bag_weight + self.extra_kilos
 
 
 class BrokerBooking(TimestampMixin, Base):
@@ -235,7 +353,7 @@ class TruckLoadLine(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     trip_id: Mapped[int] = mapped_column(ForeignKey("truck_trips.id"))
-    purchase_farmer_entry_id: Mapped[int] = mapped_column(ForeignKey("purchase_farmer_entries.id"))
+    purchase_farmer_entry_id: Mapped[int] = mapped_column(ForeignKey("purchase_farmers_entries.id"))
     no_of_loaded_bags: Mapped[int] = mapped_column(Integer)
     total_remaining_bags: Mapped[int] = mapped_column(Integer)
 

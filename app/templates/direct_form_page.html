@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block title %}{{ heading[0] }}{% endblock %}
+{% block content %}
+<div class="stackbi">
+<h1 class="text-xl font-semibold mb-1">{{ heading[0] }}<br><span class="gu">{{ heading[1] }}</span></h1>
+<p class="text-sm opacity-70 mb-4">One form: the purchase columns and the farmer entry columns together, with one description. <span class="gu">એક જ ફોર્મ: ખરીદી અને ખેડૂત નોંધના ખાના સાથે, એક જ વર્ણન.</span></p>
+{% include "partials/direct_form.html" %}
+</div>
+{% endblock %}

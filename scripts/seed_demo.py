@@ -16,8 +16,8 @@ from sqlalchemy import delete, select
 
 from app.core.db import SessionLocal, engine
 from app.models import (
-    AuditLog, BagSupplier, BagSupply, Bilty, Broker, BrokerBooking, Brokerage, Farmer, Grain, Industry, Labour, LabourGroup, LabourGroupWage,
-    LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry, PurchaseInfo, Receipt, ReceiptAllocation, Transporter, Truck, TruckLoadLine,
+    AuditLog, BagSupplier, BagSupply, Bilty, Broker, BrokerBooking, Brokerage, PurchaseIndividual, Farmer, Grain, Industry, Labour, LabourGroup, LabourGroupWage,
+    LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, Receipt, ReceiptAllocation, Transporter, Truck, TruckLoadLine,
     TruckTrip, User, Village,
 )
 from app.services import audit
@@ -109,20 +109,26 @@ async def seed() -> None:
         for name, rows in masters.items():
             ids[name] = [r.id for r in rows]
 
-        # ---- purchase_info: one village deal per grain
+        # ---- purchase_group: one deal per grain (a village can have several)
         day = lambda back: TODAY - timedelta(days=back)  # noqa: E731
         infos = []
         for i, g in enumerate(grains):
             d = day(5 - i % 5)
-            infos.append(PurchaseInfo(purchase_info_date=d, business_year=business_year_of(d), village_id=villages[i % 3].id, grain_id=g.id, grain_rate_per_20kg=GRAINS[i][3],
-                                      pay_after_no_of_days=[7, 10, 15, 20][i % 4], purchase_info_terms=g.grain_terms, description="Demo purchase", created_by=user.id))
+            infos.append(PurchaseGroup(purchase_group_date=d, business_year=business_year_of(d), village_id=villages[i % 3].id, grain_id=g.id, grain_rate_per_20kg=GRAINS[i][3],
+                                      pay_after_no_of_days=[7, 10, 15, 20][i % 4], purchase_group_terms=g.grain_terms, description="Demo purchase", created_by=user.id))
         db.add_all(infos)
         await db.flush()
-        ids["purchase_info"] = [p.id for p in infos]
+        ids["purchase_group"] = [p.id for p in infos]
         for p in infos:
-            stamp(db, user, "purchase_info", p)
+            stamp(db, user, "purchase_group", p)
 
-        # ---- farmer weighing entries: one per purchase_info
+        # ---- the farmers who joined each purchase: the one with an entry plus two more who have not delivered yet
+        joined = [PurchaseGroupFarmer(purchase_group_id=p.id, farmer_id=farmers[(i + k) % N].id, created_by=user.id) for i, p in enumerate(infos) for k in (0, 1, 2)]
+        db.add_all(joined)
+        await db.flush()
+        ids["purchase_group_farmers"] = [j.id for j in joined]
+
+        # ---- farmer weighing entries: one per purchase_group (for the first listed farmer)
         entries = []
         for i, p in enumerate(infos):
             net = grains[i].net_bag_weight
@@ -130,16 +136,33 @@ async def seed() -> None:
             amount = payable_amount(bags, kilos, net, p.grain_rate_per_20kg)
             borrowing = rng.choice([0, 0, 500, 1000, 2000]) if amount > 3000 else 0
             entries.append(PurchaseFarmerEntry(
-                purchase_entry_date=p.purchase_info_date, business_year=p.business_year, purchase_info_id=p.id, farmer_id=farmers[i].id, labour_group_id=labour[i].id,
+                purchase_entry_date=p.purchase_group_date, business_year=p.business_year, purchase_group_id=p.id, farmer_id=farmers[i].id, labour_group_id=labour[i].id,
                 no_of_filled_bags=bags, extra_kilos=kilos, no_of_handful_bags=handful, total_available_bags=total_available_bags(bags, handful),
-                payable_amount=amount, borrowed_amount=borrowing, due_date=p.purchase_info_date + timedelta(days=p.pay_after_no_of_days),
+                payable_amount=amount, borrowed_amount=borrowing, due_date=p.purchase_group_date + timedelta(days=p.pay_after_no_of_days),
                 expected_raw_weight_per_bag=net + rng.randint(0, 2), grain_quality_code=rng.choice([None, "A", "B"]), grain_store_at=rng.choice([None, "Farmer's shed", "Godown"]),
                 description=rng.choice([None, None, "2 quality grains", "warning: moisture"]), created_by=user.id))
         db.add_all(entries)
         await db.flush()
-        ids["purchase_farmer_entries"] = [e.id for e in entries]
+        ids["purchase_farmers_entries"] = [e.id for e in entries]
         for e in entries:
-            stamp(db, user, "purchase_farmer_entries", e)
+            stamp(db, user, "purchase_farmers_entries", e)
+
+        # ---- two direct entries (the one-form Purchase Individual): purchase and entry columns in one flat row, one description
+        direct = []
+        for k, (gi, fi, bags_d) in enumerate([(0, 8, 60), (2, 9, 45)]):
+            g, d = grains[gi], day(2 - k)
+            rate = GRAINS[gi][3]
+            direct.append(PurchaseIndividual(
+                purchase_individual_date=d, business_year=business_year_of(d), village_id=farmers[fi].village_id, grain_id=g.id, grain_rate_per_20kg=rate, pay_after_no_of_days=7,
+                terms=g.grain_terms, farmer_id=farmers[fi].id, labour_group_id=labour[fi].id, no_of_filled_bags=bags_d, extra_kilos=0, no_of_handful_bags=0,
+                total_available_bags=bags_d, payable_amount=payable_amount(bags_d, 0, g.net_bag_weight, rate), borrowed_amount=0, due_date=d + timedelta(days=7),
+                description="Demo direct entry", created_by=user.id))
+        db.add_all(direct)
+        await db.flush()
+        ids["purchase_individuals"] = [x.id for x in direct]
+        for x in direct:
+            stamp(db, user, "purchase_individuals", x)
+
 
         # ---- broker bookings: one per brokerage, each for one of the first 5 industries
         bookings = []
@@ -267,6 +290,8 @@ async def remove() -> None:
     if not IDS_FILE.exists():
         sys.exit("No demo data recorded (nothing to remove).")
     ids = json.loads(IDS_FILE.read_text())
+    ids.setdefault("purchase_farmers_entries", ids.get("purchase_farmer_entries", []))  # written before the table was renamed
+    ids.setdefault("purchase_farmer_entries", ids["purchase_farmers_entries"])  # old audit rows carry the old table name
     async with SessionLocal() as db:
         pay_ids, rec_ids = ids.get("payments", []), ids.get("receipts", [])
         await db.execute(delete(PaymentAllocation).where(PaymentAllocation.payment_id.in_(pay_ids)))
@@ -274,12 +299,12 @@ async def remove() -> None:
         await db.execute(delete(ReceiptAllocation).where(ReceiptAllocation.receipt_id.in_(rec_ids)))
         await db.execute(delete(Receipt).where(Receipt.id.in_(rec_ids)))
         for model, key in ((Bilty, "bilties"), (TruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BrokerBooking, "broker_bookings"),
-                           (BagSupply, "bag_supplies"), (LabourWork, "labour_work"), (PurchaseFarmerEntry, "purchase_farmer_entries"), (PurchaseInfo, "purchase_info"),
+                           (BagSupply, "bag_supplies"), (LabourWork, "labour_work"), (PurchaseIndividual, "purchase_individuals"), (PurchaseFarmerEntry, "purchase_farmers_entries"), (PurchaseGroupFarmer, "purchase_group_farmers"), (PurchaseGroup, "purchase_group"),
                            (LabourGroupWage, "labour_group_wages"), (Brokerage, "brokerages"), (Labour, "labours"), (Farmer, "farmers"), (BagSupplier, "bag_suppliers"),
                            (LabourGroup, "labour_groups"), (Transporter, "transporters"), (Truck, "trucks"), (Industry, "industries"), (Broker, "brokers"),
                            (Grain, "grains"), (Village, "villages")):
             await db.execute(delete(model).where(model.id.in_(ids.get(key, []))))
-        for table in ("purchase_info", "purchase_farmer_entries", "broker_bookings", "truck_trips", "bilties", "labour_work", "bag_supplies", "payments", "receipts"):
+        for table in ("purchase_group", "purchase_farmers_entries", "purchase_farmer_entries", "purchase_individuals", "broker_bookings", "truck_trips", "bilties", "labour_work", "bag_supplies", "payments", "receipts"):
             await db.execute(delete(AuditLog).where(AuditLog.table_name == table, AuditLog.record_id.in_(ids.get(table, []))))
         await db.commit()
     IDS_FILE.unlink()

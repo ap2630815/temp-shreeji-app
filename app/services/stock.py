@@ -19,7 +19,7 @@ class Stock:
 
 
 async def stock_by_entry(db: AsyncSession, entry_ids: list[int] | None = None, exclude_trip_id: int | None = None) -> dict[int, Stock]:
-    """Per purchase_farmer_entries.id. `exclude_trip_id` leaves one trip's own lines out (when editing that trip)."""
+    """Per purchase_farmers_entries.id. `exclude_trip_id` leaves one trip's own lines out (when editing that trip)."""
     bought_q = select(PurchaseFarmerEntry.id, PurchaseFarmerEntry.total_available_bags)
     loaded_q = select(TruckLoadLine.purchase_farmer_entry_id, func.sum(TruckLoadLine.no_of_loaded_bags)).group_by(TruckLoadLine.purchase_farmer_entry_id)
     if entry_ids is not None:
@@ -35,16 +35,16 @@ async def stock_by_entry(db: AsyncSession, entry_ids: list[int] | None = None, e
     return out
 
 
-async def stock_by_purchase_info(db: AsyncSession, purchase_info_ids: list[int]) -> dict[int, Stock]:
-    """Per purchase_info.id (a village deal): bags bought across its entries vs bags loaded from them."""
+async def stock_by_purchase_group(db: AsyncSession, purchase_group_ids: list[int]) -> dict[int, Stock]:
+    """Per purchase_group.id (one deal): bags bought across its entries vs bags loaded from them."""
     bought_q = (
-        select(PurchaseFarmerEntry.purchase_info_id, func.sum(PurchaseFarmerEntry.total_available_bags))
-        .where(PurchaseFarmerEntry.purchase_info_id.in_(purchase_info_ids)).group_by(PurchaseFarmerEntry.purchase_info_id)
+        select(PurchaseFarmerEntry.purchase_group_id, func.sum(PurchaseFarmerEntry.total_available_bags))
+        .where(PurchaseFarmerEntry.purchase_group_id.in_(purchase_group_ids)).group_by(PurchaseFarmerEntry.purchase_group_id)
     )
     loaded_q = (
-        select(PurchaseFarmerEntry.purchase_info_id, func.sum(TruckLoadLine.no_of_loaded_bags))
+        select(PurchaseFarmerEntry.purchase_group_id, func.sum(TruckLoadLine.no_of_loaded_bags))
         .join(PurchaseFarmerEntry, PurchaseFarmerEntry.id == TruckLoadLine.purchase_farmer_entry_id)
-        .where(PurchaseFarmerEntry.purchase_info_id.in_(purchase_info_ids)).group_by(PurchaseFarmerEntry.purchase_info_id)
+        .where(PurchaseFarmerEntry.purchase_group_id.in_(purchase_group_ids)).group_by(PurchaseFarmerEntry.purchase_group_id)
     )
     out: dict[int, Stock] = {}
     for pid, total in (await db.execute(bought_q)).all():
