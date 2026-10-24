@@ -4,7 +4,7 @@
   <div class="card bg-base-100 shadow">
     <div class="card-body gap-3">
       <h2 class="font-semibold">{{ t('Purchase details', 'ખરીદીની વિગત') }}</h2>
-      <p class="text-xs opacity-70">{{ t('One deal with the farmers who gathered. The same village can have many purchases.', 'એકઠા થયેલા ખેડૂતો સાથે એક સોદો. એક જ ગામની અનેક ખરીદી થઈ શકે.') }}</p>
+      <p class="bi-stack text-xs opacity-70">{{ t('One deal with the farmers who gathered. The same village can have many purchases.', 'એકઠા થયેલા ખેડૂતો સાથે એક સોદો. એક જ ગામની અનેક ખરીદી થઈ શકે.') }}</p>
       {% include "partials/form_fields.html" %}
     </div>
   </div>
@@ -20,7 +20,7 @@
           <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('li').remove()">✕</button></li>
         {% endfor %}
       </ul>
-      <p id="picked-empty" class="text-sm opacity-60 {{ 'hidden' if selected }}">{{ t('No farmer listed yet. Find farmers below and add them.', 'હજી કોઈ ખેડૂત નથી. નીચે શોધીને ઉમેરો.') }}</p>
+      <p id="picked-empty" class="bi-stack text-xs opacity-70 {{ 'hidden' if selected }}">{{ t('No farmer listed yet. Find farmers below and add them.', 'હજી કોઈ ખેડૂત નથી. નીચે શોધીને ઉમેરો.') }}</p>
       {% if 'farmer_ids' in errors %}<span class="text-error text-sm">{{ errors['farmer_ids'][0] }} <span class="gu">{{ errors['farmer_ids'][1] }}</span></span>{% endif %}
 
       <div class="divider my-0"></div>
@@ -30,24 +30,31 @@
         <input type="hidden" name="pg" value="{{ picker_grain }}">
         <input type="hidden" name="pfree_seen" value="1">
         <select name="pv" class="select select-bordered select-sm" hx-get="/PurchaseGroup/FarmerSearch" hx-target="#farmer-results" hx-swap="innerHTML" hx-include="#picker-filters" hx-trigger="change">
-          <option value="">{{ t('All villages', 'બધા ગામ') }}</option>
+          <option value="">All villages&nbsp;&nbsp; બધા ગામ</option>
           {% for v in picker_villages %}<option value="{{ v.id }}" {{ 'selected' if picker_village|string == v.id|string }}>{{ v.village_name }}</option>{% endfor %}
         </select>
-        <input type="search" name="pq" onkeydown="if (event.key === 'Enter') event.preventDefault()" placeholder="Name / mobile  નામ / મોબાઇલ" class="input input-bordered input-sm flex-1 min-w-32" hx-get="/PurchaseGroup/FarmerSearch" hx-target="#farmer-results" hx-swap="innerHTML"
+        <input type="search" name="pq" onkeydown="if (event.key === 'Enter') event.preventDefault()" placeholder="Name - mobile   નામ - મોબાઇલ" class="input input-bordered input-sm flex-1 min-w-32" hx-get="/PurchaseGroup/FarmerSearch" hx-target="#farmer-results" hx-swap="innerHTML"
                hx-include="#picker-filters" hx-trigger="input changed delay:300ms, search">
         <label class="label cursor-pointer gap-1 p-0"><input type="checkbox" name="pfree" value="1" {{ 'checked' if picker_free }} class="checkbox checkbox-sm" hx-get="/PurchaseGroup/FarmerSearch" hx-target="#farmer-results" hx-swap="innerHTML" hx-include="#picker-filters">
-          <span class="text-xs">{{ t('Not in another purchase of this grain', 'આ અનાજની બીજી ખરીદીમાં નથી') }}</span></label>
+          <span class="bi-stack text-xs">{{ t('Not in another purchase of this grain', 'આ અનાજની બીજી ખરીદીમાં નથી') }}</span></label>
       </div>
       <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-300 rounded">
         <table class="table table-sm"><tbody id="farmer-results" hx-target="this" hx-swap="innerHTML" hx-get="/PurchaseGroup/FarmerSearch?pinfo={{ p_id or '' }}&pv={{ picker_village }}&pg={{ picker_grain }}{{ '&pfree=1' if picker_free }}" hx-trigger="load"></tbody></table>
       </div>
-      <p class="text-xs opacity-60">{{ t('Yellow tags: already in another purchase of the selected grain this business year.', 'પીળા ટેગ: પસંદ કરેલા અનાજની આ વર્ષની બીજી ખરીદીમાં પહેલેથી છે.') }}</p>
+      <p class="bi-stack text-xs opacity-60">{{ t('Yellow tags: already in another purchase of the selected grain this business year.', 'પીળા ટેગ: પસંદ કરેલા અનાજની આ વર્ષની બીજી ખરીદીમાં પહેલેથી છે.') }}</p>
     </div>
   </div>
 
-  <div class="lg:col-span-2 flex gap-2">
-    <button class="btn btn-primary"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
-    <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
+  {# ---------------- below: actions (left) and farmers listed (right) #}
+  <div class="card bg-base-100 shadow lg:col-span-2">
+    <div class="card-body p-4 flex-row flex-wrap items-center gap-3">
+      <button class="btn btn-primary"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
+      <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
+      <div class="ml-auto text-sm text-right">
+        <span class="font-semibold">{{ t('Farmers listed', 'યાદીમાં ખેડૂતો') }}: <span id="picked-count">{{ selected | length }}</span></span>
+        <div class="text-xs opacity-60">{{ t('Review the details and farmers, then save.', 'વિગત અને ખેડૂતો તપાસીને સાચવો.') }}</div>
+      </div>
+    </div>
   </div>
 
   {% if confirm_dupes and not (modal and modal.kind == 'dupes') %}<input type="hidden" name="confirm_dupes" value="1">{% endif %}
@@ -89,7 +96,9 @@
     toggleEmpty();
   };
   function toggleEmpty() {
-    document.getElementById('picked-empty').classList.toggle('hidden', document.querySelectorAll('#picked li').length > 0);
+    var n = document.querySelectorAll('#picked li').length;
+    document.getElementById('picked-empty').classList.toggle('hidden', n > 0);
+    document.getElementById('picked-count').textContent = n;
   }
   var grainSelect = document.querySelector('#purchase-form [name="grain_id"]');
   if (grainSelect) grainSelect.addEventListener('change', function () {

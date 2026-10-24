@@ -1,9 +1,11 @@
 <form id="master-form" class="card bg-base-100 shadow" hx-post="{{ action }}" hx-target="#master-form" hx-swap="outerHTML">
   <div class="card-body gap-3">
     {% include "partials/form_fields.html" %}
+    {% if not buttons_outside %}
     <div class="flex gap-2 mt-2">
       <button class="btn btn-primary"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
       <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
     </div>
+    {% endif %}
   </div>
 </form>

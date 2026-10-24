@@ -1,6 +1,7 @@
+<div class="lf-grid">
     {% for f in fields %}
     <label class="form-control">
-      <span class="label-text">{{ f.en }} <span class="gu">{{ f.gu }}</span>{% if f.required %} <span class="text-error">*</span>{% endif %}</span>
+      <span class="label-text"><span>{{ f.en }}{% if f.required %} <span class="text-error">*</span>{% endif %}</span><span class="gu">{{ f.gu }}</span></span>
       {% set v = values.get(f.name, '') %}
       {% if f.kind == 'textarea' %}
         <textarea name="{{ f.name }}" rows="2" class="textarea textarea-bordered {{ 'textarea-error' if f.name in errors }}">{{ v }}</textarea>
@@ -78,9 +79,10 @@
                class="input input-bordered {{ 'join-item flex-1 min-w-0' if f.is_mobile }} {{ 'input-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
         {% if f.is_mobile %}</div>{% endif %}
       {% endif %}
-      {% if f.help %}<span class="text-xs opacity-60 mt-1">{{ f.help[0] }} <span class="gu">{{ f.help[1] }}</span></span>{% endif %}
+      {% if f.help %}<span class="field-help text-xs opacity-60 mt-1">{{ f.help[0] }} <span class="gu">{{ f.help[1] }}</span></span>{% endif %}
       {% if f.name in errors %}
         <span class="text-error text-sm mt-1">{{ errors[f.name][0] }} <span class="gu">{{ errors[f.name][1] }}</span></span>
       {% endif %}
     </label>
     {% endfor %}
+</div>

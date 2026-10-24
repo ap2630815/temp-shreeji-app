@@ -8,54 +8,85 @@
 {%- else -%}{{ value }}{%- endif -%}
 {%- endmacro %}
 {% block title %}Analysis{% endblock %}
+{% block theme %}dusk{% endblock %}
 {% block content %}
-<div class="flex flex-wrap items-center gap-3 mb-3">
-  <h1 class="text-xl font-semibold flex-1">{{ t('Analysis', 'વિશ્લેષણ') }} · {{ ledgers[ledger][0] }} <span class="gu text-base">{{ ledgers[ledger][1] }}</span>
-    <span class="text-sm font-normal opacity-70">· {{ year }}</span></h1>
-  {% if filtered %}<span class="badge badge-info">{{ t('Filtered by the toolbar', 'ટૂલબાર ફિલ્ટર લાગુ') }}</span>{% endif %}
+<style>
+  /* no sideways scrolling: the summary tiles wrap into as many columns as fit ... */
+  .an-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: .75rem; }
+  /* ... tables shrink to the page (compact cells, headers and long names wrap) ... */
+  .an-table { width: 100%; }
+  .an-table :is(th, td) { padding-inline: .5rem; vertical-align: top; }
+  .an-table th { white-space: normal; line-height: 1.15; }
+  .an-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* ... and on a phone each row folds into a small card, every value labelled with its column */
+  @media (max-width: 767px) {
+    .an-table thead { display: none; }
+    .an-table, .an-table tbody, .an-table tfoot, .an-table tr, .an-table td { display: block; width: 100%; }
+    .an-table tr { border: 1px solid oklch(var(--b3)); border-radius: var(--rounded-box, 1rem); padding: .25rem .5rem; margin-bottom: .5rem; }
+    .an-table td { display: flex; justify-content: space-between; gap: 1rem; border: 0; padding: .15rem 0; text-align: right; }
+    .an-table td::before { content: attr(data-label); text-align: left; opacity: .65; font-size: .75rem; }
+    .an-table td:first-child { font-weight: 600; }
+  }
+</style>
+<div class="stackall">
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-xl font-semibold flex-1 flex items-center gap-6 leading-tight">
+    <span class="flex flex-col"><span>Analysis</span><span class="gu text-base font-normal">વિશ્લેષણ</span></span>
+    <span class="flex flex-col"><span>{{ ledgers[ledger][0] }}</span><span class="gu text-base font-normal">{{ ledgers[ledger][1] }}</span></span>
+  </h1>
+  <span class="badge badge-lg h-auto py-1 gap-3">{{ t('Business year', 'વ્યવસાય વર્ષ') }}<b>{{ year }}</b></span>
+  {% if filtered %}<span class="badge badge-lg badge-info h-auto py-1 gap-3">{{ t('Filtered by the toolbar', 'ટૂલબાર ફિલ્ટર લાગુ') }}</span>{% endif %}
 </div>
-<div class="tabs tabs-boxed bg-base-100 mb-4 w-fit flex-wrap">
+<div class="tabs tabs-boxed bg-base-100 mb-3 w-fit flex-wrap">
   {% for key, label in ledgers.items() %}
-  <a href="/Analysis?ledger={{ key }}{{ '&' ~ keep if keep }}" class="tab {{ 'tab-active' if key == ledger }}">{{ label[0] }} <span class="gu ml-1">{{ label[1] }}</span></a>
+  <a href="/Analysis?ledger={{ key }}{{ '&' ~ keep if keep }}" class="tab h-auto py-1 {{ 'tab-active' if key == ledger }}"><span class="flex flex-col leading-tight text-center"><span>{{ label[0] }}</span><span class="gu text-xs">{{ label[1] }}</span></span></a>
   {% endfor %}
 </div>
 {% for n in report.notes %}<p class="text-xs opacity-70 mb-2">{{ n[0] }} <span class="gu">{{ n[1] }}</span></p>{% endfor %}
 
-<div class="stats stats-vertical lg:stats-horizontal shadow bg-base-100 w-full mb-4 overflow-x-auto">
+<div class="an-tiles mb-4">
   {% for s in report.stats %}
-  <div class="stat py-2 px-4"><div class="stat-title text-xs">{{ s.en }} <span class="gu">{{ s.gu }}</span></div>
-    <div class="stat-value text-xl">{{ fmt(s.value, s.kind) }}{% if s.kind == 'kg' %} <span class="text-sm">kg</span>{% endif %}</div>
-    {% if s.sub %}<div class="stat-desc">{{ s.sub }}</div>{% endif %}</div>
+  <div class="stats shadow bg-base-100"><div class="stat py-2 px-4"><div class="stat-title">{{ t(s.en, s.gu) }}</div>
+    <div class="stat-value text-2xl whitespace-normal break-words">{{ fmt(s.value, s.kind) }}{% if s.kind == 'kg' %} <span class="text-sm">kg</span>{% endif %}</div>
+    {% if s.sub %}<div class="stat-desc w-full mt-1 border-t border-base-300 pt-1 whitespace-normal">{{ s.sub }}</div>{% endif %}</div></div>
   {% endfor %}
 </div>
 
+{% macro table_card(tb, wide=false) %}
+<div class="card bg-base-100 shadow {{ 'xl:col-span-2' if wide }}"><div class="card-body p-4">
+  <h2 class="font-semibold">{{ tb.title[0] }} <span class="gu">{{ tb.title[1] }}</span></h2>
+  <table class="table table-sm even-tint an-table">
+    <thead><tr>{% for en, gu, kind in tb.headers %}<th class="{{ 'text-right' if kind != 'text' }}">{{ en }}<br><span class="gu text-xs font-normal">{{ gu }}</span></th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in tb.rows %}<tr>{% for cell in row %}{% set kind = tb.headers[loop.index0][2] %}<td data-label="{{ tb.headers[loop.index0][0] }}" class="{{ 'num' if kind != 'text' }}">{{ fmt(cell, kind) }}</td>{% endfor %}</tr>
+    {% else %}<tr><td colspan="{{ tb.headers | length }}" class="text-center opacity-60 !block md:!table-cell">{{ t('No data', 'ડેટા નથી') }}</td></tr>{% endfor %}
+    </tbody>
+    {% if tb.total %}<tfoot><tr class="font-semibold">{% for cell in tb.total %}{% set kind = tb.headers[loop.index0][2] %}<td data-label="{{ tb.headers[loop.index0][0] }}" class="{{ 'num' if kind != 'text' }}">{% if cell == 'Total' %}{{ t('Total', 'કુલ') }}{% elif cell != '' %}{{ fmt(cell, kind) }}{% endif %}</td>{% endfor %}</tr></tfoot>{% endif %}
+  </table>
+</div></div>
+{% endmacro %}
+
+{# every ledger: the bar charts side by side with a block holding the money-moved tables (Payments and Payments by status: one above the other in the narrow third column on a wide screen, side by side when the block runs full width on a medium one, stacked again on a phone); every other table follows full width, one under another #}
+{% set stacked = ('Payments', 'Payments by status', 'Receipts') %}
+<div class="grid lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
 {% for b in report.bars %}
 {% set top = (b.items | map(attribute=1) | max) if b.items else 0 %}
-<div class="card bg-base-100 shadow mb-4"><div class="card-body p-4">
+<div class="card bg-base-100 shadow h-full"><div class="card-body p-4">
   <h2 class="font-semibold">{{ b.title[0] }} <span class="gu">{{ b.title[1] }}</span></h2>
   {% for label, value in b.items %}
   <div class="flex items-center gap-2 text-sm">
-    <span class="w-32 shrink-0">{{ label }}</span>
+    <span class="w-28 shrink-0 break-words">{{ label }}</span>
     <div class="flex-1 bg-base-200 rounded h-4"><div class="bg-primary h-4 rounded" style="width: {{ ((value * 100 / top) if top else 0) | round(1) }}%"></div></div>
-    <span class="w-28 text-right">{{ fmt(value, b.kind) }}</span>
+    <span class="w-24 shrink-0 text-right">{{ fmt(value, b.kind) }}</span>
   </div>
   {% else %}<p class="text-sm opacity-60">{{ t('No data', 'ડેટા નથી') }}</p>{% endfor %}
 </div></div>
 {% endfor %}
+<div class="flex flex-col lg:flex-row xl:flex-col gap-4 lg:col-span-2 xl:col-span-1 [&>.card]:flex-1 [&>.card]:min-w-0">{% for tb in report.tables if tb.title[0] in stacked %}{{ table_card(tb) }}{% endfor %}</div>
+</div>
+
 
 <div class="grid xl:grid-cols-2 gap-4">
-{% for tb in report.tables %}
-<div class="card bg-base-100 shadow {{ 'xl:col-span-2' if tb.headers | length > 6 }}"><div class="card-body p-4">
-  <h2 class="font-semibold">{{ tb.title[0] }} <span class="gu">{{ tb.title[1] }}</span></h2>
-  <div class="overflow-x-auto"><table class="table table-zebra table-sm">
-    <thead><tr>{% for en, gu, kind in tb.headers %}<th class="whitespace-nowrap {{ 'text-right' if kind != 'text' }}">{{ en }}<br><span class="gu text-xs font-normal">{{ gu }}</span></th>{% endfor %}</tr></thead>
-    <tbody>
-    {% for row in tb.rows %}<tr>{% for cell in row %}{% set kind = tb.headers[loop.index0][2] %}<td class="{{ 'text-right whitespace-nowrap' if kind != 'text' }}">{{ fmt(cell, kind) }}</td>{% endfor %}</tr>
-    {% else %}<tr><td colspan="{{ tb.headers | length }}" class="text-center opacity-60">{{ t('No data', 'ડેટા નથી') }}</td></tr>{% endfor %}
-    </tbody>
-    {% if tb.total %}<tfoot><tr class="font-semibold">{% for cell in tb.total %}{% set kind = tb.headers[loop.index0][2] %}<td class="{{ 'text-right whitespace-nowrap' if kind != 'text' }}">{% if cell == 'Total' %}{{ t('Total', 'કુલ') }}{% elif cell != '' %}{{ fmt(cell, kind) }}{% endif %}</td>{% endfor %}</tr></tfoot>{% endif %}
-  </table></div>
-</div></div>
-{% endfor %}
+{% for tb in report.tables if tb.title[0] not in stacked %}{{ table_card(tb, true) }}{% endfor %}
 </div>
 {% endblock %}

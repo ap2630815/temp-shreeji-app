@@ -39,7 +39,7 @@
         <td><a class="link" href="/Statements/bag_supplier/{{ b.supplier_id }}">{{ b.supplier.pet_name }}</a></td>
         <td>{{ b.farmer.village.village_name }} — {{ b.farmer.farmer_name }}</td>
         <td>{{ b.no_of_bags }}</td><td>{{ b.rate_per_bag | inr }}</td><td>{{ b.payable_amount | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (b.payable_amount - p) | inr }}</td>
-        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/BagSupplies/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/BagSupplies/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}<tr><td colspan="9" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>

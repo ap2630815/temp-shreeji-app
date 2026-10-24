@@ -21,11 +21,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, toolbar_window, today
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import format_mobile, render, render_with_csrf
-from app.models import PurchaseIndividual, Farmer, Grain, LabourGroup, PurchaseFarmerEntry, PurchaseGroup, User, Village
+from app.models import PurchaseIndividual, Farmer, Grain, LabourGroup, PurchaseFarmerEntry, User, Village
 from app.services import audit
 from app.services.ledger import all_entry_views, direct_entry_views, paid_for_direct, totals
 from app.services.money import payable_amount, total_available_bags
@@ -49,18 +49,12 @@ async def _ledger_page(request, csrf, db, user, *, year, grain_id, village_id, d
     year = year if year in years else current_year_label()
     source = direct_entry_views(db) if direct else all_entry_views(db)
     views = [v for v in await source if v.entry.business_year == year and (not grain_id or v.entry.grain.id == grain_id) and (not village_id or v.entry.farmer.village_id == village_id)]  # the village of the farmer; a purchase's own village is reached through its # link
+    if window := toolbar_window(request):
+        views = [v for v in views if window[0] <= v.entry.entry_date <= window[1]]
     views.sort(key=lambda v: (v.entry.entry_date, v.entry.id), reverse=True)
-    group_stmt = select(PurchaseGroup).where(PurchaseGroup.business_year == year)  # the Group Ledger dropdown follows the toolbar too
-    if grain_id:
-        group_stmt = group_stmt.where(PurchaseGroup.grain_id == grain_id)
-    if village_id:
-        group_stmt = group_stmt.where(PurchaseGroup.village_id == village_id)
-    infos = [] if direct else list((await db.scalars(
-        group_stmt.order_by(PurchaseGroup.purchase_group_date.desc(), PurchaseGroup.id.desc()).limit(100)
-    )).unique().all())
     now = today()
     return render_with_csrf(request, csrf, "farmers_entries.html", user=user, views=views, totals=totals(views, now), today=now, year=year, years=years,
-                            year_locked=year != current_year_label(), infos=infos, direct=direct)
+                            year_locked=year != current_year_label(), direct=direct)
 
 
 @router.get("/PurchaseFarmersEntries", response_class=HTMLResponse)
@@ -119,7 +113,7 @@ async def direct_fields(db: AsyncSession) -> tuple[list[F], list[F], dict[int, i
         F("no_of_filled_bags", "Filled bags", "ભરેલી બેગ", kind="int", required=True),
         F("extra_kilos", "Extra kilos (loose, beyond full bags)", "વધારાના કિલો (પૂરી બેગ ઉપરાંત)", kind="int"),
         F("no_of_handful_bags", "Handful bags", "હેન્ડફુલ બેગ", kind="int", help=("Counted in the stock, not in the payment", "સ્ટોકમાં ગણાય છે, ચુકવણીમાં નહીં")),
-        F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg) — reference only", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો) — ફક્ત સંદર્ભ", kind="int"),
+        F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)", kind="int"),
         F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ"),
         F("grain_store_at", "Grain stored at", "અનાજ ક્યાં સંગ્રહ્યું"),
         F("borrowed_amount", "Borrowing / advance to deduct (₹)", "ઉધાર / એડવાન્સ કાપવાના (₹)", kind="int"),

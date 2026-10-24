@@ -1,8 +1,54 @@
 {% extends "master_form_page.html" %}
-{% from "partials/bilabel.html" import t %}
+{% from "partials/bilabel.html" import t, th %}
 {% block pre_form %}
-<div class="alert bg-base-100 shadow-sm mb-3 text-sm flex-wrap">
-  <span>{{ t('Outstanding', 'બાકી') }}: <b>{{ summary.due | inr }}</b>{% if summary.overdue %} · <span class="text-error">{{ t('Overdue', 'મુદત વીતી') }} {{ summary.overdue | inr }}</span>{% endif %}</span>
-  {% if party_type == 'farmer' and party.head_of_family and party.head_of_family | lower != 'self' %}<span class="badge badge-warning">{{ t('Verify with head of family', 'કુટુંબના વડા સાથે ચકાસો') }}: {{ party.head_of_family }}</span>{% endif %}
+<style>
+  .paycard .bi > .gu { margin-left: .6em; }  /* two spaces between side-by-side English and Gujarati */
+  .paycard .notice .bi > .gu { margin-left: 0; }
+  .paycard .notice-value { border-left: 0; padding-left: 0; }
+</style>
+<div class="paycard card bg-base-100 shadow-sm mb-3 max-w-2xl">
+  <div class="card-body p-4 gap-3">
+    <div class="flex flex-wrap items-start gap-x-4 gap-y-2">
+      <div class="flex-1 min-w-0">
+        <div class="text-xs uppercase opacity-60">{{ t(party_label[0], party_label[1]) }}</div>
+        <div class="text-lg font-semibold leading-tight">{{ party_name }}</div>
+        {% if party_name_gu %}<div class="gu text-base leading-tight">{{ party_name_gu }}</div>{% endif %}
+        {% if party_mobile %}<div class="text-sm">{{ party_mobile | mobhtml }}</div>{% endif %}
+      </div>
+      {% if party_type == 'farmer' and party.head_of_family and party.head_of_family | lower != 'self' %}
+      <div class="notice notice-warning flex-col items-start text-left gap-0 ml-auto">
+        <div class="notice-title">{{ t('Verify with head of family', 'કુટુંબના વડા સાથે ચકાસો') }}</div>
+        <div class="notice-value font-semibold">{{ party.head_of_family }}</div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+      <div class="rounded-box bg-base-200 px-3 py-2">{{ t('Total', 'કુલ') }}<b class="block text-base">{{ summary.amount | inr }}</b></div>
+      <div class="rounded-box bg-base-200 px-3 py-2">{{ t('Paid', 'ચૂકવ્યું') }}<b class="block text-base">{{ summary.paid | inr }}</b></div>
+      <div class="rounded-box bg-base-200 px-3 py-2">{{ t('Outstanding', 'બાકી') }}<b class="block text-base">{{ summary.due | inr }}</b></div>
+      {% if party_type == 'farmer' %}<div class="rounded-box px-3 py-2 {{ 'bg-error/10 text-error' if summary.overdue else 'bg-base-200' }}">{{ t('Overdue', 'મુદત વીતી') }}<b class="block text-base">{{ summary.overdue | inr }}</b></div>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block post_form %}
+<div class="max-w-2xl mt-3">
+  <h2 class="font-semibold mb-1">{{ t('Open items, settled oldest first', 'બાકી વિગતો, જૂની પહેલા ચૂકવાશે') }}</h2>
+  <div class="overflow-x-auto bg-base-100 rounded-box shadow">
+    <table class="table table-sm even-tint">
+      <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Details', 'વિગત') }}{% if party_type == 'farmer' %}{{ th('Due on', 'ચૂકવણી તા.') }}{% endif %}{{ th('Amount', 'રકમ') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Balance', 'બાકી') }}</tr></thead>
+      <tbody>
+      {% for p in items %}
+        <tr>
+          <td class="whitespace-nowrap">{{ p.doc_date }}</td><td>{{ p.label }}</td>
+          {% if party_type == 'farmer' %}<td class="whitespace-nowrap {{ 'text-error' if p.is_overdue(today) }}">{{ p.due_date }}</td>{% endif %}
+          <td class="text-right">{{ p.amount | inr }}</td><td class="text-right">{{ p.paid | inr }}</td><td class="text-right font-semibold">{{ p.due | inr }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="text-center opacity-60">{{ t('Nothing due', 'કંઈ બાકી નથી') }} ✔</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, toolbar_window, today
 from app.api.masters_config import F, run_validation
 from app.api.payments import METHOD_OPTIONS, PDF_HEADERS
 from app.core.db import get_db
@@ -67,10 +67,13 @@ async def account_data(db: AsyncSession, industry_id: int) -> dict:
 @router.get("/Receivables", response_class=HTMLResponse)
 async def overview(request: Request, grain_id: int = 0, village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     per: dict[int, list] = {}
+    window = toolbar_window(request)
     conds = trip_conditions(grain_id, village_id)  # the toolbar: booking grain / village the bags were bought in
     allowed = set((await db.scalars(select(TruckTrip.id).where(*conds))).all()) if conds else None
     for v in await svc.bilty_views(db):
         if allowed is not None and v.bilty.truck_trip_id not in allowed:
+            continue
+        if window and not window[0] <= v.bilty.bilty_date <= window[1]:
             continue
         per.setdefault(v.bilty.trip.industry.id, []).append(v)
     industries = {i.id: i for i in (await db.scalars(select(Industry).where(Industry.id.in_(per)))).all()} if per else {}

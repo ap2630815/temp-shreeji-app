@@ -25,7 +25,7 @@
         <td>{{ w.payable_amount | inr }}</td><td>{{ w.borrowing_amount | inr if w.borrowing_amount else '' }}</td>
         <td class="font-medium">{{ w.net_payable | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (w.net_payable - p) | inr }}</td>
         <td>{{ w.petrol | inr if w.petrol else '' }}</td><td>{{ w.meal | inr if w.meal else '' }}</td>
-        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/LabourWork/{{ w.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/LabourWork/{{ w.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}<tr><td colspan="10" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>

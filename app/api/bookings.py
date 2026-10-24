@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, toolbar_window, today
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
@@ -98,6 +98,8 @@ async def list_page(
         stmt = stmt.join(Brokerage, Brokerage.id == BrokerBooking.brokerage_id).where(Brokerage.grain_id == grain_id)
     if village_id:  # bookings that have a trip carrying bags bought in that village
         stmt = stmt.where(BrokerBooking.id.in_(select(TruckTrip.broker_booking_id).where(*trip_conditions(0, village_id))))
+    if window := toolbar_window(request):
+        stmt = stmt.where(BrokerBooking.booking_date.between(*window))
     bookings = list((await db.scalars(stmt.order_by(BrokerBooking.booking_date.desc(), BrokerBooking.id.desc()))).unique().all())
     counts = {}
     if bookings:

@@ -7,7 +7,8 @@ from itsdangerous import BadData, URLSafeTimedSerializer
 from markupsafe import Markup, escape
 
 from app.core.config import settings
-from app.core.labels import LABELS
+from app.core.labels import LABELS, method_label
+from app.core.periods import PERIODS
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -15,6 +16,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 from app.api.masters_config import SPECS
 
 templates.env.globals["L"] = LABELS
+templates.env.globals["PERIODS"] = PERIODS
 
 
 def cell(row, path: str):
@@ -145,3 +147,6 @@ def render_with_csrf(request: Request, csrf, name: str, **context):
         csrf.set_csrf_cookie(signed, response)
         return response
     return render(request, name, csrf_token=token, **context)
+
+
+templates.env.filters["method"] = method_label

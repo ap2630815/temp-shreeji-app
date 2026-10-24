@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, toolbar_window, today
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
@@ -219,6 +219,8 @@ async def list_page(
     year = year if year in years else current_year_label()
     stmt = select(TruckTrip).where(TruckTrip.business_year == year)
     stmt = stmt.where(*trip_conditions(grain_id, village_id))  # booking grain / village the bags were bought in
+    if window := toolbar_window(request):
+        stmt = stmt.where(TruckTrip.trip_date.between(*window))
     trips = list((await db.scalars(stmt.order_by(TruckTrip.trip_date.desc(), TruckTrip.id.desc()))).unique().all())
     return render_with_csrf(request, csrf, "trip_list.html", user=user, trips=trips, grain_id=grain_id, year=year, years=years,
                             year_locked=year != current_year_label(), warn_pct=SHORT_WARN_PCT)

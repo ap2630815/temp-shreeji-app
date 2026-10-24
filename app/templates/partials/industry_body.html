@@ -1,16 +1,29 @@
 {% from "partials/bilabel.html" import t, dth %}
+<style>
+  .stmt .bi > .gu { margin-left: .6em; }  /* two spaces between side-by-side English and Gujarati */
+  .stmt :is(b, .bi, .gu) + .gu { margin-left: .6em; }
+  .stmt .head :is(h1, div) > .gu { margin-left: .6em; }
+  .stmt div.meta { column-gap: 100px; }  /* space between the two columns of header fields */
+  .stmt .meta .f { display: flex; justify-content: space-between; align-items: flex-start; gap: .6em; }
+  .stmt .meta .f > span:first-child { line-height: 1.2; }
+  .stmt .meta .f .v { text-align: right; line-height: 1.2; }
+  .stmt .meta .v .gu { display: block; margin-left: 0; }
+  .stmt td.nw { white-space: nowrap; }
+  .stmt tfoot td { background: #f3f3f3; font-weight: 700; }
+</style>
+<div class="stmt">
 <div class="head">
   <div>
     <h1>{{ t('Industry Account', 'ઉદ્યોગ ખાતું') }}</h1>
     <div>{{ L['app_name'][0] }} <span class="gu">{{ L['app_name'][1] }}</span></div>
   </div>
-  <div style="text-align:right">{{ t('Date', 'તારીખ') }}: {{ today }}</div>
+  <div style="text-align:right">{{ t('Date', 'તારીખ') }}:&nbsp;&nbsp;{{ today }}</div>
 </div>
 <div class="meta">
-  <div>{{ t('Industry', 'ઉદ્યોગ') }}: <b>{{ industry.industrialist_name }}</b>{% if industry.industrialist_name_gu %} <span class="gu">({{ industry.industrialist_name_gu }})</span>{% endif %}</div>
-  <div>{{ t('Location', 'સ્થળ') }}: {{ industry.location }}</div>
-  <div>{{ t('Owner', 'માલિક') }}: {{ industry.owner_name }} ({{ industry.owner_mobile | mobhtml }})</div>
-  <div>{{ t('Supervisor', 'સુપરવાઇઝર') }}: {{ industry.supervisor_name }} ({{ industry.supervisor_mobile | mobhtml }})</div>
+  <div class="f"><span>Industry<br><span class="gu">ઉદ્યોગ</span></span><span class="v"><b>{{ industry.industrialist_name }}</b>{% if industry.industrialist_name_gu %}<span class="gu">{{ industry.industrialist_name_gu }}</span>{% endif %}</span></div>
+  <div class="f"><span>Location<br><span class="gu">સ્થળ</span></span><span class="v">{{ industry.location }}</span></div>
+  <div class="f"><span>Owner<br><span class="gu">માલિક</span></span><span class="v">{{ industry.owner_name }}<span class="gu">{{ industry.owner_mobile | mobhtml }}</span></span></div>
+  <div class="f"><span>Supervisor<br><span class="gu">સુપરવાઇઝર</span></span><span class="v">{{ industry.supervisor_name }}<span class="gu">{{ industry.supervisor_mobile | mobhtml }}</span></span></div>
 </div>
 <div class="sum">
   <div>{{ t('Billed', 'બિલ') }}<b>{{ summary.billed | inr }}</b></div>
@@ -27,7 +40,7 @@
   <tbody>
   {% for v in views %}{% set b = v.bilty %}
     <tr>
-      <td>{{ b.bilty_date }}</td><td>{{ b.bill_number }}</td><td>{{ b.trip.truck.truck_number }}</td><td>{{ b.trip.grain.grain_name }}</td>
+      <td class="nw">{{ b.bilty_date }}</td><td>{{ b.bill_number }}</td><td>{{ b.trip.truck.truck_number }}</td><td>{{ b.trip.grain.grain_name }}</td>
       <td class="n">{{ '{:,}'.format(b.merchant_net_weight) }}</td>
       <td class="n">{{ '{:,}'.format(b.industry_net_weight) if b.industry_net_weight is not none else '—' }}</td>
       <td class="n">{{ b.percentage_difference if b.percentage_difference is not none else '' }}</td>
@@ -40,15 +53,17 @@
     <tr><td colspan="11">{{ t('No trucks yet', 'હજી કોઈ ટ્રક નથી') }}</td></tr>
   {% endfor %}
   </tbody>
+  {% if views %}<tfoot><tr><td colspan="8">{{ t('Total', 'કુલ') }}</td><td class="n">{{ summary.billed | inr }}</td><td class="n">{{ summary.received | inr }}</td><td class="n">{{ summary.due | inr }}</td></tr></tfoot>{% endif %}
 </table>
 <h2>{{ t('Receipts', 'પ્રાપ્તિઓ') }}</h2>
 <table>
-  <thead><tr>{{ dth('No.', 'નં.') }}{{ dth('Date', 'તારીખ') }}{{ dth('Amount', 'રકમ', 'n') }}{{ dth('Method', 'રીત') }}{{ dth('Paid by', 'આપનાર') }}{{ dth('Reference', 'રેફરન્સ') }}</tr></thead>
+  <thead><tr>{{ dth('No.', 'નં.') }}{{ dth('Date', 'તારીખ') }}{{ dth('Amount', 'રકમ') }}{{ dth('Method', 'રીત') }}{{ dth('Paid by', 'આપનાર') }}{{ dth('Reference', 'રેફરન્સ') }}</tr></thead>
   <tbody>
   {% for r in receipts %}
-    <tr><td>#{{ r.id }}</td><td>{{ r.receipt_date }}</td><td class="n">{{ r.amount | inr }}</td><td>{{ r.method | upper }}</td><td>{{ r.payer_name or '' }}</td><td>{{ r.reference_no or '' }}</td></tr>
+    <tr><td>#{{ r.id }}</td><td class="nw">{{ r.receipt_date }}</td><td>{{ r.amount | inr }}</td><td>{{ r.method | method }}</td><td>{{ r.payer_name or '' }}</td><td>{{ r.reference_no or '' }}</td></tr>
   {% else %}
     <tr><td colspan="6">{{ t('Nothing received yet', 'હજી કંઈ મળ્યું નથી') }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>

@@ -31,7 +31,7 @@
         <td>{{ b.truck_size }} T</td>
         <td>{{ ('%.1f %%' % b.percentage_deduction) if b.percentage_deduction is not none else '' }}</td>
         <td>{{ counts.get(b.id, 0) }}</td>
-        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/Bookings/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/Bookings/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}
       <tr><td colspan="9" class="text-center opacity-60">{{ t('No bookings in this year', 'આ વર્ષમાં કોઈ બુકિંગ નથી') }}</td></tr>

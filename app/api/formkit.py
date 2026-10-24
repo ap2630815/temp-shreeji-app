@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import Request
 
 from app.api.masters_config import F, national_mobile
+from app.core.periods import date_window as _date_window
 from app.services.years import current_year_label
 
 
@@ -61,6 +62,11 @@ def toolbar_ids(request: Request) -> tuple[int, int]:
         v = request.query_params.get(key, "").strip()
         return int(v) if v.isdigit() else 0
     return one("village_id"), one("grain_id")
+
+
+def toolbar_window(request: Request) -> tuple[date, date] | None:
+    """(first, last) day chosen by the toolbar's date filter, None when it is off."""
+    return _date_window(request.query_params, today())
 
 
 def apply_toolbar(request: Request, values: dict) -> dict:

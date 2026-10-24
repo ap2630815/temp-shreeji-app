@@ -13,12 +13,6 @@
   {# 1. direct entries, 2. the purchase_group deals, 3. one deal's farmers and ledger #}
   <a href="/PurchaseIndividual" class="btn btn-sm">{{ t('Purchase Individual', 'ખરીદી વ્યક્તિગત') }}</a>
   <a href="/PurchaseGroup" class="btn btn-sm">{{ t('Purchase Group', 'ખરીદી જૂથ') }}</a>
-  <div class="dropdown">
-    <div tabindex="0" role="button" class="btn btn-sm {{ 'btn-disabled' if not infos }}">▾ {{ t('Group Ledger', 'જૂથ ખાતું') }}</div>
-    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-80 p-2 shadow max-h-80 overflow-y-auto flex-nowrap">
-      {% for p in infos %}<li><a href="/PurchaseGroup/{{ p.id }}">#{{ p.id }} · {{ p.village.village_name }} · {{ p.grain.grain_name }} · {{ p.purchase_group_date }}</a></li>{% endfor %}
-    </ul>
-  </div>
   <span class="flex-1"></span>
   {% endif %}
   {% if direct %}<a href="/PurchaseIndividual/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
@@ -65,7 +59,7 @@
         <td class="font-semibold">{{ v.due | inr }}</td>
         <td class="whitespace-nowrap {{ 'text-error' if v.is_overdue(today) }}">{{ e.due_date }}</td>
         <td>{{ badge(v.status, v.is_overdue(today)) }}</td>
-        <td class="text-right whitespace-nowrap"><a class="btn btn-ghost btn-xs" href="{{ '/PurchaseIndividual/%s/Edit' % e.id if e.is_direct else '/PurchaseGroup/Entries/%s/Edit' % e.id }}">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right whitespace-nowrap"><a class="btn btn-primary btn-sm" href="{{ '/PurchaseIndividual/%s/Edit' % e.id if e.is_direct else '/PurchaseGroup/Entries/%s/Edit' % e.id }}">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}
       <tr><td colspan="16" class="text-center opacity-60">{{ t('No entries in this year', 'આ વર્ષમાં કોઈ નોંધ નથી') }}</td></tr>

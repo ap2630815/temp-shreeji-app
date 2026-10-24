@@ -37,7 +37,7 @@
         <td>{{ tt.net_payable | inr }}</td>
         <td>{{ tt.paid | inr }}</td>
         <td class="{{ 'text-error font-semibold' if tt.overdue }}">{{ tt.due | inr }}</td>
-        <td class="text-right"><a class="btn btn-ghost btn-xs" href="/PurchaseGroup/{{ p.id }}">{{ t('Open', 'ખોલો') }}</a></td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/PurchaseGroup/{{ p.id }}">{{ t('Open', 'ખોલો') }}</a></td>
       </tr>
     {% else %}
       <tr><td colspan="12" class="text-center opacity-60">{{ t('No purchases in this year', 'આ વર્ષમાં કોઈ ખરીદી નથી') }}</td></tr>

@@ -4,26 +4,38 @@
     {# ---------------- the purchase columns #}
     <div class="card bg-base-100 shadow">
       <div class="card-body gap-3">
-        <h2 class="font-semibold">{{ t('Purchase', 'ખરીદી') }}</h2>
+        <h2 class="bi-stack font-semibold">{{ t('Purchase', 'ખરીદી') }}</h2>
         {% with fields=purchase_fields %}{% include "partials/form_fields.html" %}{% endwith %}
       </div>
     </div>
     {# ---------------- the farmer entry columns, ending with the single description #}
     <div class="card bg-base-100 shadow">
       <div class="card-body gap-3">
-        <h2 class="font-semibold">{{ t('Farmer entry', 'ખેડૂત નોંધ') }}</h2>
+        <h2 class="bi-stack font-semibold">{{ t('Farmer entry', 'ખેડૂત નોંધ') }}</h2>
         {% with fields=entry_fields %}{% include "partials/form_fields.html" %}{% endwith %}
+      </div>
+    </div>
+    {# ---------------- second row: the buttons (left) and the amounts (right), side by side and level #}
+    <div class="card bg-base-100 shadow self-stretch">
+      <div class="card-body flex-row flex-wrap items-center gap-3">
+        <button class="btn btn-primary"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
+        {% if not editing %}<button class="btn btn-outline" type="submit" name="again" value="1">{{ t('Save & add another', 'સાચવો અને બીજી ઉમેરો') }}</button>{% endif %}
+        <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
+      </div>
+    </div>
+    {# the amounts: label on the left (English above Gujarati), "₹ number" on the right #}
+    <div class="card bg-base-100 shadow self-stretch">
+      <div class="card-body gap-3">
+        <div class="grid grid-cols-[auto_auto] justify-between gap-x-8 gap-y-3 items-center tabular-nums">
+          <div class="leading-tight">Payable amount<span class="gu block">ચૂકવવાપાત્ર રકમ</span></div>
+          <b id="pv-amount" class="text-right text-lg">—</b>
+          <div class="leading-tight">After borrowing<span class="gu block">ઉધાર બાદ</span></div>
+          <b id="pv-net" class="text-right text-lg">—</b>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="flex flex-wrap items-center gap-3">
-    <button class="btn btn-primary"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
-    {% if not editing %}<button class="btn btn-outline" type="submit" name="again" value="1">{{ t('Save & add another', 'સાચવો અને બીજી ઉમેરો') }}</button>{% endif %}
-    <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
-    <span class="flex-1"></span>
-    <span class="text-sm">{{ t('Payable amount', 'ચૂકવવાપાત્ર રકમ') }}: <b id="pv-amount">—</b> <span class="opacity-60">· {{ t('after borrowing', 'ઉધાર બાદ') }}: <b id="pv-net">—</b></span></span>
-  </div>
 </form>
 <script>
   (function () {

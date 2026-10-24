@@ -10,7 +10,7 @@
   <div>{{ t('Received from', 'મળ્યા') }}: <b>{{ industry.industrialist_name }}</b></div>
   <div>{{ t('Location', 'સ્થળ') }}: {{ industry.location }}</div>
   <div>{{ t('Paid by', 'આપનાર') }}: {{ receipt.payer_name or '—' }}</div>
-  <div>{{ t('Method', 'રીત') }}: <b>{{ receipt.method | upper }}</b> · {{ t('Reference', 'રેફરન્સ') }}: {{ receipt.reference_no or '—' }}</div>
+  <div>{{ t('Method', 'રીત') }}: <b>{{ receipt.method | method }}</b> · {{ t('Reference', 'રેફરન્સ') }}: {{ receipt.reference_no or '—' }}</div>
 </div>
 <div class="sum"><div>{{ t('Amount received', 'મળેલી રકમ') }}<b class="big">{{ receipt.amount | inr }}</b></div></div>
 {% if receipt.description %}<div>{{ t('Note', 'નોંધ') }}: {{ receipt.description }}</div>{% endif %}

@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, toolbar_window, today
 from app.api.masters_config import MOBILE, F, run_validation
 from app.core.db import get_db
 from app.core.pdf import render_pdf
@@ -25,7 +25,7 @@ from app.services.years import YearLockedError
 
 router = APIRouter()
 
-METHOD_OPTIONS = (("cash", "Cash રોકડ"), ("cheque", "Cheque ચેક"), ("upi", "UPI"), ("bank", "Bank transfer બેંક ટ્રાન્સફર"))
+METHOD_OPTIONS = (("cash", "Cash રોકડ"), ("cheque", "Cheque ચેક"), ("upi", "UPI"), ("bank", "RTGS / NEFT"))
 PDF_HEADERS = {"Content-Disposition": "inline"}
 
 
@@ -99,7 +99,7 @@ async def statement_data(db: AsyncSession, party_type: str, party_id: int) -> di
     rows = await pay_svc.load_payables(db, party_type, party_id)
     now = today()
     return dict(party=party, party_type=party_type, party_label=party_label(party_type), party_name=PARTIES[party_type].name(party),
-                party_name_gu=PARTIES[party_type].name_gu(party), party_mobile=PARTIES[party_type].mobile(party), rows=rows, payments=await pay_svc.payments_of(db, party_type, party_id), totals=pay_svc.summarize(rows, now), today=now)
+                party_name_gu=PARTIES[party_type].name_gu(party), party_mobile=PARTIES[party_type].mobile(party), rows=rows, columns=pay_svc.COLUMNS[party_type], payments=await pay_svc.payments_of(db, party_type, party_id), totals=pay_svc.summarize(rows, now), today=now)
 
 
 @router.get("/Statements/{party_type}/{party_id}", response_class=HTMLResponse)
@@ -121,13 +121,15 @@ async def statement_pdf(party_type: str, party_id: int, user: User = Depends(cur
 
 # ------------------------------------------------------------------ pay
 
-def _pay_ctx(party_type: str, party, fields, values, errors, summary):
+def _pay_ctx(party_type: str, party, fields, values, errors, summary, items):
     name = PARTIES[party_type].name(party)
     label = party_label(party_type)
     return form_context(
         fields=fields, values=values, errors=errors, action=f"/Pay/{party_type}/{party.id}",
         heading=(f"Pay {label[0].lower()}: {name}", f"ચુકવણી ({label[1]}): {name}"),
-        back_url=f"/Statements/{party_type}/{party.id}", party=party, party_type=party_type, summary=summary,
+        back_url=f"/Statements/{party_type}/{party.id}", party=party, party_type=party_type, summary=summary, items=items,
+        party_name=PARTIES[party_type].name(party), party_name_gu=PARTIES[party_type].name_gu(party), party_mobile=PARTIES[party_type].mobile(party),
+        party_label=label, today=today(),
     )
 
 
@@ -137,11 +139,13 @@ async def pay_page(
 ):
     party = await _party(db, party_type, party_id)
     now = today()
-    summary = pay_svc.summarize(await pay_svc.load_payables(db, party_type, party_id), now)
+    rows = await pay_svc.load_payables(db, party_type, party_id)
+    summary = pay_svc.summarize(rows, now)
+    items = [r for r in rows if r.due > 0]  # oldest first: the order a payment settles them
     name, mobile = PARTIES[party_type].receiver(party)
     values = dict(payment_date=now.isoformat(), method="cash", receiver_name=name, receiver_mobile=mobile,
                   amount=str(summary["due"]) if summary["due"] else "")
-    return render_with_csrf(request, csrf, "pay_form_page.html", user=user, **_pay_ctx(party_type, party, payment_fields(), values, {}, summary))
+    return render_with_csrf(request, csrf, "pay_form_page.html", user=user, **_pay_ctx(party_type, party, payment_fields(), values, {}, summary, items))
 
 
 @router.post("/Pay/{party_type}/{party_id}", response_class=HTMLResponse)
@@ -152,10 +156,12 @@ async def pay(
     party = await _party(db, party_type, party_id)
     fields = payment_fields()
     raw = await read_form(request)
-    summary = pay_svc.summarize(await pay_svc.load_payables(db, party_type, party_id), today())
+    rows = await pay_svc.load_payables(db, party_type, party_id)
+    summary = pay_svc.summarize(rows, today())
+    items = [r for r in rows if r.due > 0]
 
     def rerender(errs):
-        return render(request, "partials/master_form.html", **_pay_ctx(party_type, party, fields, raw, errs, summary))
+        return render(request, "partials/master_form.html", **_pay_ctx(party_type, party, fields, raw, errs, summary, items))
 
     clean, errors = run_validation(PaymentIn, fields, normalize_fields(fields, raw))
     if errors:
@@ -211,12 +217,13 @@ async def payables_page(
     if type not in PARTIES:
         raise HTTPException(404)
     now = today()
+    window = toolbar_window(request)
     per_party: dict[int, dict] = {}
     on_grain: set[tuple[str, int]] | None = None
     if type == "farmer" and grain_id:  # the toolbar grain: only the entries (purchase or individual) of that grain
         on_grain = {(DIRECT if v.entry.is_direct else FARMER, v.entry.id) for v in await all_entry_views(db) if v.entry.grain.id == grain_id}
     for p in await pay_svc.load_payables(db, type):
-        if p.due <= 0 or (on_grain is not None and (p.payable_type, p.payable_id) not in on_grain):
+        if p.due <= 0 or (window and not window[0] <= p.doc_date <= window[1]) or (on_grain is not None and (p.payable_type, p.payable_id) not in on_grain):
             continue
         row = per_party.setdefault(p.party_id, dict(party_id=p.party_id, name=p.party_name, due=0, overdue=0, earliest=p.sort_key[0], items=0))
         row["due"] += p.due

@@ -13,6 +13,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.labels import method_label
 from app.models import BagSupply, LabourGroupWage, LabourWork, Payment, Receipt, TruckTrip
 from app.services import receivables as rec_svc
 from app.services.ledger import all_entry_views
@@ -143,7 +144,7 @@ async def _money_blocks(db: AsyncSession, report: Report, *, party_type: str | N
     for _, amount, method, _, _ in rows:
         by_method[method]["n"] += 1
         by_method[method]["amount"] += amount
-    method_rows = sorted(([m.upper(), v["n"], v["amount"]] for m, v in by_method.items()), key=lambda r: -r[2])
+    method_rows = sorted(([method_label(m), v["n"], v["amount"]] for m, v in by_method.items()), key=lambda r: -r[2])
     report.tables.append(Table(word[0], [("Method", "રીત", "text"), ("Count", "સંખ્યા", "int"), (word[1][0], word[1][1], "inr")], method_rows,
                                ["Total", sum(r[1] for r in method_rows), sum(r[2] for r in method_rows)]))
     if party_type is not None:

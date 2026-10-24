@@ -1,8 +1,8 @@
 {% extends "master_form_page.html" %}
 {% from "partials/bilabel.html" import t %}
 {% block pre_form %}
-<div class="alert bg-base-100 shadow-sm mb-3 text-sm flex-wrap">
-  <span>{{ t('Outstanding', 'બાકી') }}: <b>{{ summary.due | inr }}</b></span>
-  {% if summary.awaiting_weight %}<span class="badge badge-warning">{{ summary.awaiting_weight }} {{ t('truck(s) still need the industry weight', 'ટ્રકનું કારખાનાનું વજન બાકી') }}</span>{% endif %}
+<div class="flex flex-wrap items-center justify-end gap-3 mb-4 max-w-2xl">
+  <span class="badge badge-lg h-auto py-1 gap-3">{{ t('Outstanding', 'બાકી') }}<b>{{ summary.due | inr }}</b></span>
+  {% if summary.awaiting_weight %}<span class="badge badge-lg badge-warning h-auto py-1 gap-3">{{ t('Trucks awaiting industry weight', 'કારખાનાનું વજન બાકી ટ્રક') }}<b>{{ summary.awaiting_weight }}</b></span>{% endif %}
 </div>
 {% endblock %}

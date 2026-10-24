@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, toolbar_ids, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, toolbar_ids, toolbar_window, today
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
@@ -69,7 +69,10 @@ def labour_snapshot(w: LabourWork) -> dict:
 async def labour_list(request: Request, year: str = "", user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     years = await _years(db, LabourWork, user)
     year = year if year in years else current_year_label()
-    rows = list((await db.scalars(select(LabourWork).where(LabourWork.business_year == year).order_by(LabourWork.work_date.desc(), LabourWork.id.desc()))).unique().all())
+    stmt = select(LabourWork).where(LabourWork.business_year == year)
+    if window := toolbar_window(request):
+        stmt = stmt.where(LabourWork.work_date.between(*window))
+    rows = list((await db.scalars(stmt.order_by(LabourWork.work_date.desc(), LabourWork.id.desc()))).unique().all())
     paid = {p.payable_id: p.paid for p in await load_payables(db, "labour_group")}
     return render_with_csrf(request, csrf, "labour_list.html", user=user, rows=rows, paid=paid, year=year, years=years, year_locked=year != current_year_label())
 
@@ -194,6 +197,8 @@ async def bag_list(request: Request, year: str = "", view: str = "supplies", vil
     stmt = select(BagSupply).where(BagSupply.business_year == year)
     if village_id:  # supplies delivered to a farmer of that village
         stmt = stmt.join(Farmer, Farmer.id == BagSupply.farmer_id).where(Farmer.village_id == village_id)
+    if window := toolbar_window(request):
+        stmt = stmt.where(BagSupply.supply_date.between(*window))
     rows = list((await db.scalars(stmt.order_by(BagSupply.supply_date.desc(), BagSupply.id.desc()))).unique().all())
     paid = {p.payable_id: p.paid for p in await load_payables(db, "bag_supplier")}
     storage: dict[int, dict] = {}

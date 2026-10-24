@@ -33,35 +33,60 @@
     </div>
     <div class="px-3 pt-2">
       <form method="get" class="flex flex-wrap items-center gap-3 bg-base-100 border border-base-300 rounded-box px-4 py-2">
-        {% for k, v in request.query_params.multi_items() if k not in ('grain_id', 'village_id') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        {% for k, v in request.query_params.multi_items() if k not in ('grain_id', 'village_id', 'period', 'on_date') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
         {# each filter is one button: English above, Gujarati below (the chosen name once picked); the real drop-down lies invisibly over it #}
         {% set vid = request.query_params.get('village_id', '') | int(0) %}
         {% set gid = request.query_params.get('grain_id', '') | int(0) %}
         {% set sel_v = (request.state.villages | selectattr('id', 'equalto', vid) | list | first) if vid else none %}
         {% set sel_g = (request.state.grains | selectattr('id', 'equalto', gid) | list | first) if gid else none %}
-        {# pages whose data has no grain behind it: the grain filter is frozen and dulled #}
-        {% set grain_off = request.url.path.startswith('/BagSupplies') %}
-        <div class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight relative normal-case font-semibold filter-btn {{ 'on' if sel_v }}">
+        {# a filter is frozen and dulled on pages whose data has no village / grain behind it (see app/api/*: the pages that read village_id / grain_id) #}
+        {% set path = request.url.path %}
+        {% set pay_type = request.query_params.get('type', 'farmer') %}
+        {% set ledger = request.query_params.get('ledger', 'farmer') %}
+        {% set village_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmersEntries', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/BagSupplies', '/Masters/Villages', '/Masters/Farmers'))
+                                  or (path.startswith('/Payables') and pay_type == 'farmer')
+                                  or (path.startswith('/Analysis') and ledger != 'labour')) %}
+        {% set grain_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmersEntries', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/Masters/Grains', '/Masters/LabourWages', '/Masters/Brokerages'))
+                                or (path.startswith('/Payables') and pay_type == 'farmer')
+                                or (path.startswith('/Analysis') and ledger != 'bag')) %}
+        {% set date_off = not path.startswith(('/PurchaseGroup', '/PurchaseFarmersEntries', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/BagSupplies', '/LabourWork', '/Payables')) %}
+        {% set period = request.query_params.get('period', '') %}
+        {% set on_date = request.query_params.get('on_date', '') if period == 'date' else '' %}
+        {% set sel_p = (PERIODS | selectattr(0, 'equalto', period) | list | first) if period and period != 'date' else none %}
+        {% set date_on = not date_off and (sel_p or on_date) %}
+        {% if village_off %}{% set sel_v = none %}{% endif %}
+        {% if grain_off %}{% set sel_g = none %}{% endif %}
+        <div class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight relative normal-case font-semibold filter-btn {{ 'opacity-40 cursor-not-allowed' if village_off else ('on' if sel_v) }}">
           <span>{{ sel_v.name if sel_v else L['village'][0] }}</span><span class="gu text-xs">{{ (sel_v.name_gu or '') if sel_v else L['village'][1] }}</span>
-          <select name="village_id" aria-label="Village" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="this.form.submit()">
-            <option value="">All બધા</option>
-            {% for v in request.state.villages %}<option value="{{ v.id }}" {{ 'selected' if v.id == vid }}>{{ v.name }} {{ v.name_gu or '' }}</option>{% endfor %}
+          <select name="village_id" aria-label="Village" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="this.form.submit()" {% if village_off %}disabled title="Not used on this page"{% endif %}>
+            <option value="">All&nbsp;&nbsp;બધા</option>
+            {% for v in request.state.villages %}<option value="{{ v.id }}" {{ 'selected' if v.id == vid }}>{{ v.name }}&nbsp;&nbsp;{{ v.name_gu or '' }}</option>{% endfor %}
           </select>
         </div>
         <div class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight relative normal-case font-semibold filter-btn {{ 'opacity-40 cursor-not-allowed' if grain_off else ('on' if sel_g) }}">
           <span>{{ sel_g.name if sel_g else L['grain'][0] }}</span><span class="gu text-xs">{{ (sel_g.name_gu or '') if sel_g else L['grain'][1] }}</span>
           <select name="grain_id" aria-label="Grain" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="this.form.submit()" {% if grain_off %}disabled title="Not used on this page"{% endif %}>
-            <option value="">All બધા</option>
-            {% for g in request.state.grains %}<option value="{{ g.id }}" {{ 'selected' if g.id == gid }}>{{ g.name }} {{ g.name_gu }}</option>{% endfor %}
+            <option value="">All&nbsp;&nbsp;બધા</option>
+            {% for g in request.state.grains %}<option value="{{ g.id }}" {{ 'selected' if g.id == gid }}>{{ g.name }}&nbsp;&nbsp;{{ g.name_gu }}</option>{% endfor %}
           </select>
         </div>
         <span class="flex-1"></span>
+        {# the date filter: a preset period ending today, or one specific day (picked with the calendar); frozen like the others where the page has no dates #}
+        <div class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight relative normal-case font-semibold filter-btn {{ 'opacity-40 cursor-not-allowed' if date_off else ('on' if date_on) }}">
+          <span>{{ on_date if date_on and on_date else (sel_p[1] if date_on and sel_p else 'Date') }}</span><span class="gu text-xs">{{ '' if date_on and on_date else (sel_p[2] if date_on and sel_p else 'તારીખ') }}</span>
+          <select id="period-sel" name="period" aria-label="Date" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" {% if date_off %}disabled title="Not used on this page"{% endif %}>
+            <option value="">All&nbsp;&nbsp;બધા</option>
+            {% for key, en, gu, _ in PERIODS %}<option value="{{ key }}" {{ 'selected' if key == period }}>{{ en }}&nbsp;&nbsp;{{ gu }}</option>{% endfor %}
+            <option value="date" {{ 'selected' if period == 'date' }}>Specific date&nbsp;&nbsp;ચોક્કસ તારીખ</option>
+          </select>
+          <input id="on-date" type="date" name="on_date" value="{{ on_date }}" class="absolute left-0 bottom-0 w-px h-px opacity-0 pointer-events-none" tabindex="-1" aria-hidden="true" {% if date_off or period != 'date' %}disabled{% endif %}>
+        </div>
         {# the report keeps whatever year / village / grain is chosen here #}
         {% set keep = [] %}{% for k in ('year', 'village_id', 'grain_id') %}{% if request.query_params.get(k) %}{% set _ = keep.append(k ~ '=' ~ request.query_params.get(k)) %}{% endif %}{% endfor %}
         {# next to Analysis: clears the village and grain filters in one click (lit while any filter is applied) #}
-        {% set any_filter = sel_v or (sel_g and not grain_off) %}
-        <a href="{{ request.url.path }}{{ ('?' ~ request.url.remove_query_params(['village_id', 'grain_id']).query) if request.url.remove_query_params(['village_id', 'grain_id']).query }}" role="switch" aria-checked="{{ 'true' if any_filter else 'false' }}" title="Clear all filters"
-           class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight normal-case font-semibold {{ 'btn-primary' if any_filter else 'btn-disabled opacity-50' }}" {% if not any_filter %}tabindex="-1" aria-disabled="true"{% endif %}>
+        {% set any_filter = sel_v or sel_g or date_on %}
+        <a href="{{ request.url.path }}{{ ('?' ~ request.url.remove_query_params(['village_id', 'grain_id', 'period', 'on_date']).query) if request.url.remove_query_params(['village_id', 'grain_id', 'period', 'on_date']).query }}" role="switch" aria-checked="{{ 'true' if any_filter else 'false' }}" title="Clear all filters"
+           class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight normal-case font-semibold filter-btn {{ 'on' if any_filter else 'opacity-40 cursor-not-allowed' }}" {% if not any_filter %}tabindex="-1" aria-disabled="true" onclick="return false"{% endif %}>
           <span>{{ 'Filter on' if any_filter else 'Filter off' }}</span><span class="gu text-xs">{{ 'ફિલ્ટર ચાલુ' if any_filter else 'ફિલ્ટર બંધ' }}</span>
         </a>
         <a href="/Analysis{{ '?' ~ keep|join('&') if keep }}" class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight normal-case font-semibold filter-btn {{ 'on' if request.url.path.startswith('/Analysis') }}"><span>Analysis</span><span class="gu text-xs">વિશ્લેષણ</span></a>
@@ -114,6 +139,17 @@
       cb.checked = !cb.checked;
     }
   }
+  // date filter: a preset submits at once; "Specific date" opens the calendar and submits once a day is picked
+  (function () {
+    var sel = document.getElementById('period-sel'), day = document.getElementById('on-date');
+    if (!sel || !day) return;
+    sel.addEventListener('change', function () {
+      if (sel.value !== 'date') { day.disabled = true; sel.form.submit(); return; }
+      day.disabled = false;
+      try { day.showPicker(); } catch (e) { day.className = 'absolute right-0 top-full z-50 bg-base-100 border rounded p-1'; day.focus(); }
+    });
+    day.addEventListener('change', function () { if (day.value) sel.form.submit(); });
+  })();
   // the toolbar's village / grain follow you from a list into its forms and detail pages (links inside the page only, the sidebar starts afresh)
   (function () {
     var cur = new URLSearchParams(location.search), keep = ['village_id', 'grain_id'].filter(function (k) { return /^\d+$/.test(cur.get(k) || ''); });

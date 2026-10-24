@@ -1,16 +1,27 @@
 {% from "partials/bilabel.html" import t, dth %}
+<style>
+  .stmt .bi > .gu { margin-left: .6em; }  /* two spaces between side-by-side English and Gujarati */
+  .stmt :is(b, .bi, .gu) + .gu { margin-left: .6em; }
+  .stmt .head :is(h1, div) > .gu { margin-left: .6em; }
+  .stmt div.meta { column-gap: 100px; }  /* space between the two columns of header fields */
+  .stmt .meta .f { display: flex; justify-content: space-between; align-items: flex-start; gap: .6em; }
+  .stmt .meta .f > span:first-child { line-height: 1.2; }
+  .stmt .meta .f .v { text-align: right; line-height: 1.2; }
+  .stmt .meta .v .gu { display: block; margin-left: 0; }
+</style>
+<div class="stmt">
 <div class="head">
   <div>
     <h1>{{ t('Farmer Statement', 'ખેડૂત ખાતાવહી') }}</h1>
     <div>{{ L['app_name'][0] }} <span class="gu">{{ L['app_name'][1] }}</span></div>
   </div>
-  <div style="text-align:right">{{ t('Date', 'તારીખ') }}: {{ today }}</div>
+  <div style="text-align:right">{{ t('Date', 'તારીખ') }}:&nbsp;&nbsp;{{ today }}</div>
 </div>
 <div class="meta">
-  <div>{{ t('Farmer', 'ખેડૂત') }}: <b>{{ farmer.farmer_name }}</b>{% if farmer.farmer_name_gu %} <span class="gu">({{ farmer.farmer_name_gu }})</span>{% endif %}</div>
-  <div>{{ t('Village', 'ગામ') }}: <b>{{ farmer.village.village_name }}</b>{% if farmer.village.village_name_gu %} <span class="gu">({{ farmer.village.village_name_gu }})</span>{% endif %}</div>
-  <div>{{ t('Mobile', 'મોબાઇલ') }}: {{ farmer.mobile | mobhtml }}</div>
-  {% if farmer.head_of_family %}<div>{{ t('Head of family', 'કુટુંબના વડા') }}: {{ farmer.head_of_family }}</div>{% endif %}
+  <div class="f"><span>Farmer<br><span class="gu">ખેડૂત</span></span><span class="v"><b>{{ farmer.farmer_name }}</b>{% if farmer.farmer_name_gu %}<span class="gu">{{ farmer.farmer_name_gu }}</span>{% endif %}</span></div>
+  <div class="f"><span>Village<br><span class="gu">ગામ</span></span><span class="v"><b>{{ farmer.village.village_name }}</b>{% if farmer.village.village_name_gu %}<span class="gu">{{ farmer.village.village_name_gu }}</span>{% endif %}</span></div>
+  <div class="f"><span>Mobile<br><span class="gu">મોબાઇલ</span></span><span class="v">{{ farmer.mobile | mobhtml }}</span></div>
+  {% if farmer.head_of_family %}<div class="f"><span>Head of family<br><span class="gu">કુટુંબના વડા</span></span><span class="v">{{ farmer.head_of_family }}</span></div>{% endif %}
 </div>
 <div class="sum">
   <div>{{ t('Total payable', 'કુલ ચૂકવવાપાત્ર') }}<b>{{ totals.net_payable | inr }}</b></div>
@@ -24,7 +35,7 @@
   <thead><tr>
     {{ dth('Date', 'તારીખ') }}{{ dth('Village / grain', 'ગામ / અનાજ') }}{{ dth('Bags', 'બેગ', 'n') }}
     {{ dth('Kg', 'કિલો', 'n') }}{{ dth('Rate/20kg', 'ભાવ/20કિ', 'n') }}{{ dth('Amount', 'રકમ', 'n') }}
-    {{ dth('Borrow', 'ઉધાર', 'n') }}{{ dth('Due on', 'ચૂકવણી તા.') }}{{ dth('Paid', 'ચૂકવ્યું', 'n') }}{{ dth('Balance', 'બાકી', 'n') }}
+    {{ dth('Borrow', 'ઉધાર', 'n') }}{{ dth('Due on', 'ચૂકવણી તા.', 'n') }}{{ dth('Paid', 'ચૂકવ્યું', 'n') }}{{ dth('Balance', 'બાકી', 'n') }}
   </tr></thead>
   <tbody>
   {% for v in views %}{% set e = v.entry %}
@@ -36,7 +47,7 @@
       <td class="n">{{ e.grain_rate_per_20kg }}</td>
       <td class="n">{{ e.payable_amount | inr }}</td>
       <td class="n">{{ e.borrowed_amount | inr if e.borrowed_amount else '' }}</td>
-      <td class="{{ 'over' if v.is_overdue(today) }}">{{ e.due_date }}</td>
+      <td class="n {{ 'over' if v.is_overdue(today) }}">{{ e.due_date }}</td>
       <td class="n">{{ v.paid | inr }}</td>
       <td class="n"><b>{{ v.due | inr }}</b></td>
     </tr>
@@ -49,13 +60,13 @@
 <h2>{{ t('Payments', 'ચુકવણીઓ') }}</h2>
 <table>
   <thead><tr>
-    {{ dth('Receipt', 'રસીદ') }}{{ dth('Date', 'તારીખ') }}{{ dth('Amount', 'રકમ', 'n') }}{{ dth('Method', 'રીત') }}
+    {{ dth('Receipt', 'રસીદ') }}{{ dth('Date', 'તારીખ') }}{{ dth('Amount', 'રકમ') }}{{ dth('Method', 'રીત') }}
     {{ dth('Received by', 'લેનાર') }}{{ dth('Reference', 'રેફરન્સ') }}
   </tr></thead>
   <tbody>
   {% for p in payments %}
     <tr>
-      <td>#{{ p.id }}</td><td>{{ p.payment_date }}</td><td class="n">{{ p.amount | inr }}</td><td>{{ p.method | upper }}</td>
+      <td>#{{ p.id }}</td><td>{{ p.payment_date }}</td><td>{{ p.amount | inr }}</td><td>{{ p.method | method }}</td>
       <td>{{ p.receiver_name }} ({{ p.receiver_mobile | mobhtml }})</td><td>{{ p.reference_no or '' }}</td>
     </tr>
   {% else %}
@@ -63,3 +74,4 @@
   {% endfor %}
   </tbody>
 </table>
+</div>

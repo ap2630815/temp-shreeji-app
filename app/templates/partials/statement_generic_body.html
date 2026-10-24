@@ -1,14 +1,25 @@
 {% from "partials/bilabel.html" import t, dth %}
+<style>
+  .stmt .bi > .gu { margin-left: .6em; }  /* two spaces between side-by-side English and Gujarati */
+  .stmt :is(b, .bi, .gu) + .gu { margin-left: .6em; }
+  .stmt .head :is(h1, div) > .gu { margin-left: .6em; }
+  .stmt div.meta { column-gap: 100px; }  /* space between the two columns of header fields */
+  .stmt .meta .f { display: flex; justify-content: space-between; align-items: flex-start; gap: .6em; }
+  .stmt .meta .f > span:first-child { line-height: 1.2; }
+  .stmt .meta .f .v { text-align: right; line-height: 1.2; }
+  .stmt .meta .v .gu { display: block; margin-left: 0; }
+</style>
+<div class="stmt">
 <div class="head">
   <div>
     <h1>{{ party_label[0] }} {{ t('Statement', 'ખાતાવહી') }} <span class="gu">{{ party_label[1] }}</span></h1>
     <div>{{ L['app_name'][0] }} <span class="gu">{{ L['app_name'][1] }}</span></div>
   </div>
-  <div style="text-align:right">{{ t('Date', 'તારીખ') }}: {{ today }}</div>
+  <div style="text-align:right">{{ t('Date', 'તારીખ') }}:&nbsp;&nbsp;{{ today }}</div>
 </div>
 <div class="meta">
-  <div>{{ party_label[0] }}: <b>{{ party_name }}</b>{% if party_name_gu %} <span class="gu">({{ party_name_gu }})</span>{% endif %}</div>
-  {% if party_mobile %}<div>{{ t('Mobile', 'મોબાઇલ') }}: {{ party_mobile | mobhtml }}</div>{% endif %}
+  <div class="f"><span>{{ party_label[0] }}<br><span class="gu">{{ party_label[1] }}</span></span><span class="v"><b>{{ party_name }}</b>{% if party_name_gu %}<span class="gu">{{ party_name_gu }}</span>{% endif %}</span></div>
+  {% if party_mobile %}<div class="f"><span>Mobile<br><span class="gu">મોબાઇલ</span></span><span class="v">{{ party_mobile | mobhtml }}</span></div>{% endif %}
 </div>
 <div class="sum">
   <div>{{ t('Total', 'કુલ') }}<b>{{ totals.amount | inr }}</b></div>
@@ -17,23 +28,30 @@
 </div>
 <h2>{{ t('Items', 'વિગતો') }}</h2>
 <table>
-  <thead><tr>{{ dth('Date', 'તારીખ') }}{{ dth('Details', 'વિગત') }}{{ dth('Amount', 'રકમ', 'n') }}{{ dth('Paid', 'ચૂકવ્યું', 'n') }}{{ dth('Balance', 'બાકી', 'n') }}</tr></thead>
+  <thead><tr>{{ dth('Date', 'તારીખ') }}{% for en, gu, right in columns %}{{ dth(en, gu, 'n' if right) }}{% endfor %}{{ dth('Amount', 'રકમ', 'n') }}{{ dth('Paid', 'ચૂકવ્યું', 'n') }}{{ dth('Balance', 'બાકી', 'n') }}{{ dth('Status', 'સ્થિતિ', 'n') }}</tr></thead>
   <tbody>
   {% for p in rows %}
-    <tr><td>{{ p.doc_date }}</td><td>{{ p.label }}</td><td class="n">{{ p.amount | inr }}</td><td class="n">{{ p.paid | inr }}</td><td class="n"><b>{{ p.due | inr }}</b></td></tr>
+    <tr>
+      <td class="nw">{{ p.doc_date }}</td>
+      {% for c in p.cells %}<td class="{{ 'n' if columns[loop.index0][2] }}">{{ c }}</td>{% endfor %}
+      <td class="n">{{ p.amount | inr }}</td><td class="n">{{ p.paid | inr }}</td><td class="n"><b>{{ p.due | inr }}</b></td>
+      <td class="n">{% if p.status == 'paid' %}{{ t('Paid', 'ચૂકવાયું') }}{% elif p.status == 'partial' %}{{ t('Partial', 'આંશિક') }}{% else %}{{ t('Pending', 'બાકી') }}{% endif %}</td>
+    </tr>
   {% else %}
-    <tr><td colspan="5">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>
+    <tr><td colspan="{{ columns | length + 5 }}">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>
   {% endfor %}
   </tbody>
+  {% if rows %}<tfoot><tr class="tot"><td colspan="{{ columns | length + 1 }}">{{ t('Total', 'કુલ') }}</td><td class="n">{{ totals.amount | inr }}</td><td class="n">{{ totals.paid | inr }}</td><td class="n">{{ totals.due | inr }}</td><td></td></tr></tfoot>{% endif %}
 </table>
 <h2>{{ t('Payments', 'ચુકવણીઓ') }}</h2>
 <table>
-  <thead><tr>{{ dth('Receipt', 'રસીદ') }}{{ dth('Date', 'તારીખ') }}{{ dth('Amount', 'રકમ', 'n') }}{{ dth('Method', 'રીત') }}{{ dth('Received by', 'લેનાર') }}{{ dth('Reference', 'રેફરન્સ') }}</tr></thead>
+  <thead><tr>{{ dth('Receipt', 'રસીદ') }}{{ dth('Date', 'તારીખ') }}{{ dth('Amount', 'રકમ') }}{{ dth('Method', 'રીત') }}{{ dth('Received by', 'લેનાર') }}{{ dth('Reference', 'રેફરન્સ') }}</tr></thead>
   <tbody>
   {% for p in payments %}
-    <tr><td>#{{ p.id }}</td><td>{{ p.payment_date }}</td><td class="n">{{ p.amount | inr }}</td><td>{{ p.method | upper }}</td><td>{{ p.receiver_name }} ({{ p.receiver_mobile | mobhtml }})</td><td>{{ p.reference_no or '' }}</td></tr>
+    <tr><td class="nw">#{{ p.id }}</td><td class="nw">{{ p.payment_date }}</td><td>{{ p.amount | inr }}</td><td>{{ p.method | method }}</td><td>{{ p.receiver_name }} ({{ p.receiver_mobile | mobhtml }})</td><td>{{ p.reference_no or '' }}</td></tr>
   {% else %}
     <tr><td colspan="6">{{ t('No payments yet', 'હજી કોઈ ચુકવણી નથી') }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>

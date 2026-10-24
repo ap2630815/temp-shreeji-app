@@ -59,6 +59,16 @@ PARTIES: dict[str, PartySpec] = {
 }
 
 
+# statement columns after the date, per party type: (English, Gujarati, right-aligned); Payable.cells fills them in order
+COLUMNS: dict[str, tuple[tuple[str, str, bool], ...]] = {
+    "farmer": (("Details", "વિગત", False),),
+    "truck": (("Industry", "ઉદ્યોગ", False), ("Grain", "અનાજ", False), ("Bags", "બેગ", True)),
+    "labour_group": (("Work", "કામ", False),),
+    "bag_supplier": (("Farmer", "ખેડૂત", False), ("Village", "ગામ", False), ("Bags", "બેગ", True), ("Rate/bag", "ભાવ/બેગ", True)),
+    "broker": (("Bill no.", "બિલ નં.", False), ("Truck", "ટ્રક", False), ("Industry", "ઉદ્યોગ", False)),
+}
+
+
 class PaymentError(Exception):
     def __init__(self, field: str, message: tuple[str, str]):
         self.field, self.message = field, message
@@ -77,6 +87,7 @@ class Payable:
     label: str
     amount: int
     paid: int
+    cells: tuple = ()  # the type-specific columns of COLUMNS[party_type], for the statement table
 
     @property
     def due(self) -> int:
@@ -120,7 +131,8 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
             e = v.entry
             source = "direct" if e.is_direct else f"#{e.purchase_group_id}, {e.purchase_group.purchase_group_date}"
             out.append(Payable(DIRECT if e.is_direct else FARMER, e.id, party_type, e.farmer_id, e.farmer.farmer_name, e.entry_date, e.due_date,
-                               f"{e.farmer.village.village_name} · {e.grain.grain_name} ({source}), {e.no_of_filled_bags} bags", e.net_payable, v.paid))
+                               f"{e.farmer.village.village_name} · {e.grain.grain_name} ({source}), {e.no_of_filled_bags} bags", e.net_payable, v.paid,
+                               (f"{e.farmer.village.village_name} · {e.grain.grain_name} ({source}), {e.no_of_filled_bags} bags",)))
     elif party_type == "truck":
         stmt = select(TruckTrip).order_by(TruckTrip.trip_date, TruckTrip.id)
         if party_id:
@@ -129,7 +141,8 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         paid = await _paid_map(db, pt, [t.id for t in trips])
         for t in trips:
             out.append(Payable(pt, t.id, party_type, t.truck_id, t.truck.truck_number, t.trip_date, None,
-                               f"{t.truck.truck_number} → {t.industry.industrialist_name}, {t.grain.grain_name}, {t.bags} bags", t.total_amount, paid.get(t.id, 0)))
+                               f"{t.truck.truck_number} → {t.industry.industrialist_name}, {t.grain.grain_name}, {t.bags} bags", t.total_amount, paid.get(t.id, 0),
+                               (t.industry.industrialist_name, t.grain.grain_name, t.bags)))
     elif party_type == "labour_group":
         stmt = select(LabourWork).order_by(LabourWork.work_date, LabourWork.id)
         if party_id:
@@ -138,7 +151,8 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         paid = await _paid_map(db, pt, [r.id for r in rows])
         for r in rows:
             out.append(Payable(pt, r.id, party_type, r.labour_group_id, r.labour_group.group_name, r.work_date, None,
-                               r.description or "Labour work", r.net_payable, paid.get(r.id, 0)))
+                               r.description or "Labour work", r.net_payable, paid.get(r.id, 0),
+                               (r.description or "Labour work",)))
     elif party_type == "bag_supplier":
         stmt = select(BagSupply).order_by(BagSupply.supply_date, BagSupply.id)
         if party_id:
@@ -147,7 +161,8 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         paid = await _paid_map(db, pt, [r.id for r in rows])
         for r in rows:
             out.append(Payable(pt, r.id, party_type, r.supplier_id, r.supplier.pet_name, r.supply_date, None,
-                               f"{r.no_of_bags} bags @ ₹ {r.rate_per_bag} to {r.farmer.farmer_name} ({r.farmer.village.village_name})", r.payable_amount, paid.get(r.id, 0)))
+                               f"{r.no_of_bags} bags @ ₹ {r.rate_per_bag} to {r.farmer.farmer_name} ({r.farmer.village.village_name})", r.payable_amount, paid.get(r.id, 0),
+                               (r.farmer.farmer_name, r.farmer.village.village_name, r.no_of_bags, r.rate_per_bag)))
     elif party_type == "broker":
         stmt = (
             select(Bilty)
@@ -163,7 +178,8 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         for r in rows:
             broker = r.booking.brokerage.broker
             out.append(Payable(pt, r.id, party_type, broker.id, broker.broker_name, r.bilty_date, None,
-                               f"Bill #{r.bill_number}, {r.trip.truck.truck_number} → {r.trip.industry.industrialist_name}", r.brokerage_amount, paid.get(r.id, 0)))
+                               f"Bill #{r.bill_number}, {r.trip.truck.truck_number} → {r.trip.industry.industrialist_name}", r.brokerage_amount, paid.get(r.id, 0),
+                               (f"#{r.bill_number}", r.trip.truck.truck_number, r.trip.industry.industrialist_name)))
     out.sort(key=lambda p: p.sort_key)
     return out
 

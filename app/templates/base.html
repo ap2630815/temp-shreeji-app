@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="shreeji">
+<html lang="en" data-theme="{% block theme %}shreeji{% endblock %}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,15 +8,15 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2"></script>
   <style>
-    /* Custom daisyUI theme modelled on the daisyUI theme-generator reference (light-blue primary, navy neutral, soft rounded cards) */
+    /* Custom daisyUI theme modelled on the daisyUI theme-generator reference (light-gray primary, charcoal neutral, soft rounded cards) */
     [data-theme="shreeji"] {
       color-scheme: light;
-      --p: 90% 0.06 230;   --pc: 22% 0.05 240;
+      --p: 90% 0 0;   --pc: 22% 0 0;
       --s: 75% 0.17 305;  --sc: 25% 0.1 305;
-      --a: 90% 0.06 230;   --ac: 22% 0.05 240;
-      --n: 28% 0.04 255;  --nc: 96% 0.005 255;
-      --b1: 99% 0.002 255; --b2: 96.5% 0.005 255; --b3: 92% 0.008 255; --bc: 28% 0.04 255;
-      --in: 70% 0.15 250; --inc: 20% 0.06 250;
+      --a: 90% 0 0;   --ac: 22% 0 0;
+      --n: 28% 0 0;  --nc: 96% 0 0;
+      --b1: 99% 0 0; --b2: 96.5% 0 0; --b3: 92% 0 0; --bc: 28% 0 0;
+      --in: 70% 0 0; --inc: 20% 0 0;
       --su: 80% 0.14 180; --suc: 22% 0.05 180;
       --wa: 85% 0.17 90;  --wac: 28% 0.06 80;
       --er: 70% 0.19 22;  --erc: 25% 0.08 22;
@@ -24,6 +24,43 @@
       --animation-btn: .2s; --animation-input: .2s;
       --btn-focus-scale: .97; --border-btn: 1px; --tab-border: 1px; --tab-radius: .75rem;
     }
+    /* "dusk": soft slate theme (dimmed surfaces, muted status colours, dark slate sidebar). A page opts in by overriding the "theme" block with dusk */
+    [data-theme="dusk"] {
+      color-scheme: light;
+      --p: 85.8% 0.018 256;  --pc: 27.6% 0.023 249;
+      --s: 76.4% 0.066 301;  --sc: 27.9% 0.053 294;
+      --a: 85.8% 0.018 256;  --ac: 27.6% 0.023 249;
+      --n: 31.9% 0.026 260;  --nc: 93.9% 0.007 261;
+      --b1: 96.6% 0.003 248; --b2: 92.4% 0.006 255; --b3: 86.5% 0.013 256; --bc: 27.6% 0.023 249;
+      --in: 72.7% 0.032 256; --inc: 34.9% 0.035 258;
+      --su: 73.5% 0.072 163; --suc: 38.1% 0.063 161;
+      --wa: 79.2% 0.128 92;  --wac: 39.8% 0.073 83;
+      --er: 71.8% 0.095 23;  --erc: 39.5% 0.120 27;
+      --rounded-box: 1.5rem; --rounded-btn: .75rem; --rounded-badge: 1.5rem;
+      --animation-btn: .2s; --animation-input: .2s;
+      --btn-focus-scale: .97; --border-btn: 1px; --tab-border: 1px; --tab-radius: .75rem;
+    }
+    [data-theme="dusk"] .drawer-side aside { background: oklch(var(--n)); color: oklch(var(--nc)); border-color: oklch(var(--n)); }
+    [data-theme="dusk"] .drawer-side aside .soft-light, [data-theme="dusk"] .drawer-side aside .menu li > a.soft-light { color: oklch(var(--bc)) !important; }
+    [data-theme="dusk"] .drawer-side aside .menu li.menu-title, [data-theme="dusk"] .drawer-side aside .menu-title { color: oklch(var(--nc) / .6); }
+    [data-theme="dusk"] .drawer-side aside .menu li > a:not(.active):hover { background: oklch(var(--nc) / .12); }
+    [data-theme="dusk"] body::before { opacity: .15; }
+    /* every form's fields (.lf-grid, see partials/form_fields.html): the title reads "English   - Gujarati" with all the dashes in one column,
+       3 spaces after the longest English title of that form (the Gujarati follows the dash and 1 space); a description line reads
+       "English   Gujarati" with the Gujarati 3 spaces after its own English */
+    .lf-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: .75em; row-gap: .75rem; }
+    .lf-grid > label.form-control { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; row-gap: .25rem; }
+    .lf-grid > label.form-control > * { grid-column: 1 / -1; }
+    .lf-grid .label-text { display: grid; grid-template-columns: subgrid; align-items: baseline; }
+    .lf-grid .label-text > .gu { font-size: .85em; white-space: pre-wrap; }
+    .lf-grid .label-text > .gu::before { content: "- "; }
+    .lf-grid .field-help > .gu::before { content: "\00a0\00a0"; white-space: pre; }
+    /* .gu-same (wraps every New / Edit form page): the Gujarati has the same size and colour as the English */
+    .gu-same .gu, .gu-same h1 .gu { font-size: 1em !important; opacity: 1 !important; }
+    .gu-same td > .gu { font-size: .75rem !important; opacity: .7 !important; }  /* a Gujarati name under an English one in a table keeps its small sub-line */
+    .bi-stack > .bi { display: inline-flex; flex-direction: column; }  /* an instruction: English above, Gujarati below */
+    .gu-same .btn .gu { font-size: .8em !important; opacity: .75 !important; }  /* buttons keep their small stacked Gujarati */
+    @media (max-width: 480px) { .lf-grid { grid-template-columns: minmax(0, 1fr); } }
     .card { border: 1px solid oklch(var(--b3) / .6); }
     .card.shadow-xl, .card.shadow-sm, .card.shadow-md { box-shadow: 0 1px 2px oklch(var(--n) / .05), 0 8px 24px -12px oklch(var(--n) / .12); }
     /* noise texture (daisyUI "noise effect") */
@@ -47,14 +84,41 @@
     .navbar { border: 1px solid oklch(var(--b3) / .6); border-radius: var(--rounded-box); }
     .input, .select, .textarea { background: oklch(var(--b1)); }
     .table :where(thead, tfoot) { color: oklch(var(--bc) / .6); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
-    .badge { font-weight: 600; }
+    /* STATUS COLOUR RULES (one standard for every badge, alert and notice):
+       warning = amber, error = red, success = green, info = grey. Always a soft tint of the colour with a thin border and the dark
+       "content" colour for the text, never a solid saturated fill. Contrast stays high and the look is the same on every page. */
+    .badge, .alert:not(.bg-base-100) { --tone: var(--b3); --tone-ink: var(--bc); }
+    .badge-warning, .alert-warning, .notice-warning { --tone: var(--wa); --tone-ink: var(--wac); }
+    .badge-error,   .alert-error,   .notice-error   { --tone: var(--er); --tone-ink: var(--erc); }
+    .badge-success, .alert-success, .notice-success { --tone: var(--su); --tone-ink: var(--suc); }
+    .badge-info,    .alert-info,    .notice-info    { --tone: var(--in); --tone-ink: var(--inc); }
+    :is(.badge, .alert, .notice):is(.badge-warning, .badge-error, .badge-success, .badge-info,
+                                    .alert-warning, .alert-error, .alert-success, .alert-info,
+                                    .notice-warning, .notice-error, .notice-success, .notice-info) {
+      background-color: oklch(var(--tone) / .22); border: 1px solid oklch(var(--tone) / .6); color: oklch(var(--tone-ink));
+    }
+    /* coloured TEXT on a white surface uses a darkened tone of the same colour so it stays readable (theme tones are too pale as text) */
+    .text-warning { color: oklch(48% 0.12 70) !important; }
+    .text-error   { color: oklch(50% 0.19 25) !important; }
+    .text-success { color: oklch(45% 0.10 170) !important; }
+    .text-info    { color: oklch(45% 0 0) !important; }
+    /* a badge grows with its text (wraps, never overflows the pill); a bilingual label stacks English over Gujarati */
+    .badge { font-weight: 600; height: auto; min-height: 1.25rem; padding-block: .15rem; line-height: 1.2; text-align: left; }
+    .badge:not(.badge-lg):not(.badge-sm) { min-height: 1.5rem; }
+    .badge .bi { display: inline-flex; flex-direction: column; text-align: left; line-height: 1.15; }
+    .badge .gu { display: block; font-size: .8em; opacity: .85; }
+    /* .notice: a message box inside a page (flex row, wraps on narrow screens); parts: .notice-title (EN over GU) and .notice-value */
+    .notice { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .75rem; padding: .5rem .75rem; border-radius: var(--rounded-box); font-size: .875rem; }
+    .notice .gu { display: block; font-size: .8em; opacity: .85; }
+    .notice-title { line-height: 1.15; font-size: .75rem; font-weight: 600; }
+    .notice-value { font-weight: 700; padding-left: .75rem; border-left: 1px solid oklch(var(--tone) / .7); }
     @font-face { font-family: "Noto Sans Gujarati"; src: url("/static/NotoSansGujarati-Regular.ttf"); font-weight: 400; }
     @font-face { font-family: "Noto Sans Gujarati"; src: url("/static/NotoSansGujarati-Bold.ttf"); font-weight: 700; }
     body { font-family: system-ui, "Noto Sans Gujarati", sans-serif; }
     .gu { font-family: "Noto Sans Gujarati", sans-serif; opacity: .75; }
-    /* sidebar: an entry with a sub-list opens it on hover / keyboard focus (and stays open on its own pages) */
+    /* sidebar: an entry with a sub-list opens it on keyboard focus (and stays open on its own pages); pointing at it does nothing */
     .hover-sub > ul { display: none; }
-    .hover-sub:hover > ul, .hover-sub:focus-within > ul, .hover-sub.open > ul { display: block; }
+    .hover-sub:focus-within > ul, .hover-sub.open > ul { display: block; }
     /* headings on the farmers-entries / purchase pages: English above, Gujarati below */
     .stackbi h1 .gu { display: block; font-size: .8em; }
     /* year report: titles, card headings, tile titles and the footnote read English above, Gujarati below */
@@ -64,8 +128,6 @@
     /* every button: icon (+, ←, ▾) on the left, text on the right with English above and Gujarati below */
     .btn .gu { display: block; font-size: .8em; }
     /* summary pills: label (English above, Gujarati below) on the left, the number on the right */
-    .badge-lg .bi { display: inline-flex; flex-direction: column; text-align: left; line-height: 1.15; }
-    .badge-lg .gu { display: block; font-size: .8em; }
     /* Payables table: even rows tinted */
     /* form fields are never highlighted: no focus ring, glow or coloured border on inputs, selects and text areas (errors keep their red border) */
     .input:focus, .input:focus-within, .select:focus, .textarea:focus,

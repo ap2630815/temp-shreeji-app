@@ -44,3 +44,8 @@ LABELS: dict[str, tuple[str, str]] = {
 def bilingual(key: str) -> str:
     en, gu = LABELS[key]
     return f"{en}  {gu}"
+
+
+def method_label(code: str | None) -> str:
+    """Payment method as shown to people: the stored code 'bank' reads RTGS / NEFT, the rest are upper-cased."""
+    return "RTGS / NEFT" if code == "bank" else (code or "").upper()

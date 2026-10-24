@@ -1,13 +1,43 @@
 {% extends "master_form_page.html" %}
 {% from "partials/bilabel.html" import t %}
 {% block pre_form %}
-<div class="alert bg-base-100 shadow-sm mb-3 text-sm flex-wrap">
-  <span>{{ p.village.village_name }} · {{ t('Rate', 'ભાવ') }} <b>{{ p.grain_rate_per_20kg | inr }}</b> / 20 kg · {{ t('bag', 'બેગ') }} <b>{{ p.grain.net_bag_weight }}</b> kg · {{ t('pay after', 'ચુકવણી') }} {{ p.pay_after_no_of_days }} {{ t('days', 'દિવસ') }}</span>
-  <a class="link" href="/PurchaseGroup/{{ p.id }}/Edit">{{ t('Farmer not listed? Add him to this purchase', 'ખેડૂત નથી? તેને આ ખરીદીમાં ઉમેરો') }}</a>
+{% macro tile(en, gu, value) %}
+<div class="flex items-center justify-between gap-2 rounded-2xl border border-base-300 bg-base-200 px-3 py-2">
+  <div class="leading-tight text-sm opacity-80">{{ en }}<span class="gu block">{{ gu }}</span></div>
+  <div class="text-sm font-bold text-right">{{ value }}</div>
 </div>
-<div class="mb-3 text-sm" id="payable-preview" data-rate="{{ p.grain_rate_per_20kg }}" data-net="{{ p.grain.net_bag_weight }}">
-  {{ t('Payable amount', 'ચૂકવવાપાત્ર રકમ') }}: <b id="pv-amount">—</b>
-  <span class="opacity-60">· {{ t('after borrowing', 'ઉધાર બાદ') }}: <b id="pv-net">—</b></span>
+{% endmacro %}
+{# the purchase at a glance: one card: a single row of small tiles, then the link below them; label on the left (English above Gujarati), its value on the right (English only) #}
+<div class="card bg-base-100 shadow mb-4 max-w-2xl">
+  <div class="card-body gap-3 p-4">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+    {{ tile('Village', 'ગામ', p.village.village_name) }}
+    {{ tile('Rate', 'ભાવ', (p.grain_rate_per_20kg | inr) ~ ' / 20 kg') }}
+    {{ tile('Bag', 'બેગ', p.grain.net_bag_weight ~ ' kg') }}
+    {{ tile('Pay after', 'ચુકવણી', p.pay_after_no_of_days ~ ' days') }}
+    </div>
+    <a class="link bi-stack inline-block text-sm" href="/PurchaseGroup/{{ p.id }}/Edit">{{ t('Farmer not listed? Add him to this purchase', 'ખેડૂત નથી? તેને આ ખરીદીમાં ઉમેરો') }}</a>
+  </div>
+</div>
+{% endblock %}
+{% block post_form %}
+{# the buttons, in their own card just above the amounts (they submit the form above through its id) #}
+<div class="card bg-base-100 shadow max-w-2xl mt-4">
+  <div class="card-body flex-row flex-wrap items-center gap-3">
+    <button class="btn btn-primary" form="master-form"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
+    <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
+  </div>
+</div>
+{# the amounts, below the form like the PurchaseIndividual form: label on the left (English above Gujarati), "₹ number" on the right #}
+<div class="card bg-base-100 shadow max-w-2xl mt-4" id="payable-preview" data-rate="{{ p.grain_rate_per_20kg }}" data-net="{{ p.grain.net_bag_weight }}">
+  <div class="card-body gap-3">
+    <div class="grid grid-cols-[auto_auto] justify-between gap-x-8 gap-y-3 items-center tabular-nums">
+      <div class="leading-tight">Payable amount<span class="gu block">ચૂકવવાપાત્ર રકમ</span></div>
+      <b id="pv-amount" class="text-right text-lg">—</b>
+      <div class="leading-tight">After borrowing<span class="gu block">ઉધાર બાદ</span></div>
+      <b id="pv-net" class="text-right text-lg">—</b>
+    </div>
+  </div>
 </div>
 <script>
 (function () {

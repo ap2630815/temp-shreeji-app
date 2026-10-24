@@ -11,7 +11,7 @@
   <div>{% if party_type == 'farmer' %}{{ t('Village', 'ગામ') }}: <b>{{ party.village.village_name }}</b>{% endif %}</div>
   <div>{{ t('Received by', 'લેનાર') }}: <b>{{ payment.receiver_name }}</b></div>
   <div>{{ t('Receiver mobile', 'લેનારનો મોબાઇલ') }}: {{ payment.receiver_mobile | mobhtml }}</div>
-  <div>{{ t('Method', 'રીત') }}: <b>{{ payment.method | upper }}</b></div>
+  <div>{{ t('Method', 'રીત') }}: <b>{{ payment.method | method }}</b></div>
   <div>{{ t('Reference', 'રેફરન્સ') }}: {{ payment.reference_no or '—' }}</div>
 </div>
 <div class="sum"><div>{{ t('Amount paid', 'ચૂકવેલી રકમ') }}<b class="big">{{ payment.amount | inr }}</b></div></div>

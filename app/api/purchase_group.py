@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, lock, normalize_fields, read_form, toolbar_ids, toolbar_window, today
 from app.api.masters_config import F, national_mobile, run_validation
 from app.core.db import get_db
 from app.core.templating import format_mobile, render, render_with_csrf
@@ -106,7 +106,7 @@ def entry_fields(farmers: list[Farmer], groups: list[LabourGroup]) -> list[F]:
         F("extra_kilos", "Extra kilos (loose, beyond full bags)", "વધારાના કિલો (પૂરી બેગ ઉપરાંત)", kind="int"),
         F("no_of_handful_bags", "Handful bags", "હેન્ડફુલ બેગ", kind="int",
           help=("Counted in the stock, not in the payment", "સ્ટોકમાં ગણાય છે, ચુકવણીમાં નહીં")),
-        F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg) — reference only", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો) — ફક્ત સંદર્ભ",
+        F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)",
           kind="int", help=("Used only to compare with the weighbridge, never in the payment", "ફક્ત કાંટા સાથે સરખામણી માટે, ચુકવણીમાં ક્યારેય નહીં")),
         F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ"),
         F("grain_store_at", "Grain stored at", "અનાજ ક્યાં સંગ્રહ્યું"),
@@ -165,6 +165,8 @@ async def list_page(
         stmt = stmt.where(PurchaseGroup.grain_id == grain_id)
     if village_id:
         stmt = stmt.where(PurchaseGroup.village_id == village_id)
+    if window := toolbar_window(request):
+        stmt = stmt.where(PurchaseGroup.purchase_group_date.between(*window))
     infos = (await db.scalars(stmt.order_by(PurchaseGroup.purchase_group_date.desc(), PurchaseGroup.id.desc()))).unique().all()
     views = await entry_views(db, purchase_group_ids=[p.id for p in infos]) if infos else []
     per: dict[int, list] = {p.id: [] for p in infos}
@@ -201,7 +203,7 @@ async def _farmers_by_id(db: AsyncSession, ids: list[int]) -> list[Farmer]:
 
 async def _form_page_ctx(db: AsyncSession, p_id: int | None, fields, values, errors, selected: list[Farmer], *, modal=None, confirm_dupes=False) -> dict:
     villages, _ = await _masters(db)
-    heading = ("Edit purchase", "ખરીદી સુધારો") if p_id else ("New purchase", "નવી ખરીદી")
+    heading = ("Edit purchase group", "ખરીદી જૂથ સુધારો") if p_id else ("New purchase group", "નવું ખરીદી જૂથ")
     return form_context(
         fields=fields, values=values, errors=errors, action=f"/PurchaseGroup/{p_id}" if p_id else "/PurchaseGroup", heading=heading,
         back_url=f"/PurchaseGroup/{p_id}" if p_id else "/PurchaseGroup", selected=selected, picker_villages=villages, picker_village=values.get("village_id", ""),
@@ -413,7 +415,7 @@ async def _entry_form_data(db: AsyncSession, p: PurchaseGroup):
 
 def _entry_ctx(p, fields, values, errors, action, heading, has_farmers=True):
     return form_context(
-        fields=fields, values=values, errors=errors, action=action, heading=heading, back_url=f"/PurchaseGroup/{p.id}", p=p, has_farmers=has_farmers,
+        fields=fields, values=values, errors=errors, action=action, heading=heading, back_url=f"/PurchaseGroup/{p.id}", p=p, has_farmers=has_farmers, buttons_outside=True,
     )
 
 
