@@ -3,7 +3,7 @@ Structure only - no data rows.
 
 ==============================================================================
 
-TABLE: bag_suppliers
+TABLE: empty_bag_sellers (direct from sellers to particular farmer house)
 -------------------------------------------------------------------
 column      | type                     | constraints
 -------------------------------------------------------------------
@@ -11,6 +11,27 @@ id          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 name        | VARCHAR(120)             | NOT NULL
 name_gu     | VARCHAR(120)             | -
 pet_name    | VARCHAR(30)              | NOT NULL, UNIQUE
+pet_name_gu | VARCHAR(30)              | -
+mobile      | VARCHAR(10)              | NOT NULL, UNIQUE
+upi_number  | VARCHAR(10)              | UNIQUE
+description | TEXT                     | -
+created_at  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
+  CHECK ck_mobile_10_digits: mobile ~ '^[0-9]{10}$'
+
+==============================================================================
+
+TABLE: empty_bag_movers (from stockyard to particular farmer house)
+-------------------------------------------------------------------
+column      | type                     | constraints
+-------------------------------------------------------------------
+id          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+name        | VARCHAR(120)             | NOT NULL
+name_gu     | VARCHAR(120)             | -
+pet_name    | VARCHAR(30)              | NOT NULL, UNIQUE
+pet_name_gu | VARCHAR(30)              | -
 mobile      | VARCHAR(10)              | NOT NULL, UNIQUE
 upi_number  | VARCHAR(10)              | UNIQUE
 description | TEXT                     | -
@@ -29,6 +50,7 @@ column           | type                     | constraints
 id               | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 transporter_name | VARCHAR(120)             | NOT NULL, UNIQUE
 pet_name         | VARCHAR(30)              | NOT NULL, UNIQUE
+pet_name_gu      | VARCHAR(30)              | NOT NULL
 location         | VARCHAR(60)              | NOT NULL
 owner_name       | VARCHAR(120)             | NOT NULL
 owner_name_gu    | VARCHAR(120)             | -
@@ -136,16 +158,17 @@ Table constraints / indexes:
 
 TABLE: grains
 ---------------------------------------------------------------------------
-column          | type                     | constraints
+column                      | type                     | constraints
 ---------------------------------------------------------------------------
-id              | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-grain_name      | VARCHAR(30)              | NOT NULL, UNIQUE
-grain_name_gu   | VARCHAR(30)              | -
-net_bag_weight  | INTEGER                  | NOT NULL
-booking_weight  | INTEGER                  | NOT NULL
-grain_terms     | TEXT                     | -
-description     | TEXT                     | -
-created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id                          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+grain_name                  | VARCHAR(30)              | NOT NULL, UNIQUE
+grain_name_gu               | VARCHAR(30)              | -
+net_bag_weight              | INTEGER                  | NOT NULL
+expected_raw_weight_per_bag | FLOAT                    | NOT NULL
+booking_weight              | INTEGER                  | NOT NULL
+grain_terms                 | TEXT                     | -
+description                 | TEXT                     | -
+created_at                  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
   CHECK ck_grains_net_bag_weight: net_bag_weight IN (35, 50, 70, 100)
@@ -153,5 +176,24 @@ Table constraints / indexes:
 
 ==============================================================================
 
+TABLE: stockyards
+--------------------------------------------------------------------------------
+column                 | type                     | constraints
+--------------------------------------------------------------------------------
+id                     | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+name_of_stockyard      | TEXT                     | NOT NULL
+location               | TEXT                     | NOT NULL
+stockyard_owner_name   | VARCHAR(120)             | NOT NULL, DEFAULT 'Self'
+stockyard_owner_mobile | VARCHAR(10)              | NOT NULL
+stockyard_upi_number   | VARCHAR(10)              | -
+storage_capacity       | BIGINT                   | NOT NULL
+rent_of_stockyard      | INTEGER                  | NOT NULL, DEFAULT 0
+description            | TEXT                     | -
+created_at             | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
+Table constraints / indexes:
+  CHECK ck_stockyards_rent_of_stockyard_nonneg: rent_of_stockyard >= 0
+  CHECK ck_stockyards_owner_mobile_10_digits: stockyard_owner_mobile ~ '^[0-9]{10}$'
+  CHECK ck_stockyards_upi_number_10_digits: stockyard_upi_number IS NULL OR stockyard_upi_number ~ '^[0-9]{10}$'
 
+==============================================================================
