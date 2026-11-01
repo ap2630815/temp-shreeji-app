@@ -1,0 +1,158 @@
+LEDGERS USED IN THE APPLICATION
+===============================
+Tables: app/models/ledger.py (spec: file5-payment-ledger.txt). Logic: app/services/ledger.py, payables.py, receivables.py.
+Nothing is stored as a balance: paid / received / due / status are always derived from allocations.
+
+A. MONEY-OUT LEDGER  (what we pay)
+----------------------------------
+Table payments
+    id, party_type, party_id, amount (>0), payment_date, business_year (e.g. 2025-26),
+    method (cash | cheque | upi | bank), receiver_name, receiver_mobile (10 digits), reference_no,
+    status (partial | final | complete), description, created_by
+    party_type -> table that party_id points to:
+        farmer        -> farmers
+        truck         -> trucks         (paid to the truck owner)
+        labour_group  -> labour_groups
+        bag_supplier  -> bag_suppliers
+        broker        -> brokers
+
+Table payment_allocations   (which bills a payment settled)
+    id, payment_id -> payments, payable_type, payable_id, amount (>0)
+    payable_type -> table that payable_id points to:
+        farmer              -> purchase_farmers_entries
+        purchase_individual -> purchase_individuals   (direct farmer entries)
+        truck               -> truck_trips
+        labour_group        -> labour_work
+        bag_supplier        -> bag_supplies
+        broker              -> bilties            (brokerage per bilty)
+
+Payment ledgers (one per party type; amount owed per row):
+    1. Farmer ledger        row = purchase entry or direct entry   amount = net_payable (payable - borrowed); has due_date
+    2. Truck ledger         row = truck trip                       amount = truck_trip_total_amount
+    3. Labour ledger        row = labour work day                  amount = net_payable (wages - borrowing)
+    4. Bag supplier ledger  row = bag supply                       amount = rate_per_bag * no_of_bags
+    5. Broker ledger        row = bilty                            amount = brokerage_amount
+    Statement columns after the date:
+        farmer: Details | truck: Industry, Grain, Bags | labour: Work |
+        bag supplier: Farmer, Village, Bags, Rate/bag | broker: Bill no., Truck, Industry
+    Per row: amount, paid (sum of allocations), due = amount - paid, status = paid / partial / pending, overdue (farmers only).
+
+
+B. MONEY-IN LEDGER  (what industries pay us)
+--------------------------------------------
+Table receipts
+    id, industry_id -> industries, amount (>0), receipt_date, business_year,
+    method (cash | cheque | upi | bank), reference_no, payer_name, description, created_by
+
+Table receipt_allocations
+    id, receipt_id -> receipts, bilty_id -> bilties, amount (>0)
+
+Industry ledger:
+    row = bilty (one per truck trip)  amount = receivable_after_deduction (billed to the industry)
+    Per row: received (sum of allocations), due, status = unweighed / paid / partial / pending.
+    Summary: trucks, awaiting_weight, billed, received, due, short_kg.
+
+
+C. HOW A PAYMENT / RECEIPT IS RECORDED
+--------------------------------------
+1. Reject if the business year is locked.
+2. Lock the party (advisory lock) so two clerks cannot allocate against the same dues.
+3. Load the party's payables, oldest first (payments: due_date or doc date; receipts: bilty date).
+4. Spread the amount over the open dues; reject if it exceeds the outstanding total.
+5. Insert payment / receipt, then one allocation row per bill settled.
+6. Write an audit log entry (create, table, id, allocations).
+payments.status = partial (still owing) / complete (clears everything, only payment) / final (clears everything, after earlier payments).
+
+
+D. REPORT LEDGERS  (analysis page, per business year; filter by grain / village)
+-------------------------------------------------------------------------------
+farmer, truck, labour, bag supplier, broker, industry.
+Each shows stats (amounts, paid, due, overdue), grouped tables, monthly bars, and payments/receipts by method.
+
+
+E. STOCK LEDGER  (bags per farmer entry)  -- app/services/stock.py
+-------------------------------------------------------------------
+Not a table of its own: bags bought minus bags loaded on trucks, calculated on demand.
+    bought  = purchase_farmers_entries.total_available_bags   (filled bags + handful bags)
+    loaded  = SUM(truck_load_lines.no_of_loaded_bags)
+    available = bought - loaded
+Levels:
+    per farmer entry     stock_by_entry(entry_ids, exclude_trip_id)
+                         exclude_trip_id leaves one trip's own lines out, used when editing that trip
+    per purchase group   stock_by_purchase_group(ids)   (one deal: all its entries together)
+Table truck_load_lines  (the loading side of the ledger)
+    id, trip_id -> truck_trips, purchase_farmer_entry_id -> purchase_farmers_entries,
+    no_of_loaded_bags (>0), total_remaining_bags (>=0)
+    one line per (trip, entry)
+    total_remaining_bags is the only stored balance: bags still unloaded in the entry right after
+    each line, lines in id order. renumber_remaining() recalculates it after any line of that entry
+    is added, changed or removed.
+Direct farmer entries (purchase_individuals) are part of the stock ledger too: truck_load_lines has purchase_individual_id beside
+purchase_farmer_entry_id (exactly one is filled).
+Bags can also be taken from a farmer to a stockyard (farmer_stockyard_transfers); they count as 'moved' and reduce what is left at the farmer.
+    available at farmer = total_available_bags - loaded on trucks - taken to a stockyard
+Farmer bag ledger page: /StockyardPurchase?view=farmer_bags  (per entry: total available, loaded, taken to stockyard, remaining).
+Stockyard bag ledger page: /StockyardPurchase?view=stock  (per stockyard and grain: filled bought here / from farmers / loaded / in stock;
+empty received / given to farmers / used in purchases / in stock). Formulas: formula.txt, 'Stockyard bag ledgers'.
+Stockyard load lines (stockyard_load_lines) and farmer load lines are added in ONE form on the trip page: farmer part above,
+stockyard part below; fill either part or both (truck loaded wholly or partly from farmers / the stockyard).
+Loading and removing lines are written to the audit log (section F).
+
+
+F. AUDIT LOG  (who changed what and when)  -- app/models/user.py, app/services/audit.py
+----------------------------------------------------------------------------------------
+Table audit_log   (rows are only ever inserted, never updated or deleted)
+    id, at (timestamp, set by the database), user_id -> users, username,
+    action (create | update | delete), table_name, record_id, changes (JSON)
+changes:
+    create : all the values saved
+    update : only the changed fields, as {field: [old, new]}   (audit.diff)
+    delete : the identifying values of the removed row
+Written by audit.log(db, user, action, table, record_id, changes) in the same transaction as the change.
+Tables that write audit rows:
+    payments                   create (party, amount, method, receiver, status, allocations)
+    receipts                   create (industry, amount, method, allocations)
+    purchase_group             create / update
+    purchase_group_farmers     create / delete
+    purchase_farmers_entries   create / update / delete
+    purchase_individuals       create / update
+    broker_bookings            create / update
+    truck_trips                create / update
+    truck_load_lines           create / delete
+    bilties                    create / update
+    labour_work                create / update
+    bag_supplies               create / update
+    stockyard_purchases        create / update
+    stockyard_purchase_entries create / update  (also when a purchase edit recalculates its entries)
+    stockyard_arrangement_entries create / update  (also when an entry's filled bags change)
+
+
+G. STOCKYARD PURCHASE RECORDS  (/StockyardPurchase)  -- app/api/stockyard.py
+---------------------------------------------------------------------------
+Records of grain bought from a farmer and kept at a stockyard. They are NOT yet in the money-out ledger (section A):
+there is no party type for them in payments / payment_allocations, so nothing is paid or allocated against them.
+Not in the stock ledger (section E) either: that one counts only purchase_farmers_entries and truck_load_lines.
+
+Master  stockyards
+    id, name_of_stockyard, location, stockyard_owner_name (default Self), stockyard_owner_mobile (10 digits),
+    stockyard_upi_number (optional, 10 digits), storage_capacity (bags), rent_of_stockyard (>= 0, default 0), description
+
+Table stockyard_purchases   (the deal)
+    id, stockyard_purchase_date, stockyard_id -> stockyards, farmer_id -> farmers, grain_id -> grains,
+    grain_rate_per_20kg (>0), pay_after_no_of_days (>=0), no_of_empty_bags (>=0), terms, business_year, description, created_by
+
+Table stockyard_purchase_entries   (weighed lots of a deal; the farmer's payable side)
+    id, stockyard_purchase_entry_date, stockyard_purchase_id -> stockyard_purchases, no_of_filled_bags, extra_kilos,
+    payable_amount, borrowed_amount (<= payable_amount), due_date, grain_quality_code, labour_group_id (optional),
+    business_year, description, created_by
+    per row: net_payable = payable_amount - borrowed_amount     (formulas: formula.txt section 13)
+
+Table stockyard_arrangement_entries   (bag arranging work paid per bag to a labour group)
+    id, stockyard_arrangement_date, stockyard_purchase_entry_id -> stockyard_purchase_entries (optional, unique when set),
+    labour_group_id (optional), no_of_arranged_bags (>0), rate_per_arranged_bag (1 to 20), business_year, description, created_by
+    per row: amount = no_of_arranged_bags * rate_per_arranged_bag
+
+Derived views (no table of their own):
+    purchase entries     bags, payable, borrowed, net per entry, due date; totals shown in the page header
+    arrangement entries  bags and amount per entry; totals shown in the page header
+Only the current business year accepts new or changed rows; every save is written to the audit log (section F).

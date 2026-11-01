@@ -43,13 +43,13 @@
         {% set path = request.url.path %}
         {% set pay_type = request.query_params.get('type', 'farmer') %}
         {% set ledger = request.query_params.get('ledger', 'farmer') %}
-        {% set village_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmersEntries', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/BagSupplies', '/Masters/Villages', '/Masters/Farmers'))
+        {% set village_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/BagSupplies', '/Masters/Villages', '/Masters/Farmers'))
                                   or (path.startswith('/Payables') and pay_type == 'farmer')
                                   or (path.startswith('/Analysis') and ledger != 'labour')) %}
-        {% set grain_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmersEntries', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/Masters/Grains', '/Masters/LabourWages', '/Masters/Brokerages'))
+        {% set grain_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/Masters/Grains', '/Masters/LabourWages', '/Masters/Brokerages'))
                                 or (path.startswith('/Payables') and pay_type == 'farmer')
                                 or (path.startswith('/Analysis') and ledger != 'bag')) %}
-        {% set date_off = not path.startswith(('/PurchaseGroup', '/PurchaseFarmersEntries', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/BagSupplies', '/LabourWork', '/Payables')) %}
+        {% set date_off = not path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/BagSupplies', '/StockyardPurchase', '/LabourWork', '/Payables')) %}
         {% set period = request.query_params.get('period', '') %}
         {% set on_date = request.query_params.get('on_date', '') if period == 'date' else '' %}
         {% set sel_p = (PERIODS | selectattr(0, 'equalto', period) | list | first) if period and period != 'date' else none %}
@@ -106,13 +106,8 @@
         {{ item('/', 'Dashboard', 'ડેશબોર્ડ', cls='py-4 soft-light font-semibold') }}
         <li class="menu-title">{{ title('Buying', 'ખરીદી') }}</li>
         {% set pp = request.url.path %}
-        <li class="hover-sub {{ 'open' if pp.startswith(('/PurchaseFarmersEntries', '/PurchaseIndividual', '/PurchaseGroup')) }}">
-          <a href="/PurchaseFarmersEntries" class="{{ 'active' if pp.startswith('/PurchaseFarmersEntries') else '' }}"><span>Purchase Farmers Entries</span><span class="gu text-xs">ખરીદી ખેડૂત નોંધ</span></a>
-          <ul>
-            {{ item('/PurchaseIndividual', 'Purchase Individual', 'ખરીદી વ્યક્તિગત', '/PurchaseIndividual') }}
-            {{ item('/PurchaseGroup', 'Purchase Group', 'ખરીદી જૂથ', '/PurchaseGroup') }}
-          </ul>
-        </li>
+        {{ item('/PurchaseFarmers', 'Purchase Farmers', 'ખરીદી ખેડૂત', ('/PurchaseFarmers', '/PurchaseGroup', '/PurchaseIndividual')) }}
+        {{ item('/StockyardPurchase', 'Stockyard purchase', 'સ્ટોકયાર્ડ ખરીદી', '/StockyardPurchase') }}
         {{ item('/BagSupplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
         {{ item('/LabourWork', 'Labour work', 'મજૂર કામ') }}
         <li class="menu-title">{{ title('Selling', 'વેચાણ') }}</li>

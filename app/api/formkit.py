@@ -37,6 +37,11 @@ def normalize_fields(fields: list[F], raw: dict[str, str]) -> dict[str, Any]:
                 value = int(value)
             except ValueError:
                 pass
+        elif f.kind == "decimal":
+            try:
+                value = float(value)
+            except ValueError:
+                pass
         out[f.name] = value
     return out
 

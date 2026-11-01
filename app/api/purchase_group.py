@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi_csrf_protect import CsrfProtect
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
@@ -20,9 +20,11 @@ from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_cont
 from app.api.masters_config import F, national_mobile, run_validation
 from app.core.db import get_db
 from app.core.templating import format_mobile, render, render_with_csrf
-from app.models import Farmer, Grain, LabourGroup, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, TruckLoadLine, User, Village
+from app.models import Farmer, FarmerStockyardTransfer, Grain, LabourGroup, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, FarmersTruckLoadLine, User, Village
 from app.services import audit, roster
 from app.services.ledger import entry_views, paid_for_entry, purchase_group_entries, totals
+from app.services.locations import stored_locations
+from app.services.duplicates import DUPLICATE_MSG, find_duplicate
 from app.services.money import payable_amount, total_available_bags
 from app.services.stock import renumber_remaining
 from app.services.years import YearLockedError, allowed_years, assert_year_open, business_year_of, current_year_label, require_year_visible
@@ -88,14 +90,14 @@ class EntryIn(BaseModel):
     no_of_filled_bags: Annotated[int, Field(ge=0, le=INT_MAX)]
     extra_kilos: Annotated[int, Field(ge=0, le=INT_MAX)] | None = None  # blank means 0
     no_of_handful_bags: Annotated[int, Field(ge=0, le=INT_MAX)] | None = None  # blank means 0
-    expected_raw_weight_per_bag: Annotated[int, Field(ge=0, le=INT_MAX)] | None = None
+    expected_raw_weight_per_bag: Annotated[float, Field(ge=0, le=1000)] | None = None  # blank: the grain's value
     grain_quality_code: str | None = None
-    grain_store_at: str | None = None
+    grain_stored_location: str | None = None
     borrowed_amount: Annotated[int, Field(ge=0, le=INT_MAX)] | None = None  # blank means 0
     description: str | None = None
 
 
-def entry_fields(farmers: list[Farmer], groups: list[LabourGroup]) -> list[F]:
+def entry_fields(farmers: list[Farmer], groups: list[LabourGroup], locations: tuple[tuple[str, str], ...] = ()) -> list[F]:
     return [
         F("farmer_id", "Farmer", "ખેડૂત", kind="select", required=True,
           options=tuple((str(f.id), f"{f.farmer_name} — {f.village.village_name} — {format_mobile(f.mobile)}") for f in farmers)),
@@ -107,9 +109,10 @@ def entry_fields(farmers: list[Farmer], groups: list[LabourGroup]) -> list[F]:
         F("no_of_handful_bags", "Handful bags", "હેન્ડફુલ બેગ", kind="int",
           help=("Counted in the stock, not in the payment", "સ્ટોકમાં ગણાય છે, ચુકવણીમાં નહીં")),
         F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)",
-          kind="int", help=("Used only to compare with the weighbridge, never in the payment", "ફક્ત કાંટા સાથે સરખામણી માટે, ચુકવણીમાં ક્યારેય નહીં")),
+          kind="decimal", help=("Used only to compare with the weighbridge, never in the payment. Blank starts at the grain's value", "ફક્ત કાંટા સાથે સરખામણી માટે, ચુકવણીમાં ક્યારેય નહીં. ખાલી રાખો તો અનાજના મૂલ્યથી શરૂ")),
         F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ"),
-        F("grain_store_at", "Grain stored at", "અનાજ ક્યાં સંગ્રહ્યું"),
+        F("grain_stored_location", "Grain stored location", "અનાજ સંગ્રહ સ્થળ", options=locations,
+          help=("Pick a place used before, or type a new one (text in brackets is ignored when matching)", "પહેલાં વપરાયેલ સ્થળ પસંદ કરો અથવા નવું લખો (કૌંસનો લખાણ ગણાતું નથી)")),
         F("borrowed_amount", "Borrowing / advance to deduct (₹)", "ઉધાર / એડવાન્સ કાપવાના (₹)", kind="int"),
         F("description", "Description (e.g. 2 quality grains, warning)", "વર્ણન (દા.ત. બે ગુણવત્તા, ચેતવણી)", kind="textarea"),
     ]
@@ -120,8 +123,8 @@ def entry_values(e: PurchaseFarmerEntry) -> dict:
     return dict(
         farmer_id=str(e.farmer_id), labour_group_id=str(e.labour_group_id), purchase_entry_date=e.purchase_entry_date.isoformat(),
         no_of_filled_bags=str(e.no_of_filled_bags), extra_kilos=str(e.extra_kilos), no_of_handful_bags=str(e.no_of_handful_bags),
-        expected_raw_weight_per_bag=n(e.expected_raw_weight_per_bag), grain_quality_code=e.grain_quality_code or "",
-        grain_store_at=e.grain_store_at or "", borrowed_amount=str(e.borrowed_amount), description=e.description or "",
+        expected_raw_weight_per_bag=f"{e.expected_raw_weight_per_bag:g}", grain_quality_code=e.grain_quality_code or "",
+        grain_stored_location=e.grain_stored_location or "", borrowed_amount=str(e.borrowed_amount), description=e.description or "",
     )
 
 
@@ -129,7 +132,7 @@ def entry_snapshot(e: PurchaseFarmerEntry) -> dict:
     return dict(
         farmer_id=e.farmer_id, labour_group_id=e.labour_group_id, purchase_entry_date=e.purchase_entry_date, no_of_filled_bags=e.no_of_filled_bags,
         extra_kilos=e.extra_kilos, no_of_handful_bags=e.no_of_handful_bags, total_available_bags=e.total_available_bags,
-        expected_raw_weight_per_bag=e.expected_raw_weight_per_bag, grain_quality_code=e.grain_quality_code, grain_store_at=e.grain_store_at,
+        expected_raw_weight_per_bag=e.expected_raw_weight_per_bag, grain_quality_code=e.grain_quality_code, grain_stored_location=e.grain_stored_location,
         borrowed_amount=e.borrowed_amount, payable_amount=e.payable_amount, due_date=e.due_date, description=e.description,
     )
 
@@ -154,18 +157,14 @@ async def _years_with_data(db: AsyncSession, user: User) -> list[str]:
 
 # ---------------------------------------------------------------- list
 
-@router.get("", response_class=HTMLResponse)
-async def list_page(
-    request: Request, year: str = "", grain_id: int = 0, village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
-):
-    years = await _years_with_data(db, user)
-    year = year if year in years else current_year_label()
+async def group_rows(db: AsyncSession, year: str, grain_id: int = 0, village_id: int = 0, window=None) -> list[tuple]:
+    """One row per purchase_group of the year: (group, totals of its farmer entries, number of listed farmers)."""
     stmt = select(PurchaseGroup).where(PurchaseGroup.business_year == year)
     if grain_id:
         stmt = stmt.where(PurchaseGroup.grain_id == grain_id)
     if village_id:
         stmt = stmt.where(PurchaseGroup.village_id == village_id)
-    if window := toolbar_window(request):
+    if window:
         stmt = stmt.where(PurchaseGroup.purchase_group_date.between(*window))
     infos = (await db.scalars(stmt.order_by(PurchaseGroup.purchase_group_date.desc(), PurchaseGroup.id.desc()))).unique().all()
     views = await entry_views(db, purchase_group_ids=[p.id for p in infos]) if infos else []
@@ -178,10 +177,14 @@ async def list_page(
             select(PurchaseGroupFarmer.purchase_group_id, func.count()).where(PurchaseGroupFarmer.purchase_group_id.in_([p.id for p in infos])).group_by(PurchaseGroupFarmer.purchase_group_id)
         )).all()}
     now = today()
-    rows = [(p, totals(per[p.id], now), listed.get(p.id, 0)) for p in infos]
-    return render_with_csrf(
-        request, csrf, "purchase_group_list.html", user=user, rows=rows, grain_id=grain_id, year=year, years=years, year_locked=year != current_year_label()
-    )
+    return [(p, totals(per[p.id], now), listed.get(p.id, 0)) for p in infos]
+
+
+@router.get("", response_class=HTMLResponse)
+async def list_page(request: Request, user: User = Depends(current_user)):
+    """The purchase groups are the 'groups' tab of /PurchaseFarmers."""
+    q = request.url.query
+    return RedirectResponse("/PurchaseFarmers?view=groups" + (f"&{q}" if q else ""), status_code=307)
 
 
 # ---------------------------------------------------------------- the purchase form: fields on the left, farmer picker on the right
@@ -206,7 +209,7 @@ async def _form_page_ctx(db: AsyncSession, p_id: int | None, fields, values, err
     heading = ("Edit purchase group", "ખરીદી જૂથ સુધારો") if p_id else ("New purchase group", "નવું ખરીદી જૂથ")
     return form_context(
         fields=fields, values=values, errors=errors, action=f"/PurchaseGroup/{p_id}" if p_id else "/PurchaseGroup", heading=heading,
-        back_url=f"/PurchaseGroup/{p_id}" if p_id else "/PurchaseGroup", selected=selected, picker_villages=villages, picker_village=values.get("village_id", ""),
+        back_url=f"/PurchaseGroup/{p_id}" if p_id else "/PurchaseFarmers?view=groups", selected=selected, picker_villages=villages, picker_village=values.get("village_id", ""),
         p_id=p_id, modal=modal, confirm_dupes=confirm_dupes, year=current_year_label(), picker_grain=values.get("grain_id", ""),
         picker_free=("pfree" in values) if "pfree_seen" in values else True,  # ticked by default; a form sent back keeps the user's choice
     )
@@ -426,7 +429,7 @@ async def new_entry_page(
     p = await _get_info(db, purchase_group_id)
     farmers, groups = await _entry_form_data(db, p)
     ctx = _entry_ctx(
-        p, entry_fields(farmers, groups),
+        p, entry_fields(farmers, groups, await stored_locations(db)),
         dict(purchase_entry_date=today().isoformat(), extra_kilos="0", no_of_handful_bags="0", borrowed_amount="0", farmer_id=str(farmer_id) if farmer_id else ""), {},
         f"/PurchaseGroup/{p.id}/Entries",
         (f"Add farmer entry — {p.village.village_name}", f"ખેડૂત એન્ટ્રી ઉમેરો — {p.village.village_name}"), bool(farmers),
@@ -443,7 +446,7 @@ async def edit_entry_page(
         raise HTTPException(404)
     p = e.purchase_group
     farmers, groups = await _entry_form_data(db, p)
-    fields = lock(entry_fields(farmers, groups), {"farmer_id"})
+    fields = lock(entry_fields(farmers, groups, await stored_locations(db)), {"farmer_id"})
     ctx = _entry_ctx(
         p, fields, entry_values(e), {}, f"/PurchaseGroup/Entries/{e.id}",
         (f"Edit entry — {e.farmer.farmer_name}", f"એન્ટ્રી સુધારો — {e.farmer.farmer_name}"),
@@ -472,9 +475,9 @@ async def update_entry(
 
 
 async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry | None, user: User, db: AsyncSession):
-    p_id, village_name, net_weight = p.id, p.village.village_name, p.grain.net_bag_weight  # read now: a rollback expires the ORM objects
+    p_id, village_name, net_weight, expected_weight = p.id, p.village.village_name, p.grain.net_bag_weight, p.grain.expected_raw_weight_per_bag  # read now: a rollback expires the ORM objects
     farmers, groups = await _entry_form_data(db, p)
-    fields = entry_fields(farmers, groups)
+    fields = entry_fields(farmers, groups, await stored_locations(db))
     raw = await read_form(request)
     if e is not None:
         fields = lock(fields, {"farmer_id"})
@@ -494,6 +497,8 @@ async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry
     clean["extra_kilos"] = clean["extra_kilos"] or 0
     clean["no_of_handful_bags"] = clean["no_of_handful_bags"] or 0
     clean["borrowed_amount"] = clean["borrowed_amount"] or 0
+    if clean["expected_raw_weight_per_bag"] is None:  # starts at the grain's value, editable
+        clean["expected_raw_weight_per_bag"] = expected_weight
     if clean["extra_kilos"] >= net_weight:
         return rerender({"extra_kilos": (f"Must be less than one bag ({net_weight} kg); add it to the bag count", f"એક બેગ ({net_weight} કિલો) કરતાં ઓછા હોવા જોઈએ")})
     if clean["farmer_id"] not in {f.id for f in farmers}:
@@ -512,15 +517,19 @@ async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry
     if clean["borrowed_amount"] > new_payable:
         return rerender({"borrowed_amount": (f"Cannot exceed the amount payable (₹ {new_payable})", f"ચૂકવવાપાત્ર રકમ (₹ {new_payable}) થી વધુ ન હોઈ શકે")})
 
+    if (dup := await find_duplicate(db, clean["farmer_id"], clean["purchase_entry_date"], p.grain_id, p.grain_rate_per_20kg,
+                                    clean["no_of_filled_bags"], clean["extra_kilos"], ("purchase_farmers_entries", e.id) if e else None)):
+        return rerender({"no_of_filled_bags": DUPLICATE_MSG(dup)})
     before = None
     if e is not None:
         paid = await paid_for_entry(db, e.id)
         if new_payable - clean["borrowed_amount"] < paid:
             return rerender({"no_of_filled_bags": (f"₹ {paid} is already paid against this entry; the amount cannot go below that", f"આ એન્ટ્રી સામે ₹ {paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
-        loaded = int(await db.scalar(select(func.coalesce(func.sum(TruckLoadLine.no_of_loaded_bags), 0)).where(TruckLoadLine.purchase_farmer_entry_id == e.id)))
+        loaded = int(await db.scalar(select(func.coalesce(func.sum(FarmersTruckLoadLine.no_of_loaded_bags), 0)).where(FarmersTruckLoadLine.purchase_farmer_entry_id == e.id)))
+        loaded += int(await db.scalar(select(func.coalesce(func.sum(FarmerStockyardTransfer.no_of_bags), 0)).where(FarmerStockyardTransfer.purchase_farmer_entry_id == e.id)))
         available = total_available_bags(clean["no_of_filled_bags"], clean["no_of_handful_bags"])
         if available < loaded:
-            return rerender({"no_of_filled_bags": (f"{loaded} bags of this entry are already loaded on trucks; the total cannot go below that", f"આ એન્ટ્રીની {loaded} બેગ ટ્રકમાં ભરાઈ ગઈ છે; કુલ તેથી ઓછી ન થઈ શકે")})
+            return rerender({"no_of_filled_bags": (f"{loaded} bags of this entry are already loaded on trucks or taken to a stockyard; the total cannot go below that", f"આ એન્ટ્રીની {loaded} બેગ ટ્રકમાં ભરાઈ કે સ્ટોકયાર્ડમાં લઈ જવાઈ ગઈ છે; કુલ તેથી ઓછી ન થઈ શકે")})
         before = entry_snapshot(e)
         for name, value in clean.items():
             setattr(e, name, value)

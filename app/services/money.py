@@ -43,12 +43,12 @@ def brokerage_amount(total_bags_in_truck: int, brokerage_per_bag: int) -> int:
     return total_bags_in_truck * brokerage_per_bag
 
 
-def expected_total_loaded_weight(lines: list[tuple[int, int | None]]) -> int | None:
+def expected_total_loaded_weight(lines: list[tuple[int, float | None]]) -> int | None:
     """Sum of no_of_loaded_bags * expected_raw_weight_per_bag over the trip's load lines.
     None when any line's entry has no expected weight (so a partial sum is never shown as a total)."""
     if any(weight is None for _, weight in lines):
         return None
-    return sum(bags * weight for bags, weight in lines)
+    return int(Decimal(str(sum(bags * weight for bags, weight in lines))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))  # whole kg
 
 
 def receivable_amount(industry_net_kg: int, booking_weight: int, grain_rate_per_booking_weight: int, any_rate_change: int) -> int:

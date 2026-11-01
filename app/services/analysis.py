@@ -117,7 +117,7 @@ class _G(dict):
 
 
 def _trip_villages(trip: TruckTrip) -> set[int]:
-    return {line.entry.purchase_group.village_id for line in trip.load_lines}
+    return {line.entry.village_id for line in trip.load_lines}
 
 
 def _keep_trip(trip: TruckTrip, grain_id: int, village_id: int) -> bool:

@@ -5,13 +5,14 @@ set by the application from the record's own date (file9-database.txt, rule 5)."
 
 from datetime import date
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, Float, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Date, Float, ForeignKey, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, text
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import cast, func, select
+from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.masters import Brokerage, Farmer, Grain, Industry, LabourGroup, BagSupplier, Transporter, Truck, Village
+from app.models.masters import Brokerage, Farmer, Grain, Industry, LabourGroup, BagSupplier, Stockyard, Transporter, Truck, Village
 from app.services import money
 
 BUSINESS_YEAR = r"^[0-9]{4}-[0-9]{2}$"
@@ -84,10 +85,7 @@ class PurchaseFarmerEntry(TimestampMixin, Base):
         CheckConstraint("payable_amount >= 0", name="ck_purchase_farmers_entries_payable_amount"),
         CheckConstraint("borrowed_amount >= 0", name="ck_purchase_farmers_entries_borrowed_amount"),
         CheckConstraint("borrowed_amount <= payable_amount", name="ck_purchase_farmers_entries_borrowed_amount_le_payable_amount"),
-        CheckConstraint(
-            "expected_raw_weight_per_bag IS NULL OR expected_raw_weight_per_bag >= 0",
-            name="ck_purchase_farmers_entries_expected_raw_weight_per_bag",
-        ),
+        CheckConstraint("expected_raw_weight_per_bag >= 0", name="ck_purchase_farmers_entries_expected_raw_weight_per_bag"),
         CheckConstraint("no_of_handful_bags >= 0", name="ck_purchase_farmers_entries_no_of_handful_bags"),
         CheckConstraint("total_available_bags >= 0", name="ck_purchase_farmers_entries_total_available_bags"),
         Index("ix_purchase_farmers_entries_purchase_group_id", "purchase_group_id"),
@@ -110,9 +108,9 @@ class PurchaseFarmerEntry(TimestampMixin, Base):
     payable_amount: Mapped[int] = mapped_column(BigInteger)
     borrowed_amount: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     due_date: Mapped[date] = mapped_column(Date)
-    expected_raw_weight_per_bag: Mapped[int | None] = mapped_column(Integer)
+    expected_raw_weight_per_bag: Mapped[float] = mapped_column(Float)  # starts at the grain's expected_raw_weight_per_bag, editable
     grain_quality_code: Mapped[str | None] = mapped_column(Text)
-    grain_store_at: Mapped[str | None] = mapped_column(Text)
+    grain_stored_location: Mapped[str | None] = mapped_column(Text)
     no_of_handful_bags: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     total_available_bags: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     business_year: Mapped[str] = mapped_column(String(7))
@@ -134,6 +132,14 @@ class PurchaseFarmerEntry(TimestampMixin, Base):
 
     # ---- the same names a PurchaseIndividual has, so the farmer ledger can list both kinds of entry together
     is_direct = False
+
+    @property
+    def village_id(self) -> int:
+        return self.purchase_group.village_id
+
+    @property
+    def village(self) -> Village:
+        return self.purchase_group.village
 
     @property
     def entry_date(self) -> date:
@@ -170,7 +176,7 @@ class PurchaseIndividual(TimestampMixin, Base):
         CheckConstraint("payable_amount >= 0", name="ck_purchase_individuals_payable_amount"),
         CheckConstraint("borrowed_amount >= 0", name="ck_purchase_individuals_borrowed_amount"),
         CheckConstraint("borrowed_amount <= payable_amount", name="ck_purchase_individuals_borrowed_amount_le_payable_amount"),
-        CheckConstraint("expected_raw_weight_per_bag IS NULL OR expected_raw_weight_per_bag >= 0", name="ck_purchase_individuals_expected_raw_weight_per_bag"),
+        CheckConstraint("expected_raw_weight_per_bag >= 0", name="ck_purchase_individuals_expected_raw_weight_per_bag"),
         CheckConstraint("no_of_handful_bags >= 0", name="ck_purchase_individuals_no_of_handful_bags"),
         CheckConstraint("total_available_bags >= 0", name="ck_purchase_individuals_total_available_bags"),
         Index("ix_purchase_individuals_farmer_id", "farmer_id"),
@@ -196,9 +202,9 @@ class PurchaseIndividual(TimestampMixin, Base):
     payable_amount: Mapped[int] = mapped_column(BigInteger)
     borrowed_amount: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     due_date: Mapped[date] = mapped_column(Date)
-    expected_raw_weight_per_bag: Mapped[int | None] = mapped_column(Integer)
+    expected_raw_weight_per_bag: Mapped[float] = mapped_column(Float)  # starts at the grain's expected_raw_weight_per_bag, editable
     grain_quality_code: Mapped[str | None] = mapped_column(Text)
-    grain_store_at: Mapped[str | None] = mapped_column(Text)
+    grain_stored_location: Mapped[str | None] = mapped_column(Text)
     # ---- shared by both
     business_year: Mapped[str] = mapped_column(String(7))
     description: Mapped[str | None] = mapped_column(Text)
@@ -295,7 +301,8 @@ class TruckTrip(TimestampMixin, Base):
     transporter: Mapped[Transporter] = relationship(lazy="joined")
     labour_group: Mapped[LabourGroup] = relationship(lazy="joined")
     bilty: Mapped["Bilty | None"] = relationship(back_populates="trip", uselist=False, lazy="joined")
-    load_lines: Mapped[list["TruckLoadLine"]] = relationship(lazy="selectin", order_by="TruckLoadLine.id")
+    load_lines: Mapped[list["FarmersTruckLoadLine"]] = relationship(lazy="selectin", order_by="FarmersTruckLoadLine.id")
+    stockyard_lines: Mapped[list["StockyardTruckLoadLine"]] = relationship(lazy="selectin", order_by="StockyardTruckLoadLine.id")
 
     @property
     def industry(self) -> Industry:
@@ -307,8 +314,8 @@ class TruckTrip(TimestampMixin, Base):
 
     @property
     def bags(self) -> int:
-        """total_bags_in_truck: the sum of the loaded bags over the trip's load lines."""
-        return sum(line.no_of_loaded_bags for line in self.load_lines)
+        """total_bags_in_truck: the sum of the loaded bags over the trip's farmer load lines and stockyard load lines."""
+        return sum(line.no_of_loaded_bags for line in self.load_lines) + sum(line.no_of_loaded_bags for line in self.stockyard_lines)
 
     @property
     def freight_weight_kg(self) -> int | None:
@@ -340,24 +347,131 @@ class TruckTrip(TimestampMixin, Base):
         return money.truck_trip_total_amount(self.trip_total, self.advance_amount, self.other_payable, self.other_deduction)
 
 
-class TruckLoadLine(Base):
-    """Bags of one farmer entry loaded on one trip (no date of its own: it belongs to its trip's year)."""
+class FarmersTruckLoadLine(Base):
+    """Bags of one farmer entry (a purchase_farmers_entries row OR a purchase_individuals row) loaded on one trip
+    (no date of its own: it belongs to its trip's year)."""
 
-    __tablename__ = "truck_load_lines"
+    __tablename__ = "farmers_truck_load_lines"
     __table_args__ = (
-        CheckConstraint("no_of_loaded_bags > 0", name="ck_truck_load_lines_no_of_loaded_bags"),
-        CheckConstraint("total_remaining_bags >= 0", name="ck_truck_load_lines_total_remaining_bags"),
-        Index("ix_truck_load_lines_purchase_farmer_entry_id", "purchase_farmer_entry_id"),
-        UniqueConstraint("trip_id", "purchase_farmer_entry_id", name="uq_truck_load_lines_trip_entry"),
+        CheckConstraint("no_of_loaded_bags > 0", name="ck_farmers_truck_load_lines_no_of_loaded_bags"),
+        CheckConstraint("total_remaining_bags >= 0", name="ck_farmers_truck_load_lines_total_remaining_bags"),
+        CheckConstraint(
+            "(purchase_farmer_entry_id IS NOT NULL AND purchase_individual_id IS NULL) OR (purchase_farmer_entry_id IS NULL AND purchase_individual_id IS NOT NULL)",
+            name="ck_farmers_truck_load_lines_one_source",
+        ),
+        Index("ix_farmers_truck_load_lines_purchase_farmer_entry_id", "purchase_farmer_entry_id"),
+        Index("ix_farmers_truck_load_lines_purchase_individual_id", "purchase_individual_id"),
+        UniqueConstraint("trip_id", "purchase_farmer_entry_id", name="uq_farmers_truck_load_lines_trip_entry"),
+        UniqueConstraint("trip_id", "purchase_individual_id", name="uq_farmers_truck_load_lines_trip_individual"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     trip_id: Mapped[int] = mapped_column(ForeignKey("truck_trips.id"))
-    purchase_farmer_entry_id: Mapped[int] = mapped_column(ForeignKey("purchase_farmers_entries.id"))
+    purchase_farmer_entry_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_farmers_entries.id"))
+    purchase_individual_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_individuals.id"))
     no_of_loaded_bags: Mapped[int] = mapped_column(Integer)
     total_remaining_bags: Mapped[int] = mapped_column(Integer)
 
-    entry: Mapped[PurchaseFarmerEntry] = relationship(lazy="joined")
+    group_entry: Mapped[PurchaseFarmerEntry | None] = relationship(lazy="joined")
+    individual: Mapped[PurchaseIndividual | None] = relationship(lazy="joined")
+
+    @property
+    def entry(self) -> PurchaseFarmerEntry | PurchaseIndividual:
+        """The farmer entry the bags came from (either kind: both expose farmer, village, entry_date, grain...)."""
+        return self.group_entry if self.purchase_farmer_entry_id is not None else self.individual
+
+
+class StockyardTruckLoadLine(Base):
+    """Bags loaded on one trip straight from a stockyard's stock of one grain. Stockyard stock is a big pool, so a line
+    names the stockyard only, never a farmer."""
+
+    __tablename__ = "stockyard_truck_load_lines"
+    __table_args__ = (
+        CheckConstraint("no_of_loaded_bags > 0", name="ck_stockyard_truck_load_lines_no_of_loaded_bags"),
+        Index("ix_stockyard_truck_load_lines_stockyard_id", "stockyard_id"),
+        UniqueConstraint("trip_id", "stockyard_id", name="uq_stockyard_truck_load_lines_trip_stockyard"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trip_id: Mapped[int] = mapped_column(ForeignKey("truck_trips.id"))
+    stockyard_id: Mapped[int] = mapped_column(ForeignKey("stockyards.id"))
+    no_of_loaded_bags: Mapped[int] = mapped_column(Integer)
+
+    stockyard: Mapped[Stockyard] = relationship(lazy="joined")
+    # The grain is the trip's grain (trip -> booking -> brokerage -> grain) and the expected raw weight per bag is worked out from the
+    # purchases that filled the stockyard: neither is stored on the line (see expected_raw_weight_per_bag at the end of this module).
+
+
+class FarmerStockyardTransfer(TimestampMixin, Base):
+    """Filled bags brought from a farmer's place (all or part of an entry's available bags) to a stockyard."""
+
+    __tablename__ = "farmer_stockyard_transfers"
+    __table_args__ = (
+        _year_check("farmer_stockyard_transfers"),
+        _year_index("farmer_stockyard_transfers"),
+        CheckConstraint("no_of_bags > 0", name="ck_farmer_stockyard_transfers_no_of_bags"),
+        CheckConstraint(
+            "(purchase_farmer_entry_id IS NOT NULL AND purchase_individual_id IS NULL) OR (purchase_farmer_entry_id IS NULL AND purchase_individual_id IS NOT NULL)",
+            name="ck_farmer_stockyard_transfers_one_source",
+        ),
+        Index("ix_farmer_stockyard_transfers_purchase_farmer_entry_id", "purchase_farmer_entry_id"),
+        Index("ix_farmer_stockyard_transfers_purchase_individual_id", "purchase_individual_id"),
+        Index("ix_farmer_stockyard_transfers_stockyard_id", "stockyard_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    transfer_date: Mapped[date] = mapped_column(Date)
+    purchase_farmer_entry_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_farmers_entries.id"))
+    purchase_individual_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_individuals.id"))
+    stockyard_id: Mapped[int] = mapped_column(ForeignKey("stockyards.id"))
+    no_of_bags: Mapped[int] = mapped_column(Integer)
+    business_year: Mapped[str] = mapped_column(String(7))
+    description: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    group_entry: Mapped[PurchaseFarmerEntry | None] = relationship(lazy="joined")
+    individual: Mapped[PurchaseIndividual | None] = relationship(lazy="joined")
+    stockyard: Mapped[Stockyard] = relationship(lazy="joined")
+
+    @property
+    def entry(self) -> PurchaseFarmerEntry | PurchaseIndividual:
+        return self.group_entry if self.purchase_farmer_entry_id is not None else self.individual
+
+    @property
+    def grain(self) -> Grain:
+        return self.entry.grain
+
+
+class StockyardEmptyBagMovement(TimestampMixin, Base):
+    """Empty bags of one grain entering a stockyard's pool ('received') or leaving it for a farmer ('given_to_farmer').
+    Bags used up by stockyard purchase entries are not recorded here: they are worked out from the entries."""
+
+    __tablename__ = "stockyard_empty_bag_movements"
+    __table_args__ = (
+        _year_check("stockyard_empty_bag_movements"),
+        _year_index("stockyard_empty_bag_movements"),
+        CheckConstraint("no_of_bags > 0", name="ck_stockyard_empty_bag_movements_no_of_bags"),
+        CheckConstraint(
+            "(movement_type = 'received' AND farmer_id IS NULL) OR (movement_type = 'given_to_farmer' AND farmer_id IS NOT NULL)",
+            name="ck_stockyard_empty_bag_movements_type_farmer",
+        ),
+        Index("ix_stockyard_empty_bag_movements_stockyard_id", "stockyard_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    movement_date: Mapped[date] = mapped_column(Date)
+    stockyard_id: Mapped[int] = mapped_column(ForeignKey("stockyards.id"))
+    grain_id: Mapped[int] = mapped_column(ForeignKey("grains.id"))
+    movement_type: Mapped[str] = mapped_column(String(16))
+    farmer_id: Mapped[int | None] = mapped_column(ForeignKey("farmers.id"))
+    no_of_bags: Mapped[int] = mapped_column(Integer)
+    business_year: Mapped[str] = mapped_column(String(7))
+    description: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    stockyard: Mapped[Stockyard] = relationship(lazy="joined")
+    grain: Mapped[Grain] = relationship(lazy="joined")
+    farmer: Mapped[Farmer | None] = relationship(lazy="joined")
 
 
 class Bilty(TimestampMixin, Base):
@@ -408,6 +522,7 @@ class Bilty(TimestampMixin, Base):
     def expected_total_loaded_weight(self) -> int | None:
         return money.expected_total_loaded_weight(
             [(line.no_of_loaded_bags, line.entry.expected_raw_weight_per_bag) for line in self.trip.load_lines]
+            + [(line.no_of_loaded_bags, line.expected_raw_weight_per_bag) for line in self.trip.stockyard_lines]
         )
 
     @property
@@ -548,3 +663,142 @@ class BagSupply(TimestampMixin, Base):
 
     supplier: Mapped[BagSupplier] = relationship(lazy="joined")
     farmer: Mapped[Farmer] = relationship(lazy="joined")
+
+class StockyardPurchase(TimestampMixin, Base):
+    """One deal with a farmer for grain kept at a stockyard: grain, rate and pay-after are agreed here and its entries (weighed lots) follow."""
+
+    __tablename__ = "stockyard_purchases"
+    __table_args__ = (
+        _year_check("stockyard_purchases"),
+        _year_index("stockyard_purchases"),
+        CheckConstraint("grain_rate_per_20kg > 0", name="ck_stockyard_purchases_rate_positive"),
+        CheckConstraint("pay_after_no_of_days >= 0", name="ck_stockyard_purchases_pay_after"),
+        CheckConstraint("no_of_empty_bags >= 0", name="ck_stockyard_purchases_no_of_empty_bags"),
+        Index("ix_stockyard_purchases_stockyard_id", "stockyard_id"),
+        Index("ix_stockyard_purchases_farmer_id", "farmer_id"),
+        Index("ix_stockyard_purchases_grain_id", "grain_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stockyard_purchase_date: Mapped[date] = mapped_column(Date)
+    stockyard_id: Mapped[int] = mapped_column(ForeignKey("stockyards.id"))
+    farmer_id: Mapped[int] = mapped_column(ForeignKey("farmers.id"))
+    grain_id: Mapped[int] = mapped_column(ForeignKey("grains.id"))
+    grain_rate_per_20kg: Mapped[int] = mapped_column(Integer)
+    pay_after_no_of_days: Mapped[int] = mapped_column(Integer)
+    no_of_empty_bags: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    terms: Mapped[str | None] = mapped_column(Text)
+    business_year: Mapped[str] = mapped_column(String(7))
+    description: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    stockyard: Mapped[Stockyard] = relationship(lazy="joined")
+    farmer: Mapped[Farmer] = relationship(lazy="joined")
+    grain: Mapped[Grain] = relationship(lazy="joined")
+
+
+class StockyardPurchaseEntry(TimestampMixin, Base):
+    """One weighed lot of a stockyard purchase. Grain, rate and pay-after come from the purchase."""
+
+    __tablename__ = "stockyard_purchase_entries"
+    __table_args__ = (
+        _year_check("stockyard_purchase_entries"),
+        _year_index("stockyard_purchase_entries"),
+        CheckConstraint("no_of_filled_bags >= 0", name="ck_stockyard_purchase_entries_no_of_filled_bags"),
+        CheckConstraint("extra_kilos >= 0", name="ck_stockyard_purchase_entries_extra_kilos"),
+        CheckConstraint("payable_amount >= 0", name="ck_stockyard_purchase_entries_payable_amount"),
+        CheckConstraint("borrowed_amount >= 0", name="ck_stockyard_purchase_entries_borrowed_amount"),
+        CheckConstraint("borrowed_amount <= payable_amount", name="ck_stockyard_purchase_entries_borrowed_amount_le_payable_amount"),
+        CheckConstraint("expected_raw_weight_per_bag >= 0", name="ck_stockyard_purchase_entries_expected_raw_weight_per_bag"),
+        Index("ix_stockyard_purchase_entries_stockyard_purchase_id", "stockyard_purchase_id"),
+        Index("ix_stockyard_purchase_entries_labour_group_id", "labour_group_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stockyard_purchase_entry_date: Mapped[date] = mapped_column(Date)
+    stockyard_purchase_id: Mapped[int] = mapped_column(ForeignKey("stockyard_purchases.id"))
+    no_of_filled_bags: Mapped[int] = mapped_column(Integer)
+    extra_kilos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    payable_amount: Mapped[int] = mapped_column(BigInteger)
+    borrowed_amount: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    due_date: Mapped[date] = mapped_column(Date)
+    expected_raw_weight_per_bag: Mapped[float] = mapped_column(Float)  # starts at the grain's expected_raw_weight_per_bag, editable
+    grain_quality_code: Mapped[str | None] = mapped_column(Text)
+    labour_group_id: Mapped[int | None] = mapped_column(ForeignKey("labour_groups.id"))
+    business_year: Mapped[str] = mapped_column(String(7))
+    description: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    purchase: Mapped[StockyardPurchase] = relationship(lazy="joined")
+    labour_group: Mapped[LabourGroup | None] = relationship(lazy="joined")
+
+    @property
+    def net_payable(self) -> int:
+        """payable_amount - borrowed_amount: what the farmer is still to be paid."""
+        return self.payable_amount - self.borrowed_amount
+
+    @property
+    def total_kg(self) -> int:
+        return self.no_of_filled_bags * self.purchase.grain.net_bag_weight + self.extra_kilos
+
+
+class StockyardArrangementEntry(TimestampMixin, Base):
+    """Arranging (stacking) bags at the stockyard, paid per bag to a labour group; may belong to one purchase entry."""
+
+    __tablename__ = "stockyard_arrangement_entries"
+    __table_args__ = (
+        _year_check("stockyard_arrangement_entries"),
+        _year_index("stockyard_arrangement_entries"),
+        CheckConstraint("no_of_arranged_bags > 0", name="ck_stockyard_arrangement_entries_no_of_arranged_bags"),
+        CheckConstraint("rate_per_arranged_bag BETWEEN 1 AND 20", name="ck_stockyard_arrangement_entries_rate"),
+        Index("ix_stockyard_arrangement_entries_purchase_entry_id", "stockyard_purchase_entry_id"),
+        Index("ix_stockyard_arrangement_entries_labour_group_id", "labour_group_id"),
+        Index("uq_stockyard_arrangement_entries_purchase_entry", "stockyard_purchase_entry_id", unique=True,
+              postgresql_where=text("stockyard_purchase_entry_id IS NOT NULL")),  # a purchase entry is arranged only once
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stockyard_arrangement_date: Mapped[date] = mapped_column(Date)
+    stockyard_purchase_entry_id: Mapped[int | None] = mapped_column(ForeignKey("stockyard_purchase_entries.id"))
+    labour_group_id: Mapped[int | None] = mapped_column(ForeignKey("labour_groups.id"))
+    no_of_arranged_bags: Mapped[int] = mapped_column(Integer)
+    rate_per_arranged_bag: Mapped[int] = mapped_column(Integer)
+    business_year: Mapped[str] = mapped_column(String(7))
+    description: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    purchase_entry: Mapped[StockyardPurchaseEntry | None] = relationship(lazy="joined")
+    labour_group: Mapped[LabourGroup | None] = relationship(lazy="joined")
+
+    @property
+    def amount(self) -> int:
+        return self.no_of_arranged_bags * self.rate_per_arranged_bag
+
+
+def _stockyard_line_expected_weight():
+    """Expected raw weight per bag of a stockyard load line: the average over the filled bags that came into that stockyard with the
+    trip's grain, each purchase weighted by its bags (stockyard purchase entries, and the farmer purchases brought in by
+    farmer_stockyard_transfers). Purchases without an expected weight are left out; None when no purchase has one."""
+    line, transfers = StockyardTruckLoadLine, FarmerStockyardTransfer
+    grain = (select(Brokerage.grain_id).join(BrokerBooking, BrokerBooking.brokerage_id == Brokerage.id).join(TruckTrip, TruckTrip.broker_booking_id == BrokerBooking.id)
+             .where(TruckTrip.id == line.trip_id).correlate(line).scalar_subquery())
+    sources = [  # (bags, expected weight, joins/filters)
+        (StockyardPurchaseEntry.no_of_filled_bags, StockyardPurchaseEntry.expected_raw_weight_per_bag,
+         lambda q: q.join(StockyardPurchase, StockyardPurchase.id == StockyardPurchaseEntry.stockyard_purchase_id)
+         .where(StockyardPurchase.stockyard_id == line.stockyard_id, StockyardPurchase.grain_id == grain)),
+        (transfers.no_of_bags, PurchaseFarmerEntry.expected_raw_weight_per_bag,
+         lambda q: q.select_from(transfers).join(PurchaseFarmerEntry, PurchaseFarmerEntry.id == transfers.purchase_farmer_entry_id)
+         .join(PurchaseGroup, PurchaseGroup.id == PurchaseFarmerEntry.purchase_group_id)
+         .where(transfers.stockyard_id == line.stockyard_id, PurchaseGroup.grain_id == grain)),
+        (transfers.no_of_bags, PurchaseIndividual.expected_raw_weight_per_bag,
+         lambda q: q.select_from(transfers).join(PurchaseIndividual, PurchaseIndividual.id == transfers.purchase_individual_id)
+         .where(transfers.stockyard_id == line.stockyard_id, PurchaseIndividual.grain_id == grain)),
+    ]
+    weighted, bags = 0, 0
+    for n, w, where in sources:
+        weighted = weighted + func.coalesce(where(select(func.sum(n * w))).scalar_subquery(), 0)
+        bags = bags + func.coalesce(where(select(func.sum(n)).where(w.is_not(None))).scalar_subquery(), 0)
+    return cast(weighted, Float) / func.nullif(bags, 0)  # float division
+
+
+StockyardTruckLoadLine.expected_raw_weight_per_bag = column_property(_stockyard_line_expected_weight())

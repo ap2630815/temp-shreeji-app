@@ -20,13 +20,14 @@ from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
 from app.services.filters import trip_conditions
 from app.models import (
-    Bilty, BrokerBooking, Brokerage, LabourGroup, PurchaseFarmerEntry, PurchaseGroup, Transporter, Truck, TruckLoadLine, TruckTrip, User,
+    Bilty, BrokerBooking, Brokerage, LabourGroup, PurchaseFarmerEntry, PurchaseGroup, PurchaseIndividual, Stockyard, StockyardTruckLoadLine, Transporter, Truck, FarmersTruckLoadLine, TruckTrip, User,
 )
 from app.services import audit, money
 from app.services.locks import advisory_lock
 from app.services.payables import paid_for
 from app.services.receivables import received_map
 from app.services.stock import renumber_remaining, stock_by_entry
+from app.services.stockyard_stock import filled_ledger, Filled
 from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible
 
 router = APIRouter(prefix="/Trips")
@@ -106,7 +107,7 @@ def trip_snapshot(t: TruckTrip) -> dict:
 
 def _locked_trip_fields(trip: TruckTrip | None) -> set[str]:
     # the loaded bags and the bilty are tied to the booking's grain / industry / rate
-    return {"broker_booking_id"} if trip is not None and (trip.load_lines or trip.bilty is not None) else set()
+    return {"broker_booking_id"} if trip is not None and (trip.load_lines or trip.stockyard_lines or trip.bilty is not None) else set()
 
 
 # ================================================================== bilty form
@@ -158,25 +159,46 @@ def bilty_snapshot(b: Bilty) -> dict:
 # ================================================================== load line form
 
 class LineIn(BaseModel):
-    purchase_farmer_entry_id: int
+    """One form, two parts: farmer load line (above) and stockyard load line (below). Fill either part or both."""
+
+    farmer_source: str | None = None  # 'g:<purchase_farmers_entries.id>' or 'i:<purchase_individuals.id>'
     no_of_loaded_bags: _int(gt=0) | None = None  # blank: load everything still unloaded in the entry
+    stockyard_id: int | None = None
+    no_of_stockyard_bags: _int(gt=0) | None = None
 
 
 async def line_fields(db: AsyncSession, trip: TruckTrip, village_id: int = 0) -> list[F]:
-    on_trip = {line.purchase_farmer_entry_id for line in trip.load_lines}
-    entries = list((await db.scalars(
+    on_trip = {f"g:{l.purchase_farmer_entry_id}" for l in trip.load_lines if l.purchase_farmer_entry_id} | {f"i:{l.purchase_individual_id}" for l in trip.load_lines if l.purchase_individual_id}
+    grain_id = trip.grain.id
+    groups = list((await db.scalars(
         select(PurchaseFarmerEntry).join(PurchaseGroup, PurchaseGroup.id == PurchaseFarmerEntry.purchase_group_id)
-        .where(PurchaseGroup.grain_id == trip.grain.id, *([PurchaseGroup.village_id == village_id] if village_id else [])).order_by(PurchaseFarmerEntry.purchase_entry_date.desc(), PurchaseFarmerEntry.id.desc()).limit(500)
+        .where(PurchaseGroup.grain_id == grain_id, *([PurchaseGroup.village_id == village_id] if village_id else []))
+        .order_by(PurchaseFarmerEntry.purchase_entry_date.desc(), PurchaseFarmerEntry.id.desc()).limit(500)
     )).unique().all())
-    stock = await stock_by_entry(db, [e.id for e in entries])
+    directs = list((await db.scalars(
+        select(PurchaseIndividual).where(PurchaseIndividual.grain_id == grain_id, *([PurchaseIndividual.village_id == village_id] if village_id else []))
+        .order_by(PurchaseIndividual.purchase_individual_date.desc(), PurchaseIndividual.id.desc()).limit(500)
+    )).unique().all())
+    g_stock = await stock_by_entry(db, [e.id for e in groups]) if groups else {}
+    d_stock = await stock_by_entry(db, [e.id for e in directs], individual=True) if directs else {}
     options = tuple(
-        (str(e.id), f"{e.purchase_group.village.village_name} · {e.farmer.farmer_name} · {e.purchase_entry_date} — {stock[e.id].available} bags left")
-        for e in entries if e.id in stock and stock[e.id].available > 0 and e.id not in on_trip
+        [(f"g:{e.id}", f"{e.purchase_group.village.village_name} · {e.farmer.farmer_name} · {e.purchase_entry_date} — {g_stock[e.id].available} bags left")
+         for e in groups if g_stock[e.id].available > 0 and f"g:{e.id}" not in on_trip]
+        + [(f"i:{e.id}", f"{e.village.village_name} · {e.farmer.farmer_name} · {e.purchase_individual_date} — {d_stock[e.id].available} bags left (individual)")
+           for e in directs if d_stock[e.id].available > 0 and f"i:{e.id}" not in on_trip]
     )
+    yards = {y.id: y for y in (await db.scalars(select(Stockyard).order_by(Stockyard.name_of_stockyard))).all()}
+    on_yards = {l.stockyard_id for l in trip.stockyard_lines}
+    filled = await filled_ledger(db, grain_id=grain_id)
+    yard_options = tuple((str(y.id), f"{y.name_of_stockyard} — {y.location} — {filled.get((y.id, grain_id), Filled()).balance} bags in stock")
+                         for y in yards.values() if filled.get((y.id, grain_id), Filled()).balance > 0 and y.id not in on_yards)
     return [
-        F("purchase_farmer_entry_id", "Load from (village · farmer)", "ક્યાંથી ભર્યું (ગામ · ખેડૂત)", kind="select", required=True, options=options),
-        F("no_of_loaded_bags", "Bags loaded", "ભરેલી બેગ", kind="int",
+        F("farmer_source", "① From farmers: village · farmer", "① ખેડૂતો પાસેથી: ગામ · ખેડૂત", kind="select", options=options),
+        F("no_of_loaded_bags", "Bags loaded from the farmer", "ખેડૂત પાસેથી ભરેલી બેગ", kind="int",
           help=("Leave blank to load all the bags left in that entry", "ખાલી રાખો તો તે એન્ટ્રીની બાકી બધી બેગ ભરાશે")),
+        F("stockyard_id", "② From stockyard", "② સ્ટોકયાર્ડમાંથી", kind="select", options=yard_options),
+        F("no_of_stockyard_bags", "Bags loaded from the stockyard", "સ્ટોકયાર્ડમાંથી ભરેલી બેગ", kind="int",
+          help=("Fill either part, or both when the truck is loaded partly from farmers and partly from a stockyard", "ટ્રક અંશતઃ ખેડૂતો પાસેથી અને અંશતઃ સ્ટોકયાર્ડમાંથી ભરાય તો બંને ભાગ ભરો")),
     ]
 
 
@@ -202,7 +224,7 @@ def _below_paid(paid: int, new_amount: int, what: tuple[str, str]) -> tuple[str,
 async def _sync_bilty_bags(db: AsyncSession, trip: TruckTrip) -> None:
     """bilties.total_bags_in_truck always equals the sum of the trip's loaded bags."""
     if trip.bilty is not None:
-        trip.bilty.total_bags_in_truck = sum(line.no_of_loaded_bags for line in trip.load_lines)
+        trip.bilty.total_bags_in_truck = trip.bags
 
 
 async def _years_with_trips(db: AsyncSession, user: User) -> list[str]:
@@ -342,40 +364,75 @@ async def add_line(request: Request, trip_id: int, user: User = Depends(current_
     clean, errors = run_validation(LineIn, fields, normalize_fields(fields, raw))
     if errors:
         return form(errors)
+    if not clean["farmer_source"] and clean["stockyard_id"] is None:
+        return form({"farmer_source": ("Pick a farmer entry, a stockyard, or both", "ખેડૂત એન્ટ્રી, સ્ટોકયાર્ડ અથવા બંને પસંદ કરો")})
+    if clean["farmer_source"] is None and clean["no_of_loaded_bags"] is not None:
+        return form({"farmer_source": ("Pick the farmer entry these bags come from", "આ બેગ ક્યા ખેડૂતની એન્ટ્રીમાંથી છે તે પસંદ કરો")})
+    if clean["stockyard_id"] is None and clean["no_of_stockyard_bags"] is not None:
+        return form({"stockyard_id": ("Pick the stockyard these bags come from", "આ બેગ ક્યા સ્ટોકયાર્ડમાંથી છે તે પસંદ કરો")})
+    if clean["stockyard_id"] is not None and clean["no_of_stockyard_bags"] is None:
+        return form({"no_of_stockyard_bags": ("Enter the bags loaded from the stockyard", "સ્ટોકયાર્ડમાંથી ભરેલી બેગ લખો")})
     try:
         await assert_year_open(db, trip.trip_date)
     except YearLockedError as exc:
         return form({"no_of_loaded_bags": YEAR_LOCKED(exc.label)})
-    entry = await db.get(PurchaseFarmerEntry, clean["purchase_farmer_entry_id"])
-    if entry is None or entry.purchase_group.grain_id != trip.grain.id:
-        return form({"purchase_farmer_entry_id": ("Pick an entry with the same grain as this trip", "આ ટ્રીપના અનાજવાળી એન્ટ્રી પસંદ કરો")})
-    if any(line.purchase_farmer_entry_id == entry.id for line in trip.load_lines):
-        return form({"purchase_farmer_entry_id": ("This entry is already loaded on this trip", "આ એન્ટ્રી આ ટ્રીપમાં પહેલેથી ભરાઈ ગઈ છે")})
-    await advisory_lock(db, "stock", entry.id)  # two clerks loading the same entry must not oversell it
-    available = (await stock_by_entry(db, [entry.id])).get(entry.id)
-    available = available.available if available else 0
-    bags = clean["no_of_loaded_bags"] or available
-    if bags <= 0 or bags > available:
-        return form({"no_of_loaded_bags": (f"Only {available} bags are left in this entry", f"આ એન્ટ્રીમાં ફક્ત {available} બેગ બાકી છે")})
-    line = TruckLoadLine(trip_id=trip.id, purchase_farmer_entry_id=entry.id, no_of_loaded_bags=bags, total_remaining_bags=available - bags)
-    db.add(line)
+    new_lines: list = []
+    added_bags = 0
+    renumber: tuple[int, bool] | None = None
+    if clean["farmer_source"]:
+        kind_, _, raw_id = clean["farmer_source"].partition(":")
+        individual = kind_ == "i"
+        entry = await db.get(PurchaseIndividual if individual else PurchaseFarmerEntry, int(raw_id)) if kind_ in ("g", "i") and raw_id.isdigit() else None
+        if entry is None or entry.grain.id != trip.grain.id:
+            return form({"farmer_source": ("Pick an entry with the same grain as this trip", "આ ટ્રીપના અનાજવાળી એન્ટ્રી પસંદ કરો")})
+        if any((l.purchase_individual_id if individual else l.purchase_farmer_entry_id) == entry.id for l in trip.load_lines):
+            return form({"farmer_source": ("This entry is already loaded on this trip", "આ એન્ટ્રી આ ટ્રીપમાં પહેલેથી ભરાઈ ગઈ છે")})
+        await advisory_lock(db, "stock_ind" if individual else "stock", entry.id)  # two clerks loading the same entry must not oversell it
+        available = (await stock_by_entry(db, [entry.id], individual=individual)).get(entry.id)
+        available = available.available if available else 0
+        bags = clean["no_of_loaded_bags"] or available
+        if bags <= 0 or bags > available:
+            return form({"no_of_loaded_bags": (f"Only {available} bags are left in this entry", f"આ એન્ટ્રીમાં ફક્ત {available} બેગ બાકી છે")})
+        line = FarmersTruckLoadLine(trip_id=trip.id, total_remaining_bags=available - bags, no_of_loaded_bags=bags,
+                             **({"purchase_individual_id": entry.id} if individual else {"purchase_farmer_entry_id": entry.id}))
+        new_lines.append(line)
+        added_bags += bags
+        renumber = (entry.id, individual)
+    if clean["stockyard_id"] is not None:
+        yard = await db.get(Stockyard, clean["stockyard_id"])
+        if yard is None:
+            return form({"stockyard_id": ("Unknown value", "અજ્ઞાત કિંમત")})
+        if any(l.stockyard_id == yard.id for l in trip.stockyard_lines):
+            return form({"stockyard_id": ("This stockyard is already loaded on this trip", "આ સ્ટોકયાર્ડ આ ટ્રીપમાં પહેલેથી ભરાઈ ગયું છે")})
+        await advisory_lock(db, "stockyard_bags", yard.id * 1000 + trip.grain.id)  # two clerks loading from the same stockyard must not oversell it
+        in_stock = (await filled_ledger(db, yard.id, trip.grain.id)).get((yard.id, trip.grain.id), Filled()).balance
+        if clean["no_of_stockyard_bags"] > in_stock:
+            return form({"no_of_stockyard_bags": (f"Only {in_stock} bags of this grain are in the stockyard", f"સ્ટોકયાર્ડમાં આ અનાજની ફક્ત {in_stock} બેગ છે")})
+        new_lines.append(StockyardTruckLoadLine(trip_id=trip.id, stockyard_id=yard.id, no_of_loaded_bags=clean["no_of_stockyard_bags"]))
+        added_bags += clean["no_of_stockyard_bags"]
+    before_bags = trip.bags
+    for line in new_lines:
+        db.add(line)
     await db.flush()
-    await renumber_remaining(db, entry.id)
+    if renumber:
+        await renumber_remaining(db, *renumber)
     if trip.bilty is not None:
-        trip.bilty.total_bags_in_truck = sum(l.no_of_loaded_bags for l in trip.load_lines) + bags
-    audit.log(db, user, "create", "truck_load_lines", line.id, dict(trip_id=trip.id, purchase_farmer_entry_id=entry.id, no_of_loaded_bags=bags))
+        trip.bilty.total_bags_in_truck = before_bags + added_bags
+    for line in new_lines:
+        if isinstance(line, FarmersTruckLoadLine):
+            audit.log(db, user, "create", "farmers_truck_load_lines", line.id, dict(trip_id=trip.id, purchase_farmer_entry_id=line.purchase_farmer_entry_id,
+                                                                            purchase_individual_id=line.purchase_individual_id, no_of_loaded_bags=line.no_of_loaded_bags))
+        else:
+            audit.log(db, user, "create", "stockyard_truck_load_lines", line.id, dict(trip_id=trip.id, stockyard_id=line.stockyard_id, no_of_loaded_bags=line.no_of_loaded_bags))
     await db.commit()
     return Response(status_code=204, headers={"HX-Redirect": f"/Trips/{trip_id}"})
 
 
-@router.post("/Lines/{line_id}/Delete", response_class=HTMLResponse)
-async def delete_line(request: Request, line_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
-    await csrf.validate_csrf(request)
-    line = await db.get(TruckLoadLine, line_id)
+async def _delete_load(request: Request, user: User, db: AsyncSession, line, kind: str):
     if line is None:
         raise HTTPException(404)
     trip = await _get_trip(db, line.trip_id)
-    trip_id, entry_id, bags = trip.id, line.purchase_farmer_entry_id, line.no_of_loaded_bags
+    trip_id, bags = trip.id, line.no_of_loaded_bags
 
     def flash(en, gu):
         return render(request, "partials/flash_text.html", kind="error", en=en, gu=gu)
@@ -394,14 +451,33 @@ async def delete_line(request: Request, line_id: int, user: User = Depends(curre
         problem = _below_paid(await paid_for(db, "broker", trip.bilty.id), money.brokerage_amount(new_bags, per_bag), ("brokerage", "દલાલી"))
         if problem:
             return flash(*problem)
-    audit.log(db, user, "delete", "truck_load_lines", line.id, dict(trip_id=trip_id, purchase_farmer_entry_id=entry_id, no_of_loaded_bags=bags))
+    renumber = None
+    if kind == "farmers_truck_load_lines":
+        audit.log(db, user, "delete", kind, line.id, dict(trip_id=trip_id, purchase_farmer_entry_id=line.purchase_farmer_entry_id,
+                                                          purchase_individual_id=line.purchase_individual_id, no_of_loaded_bags=bags))
+        renumber = (line.purchase_individual_id or line.purchase_farmer_entry_id, line.purchase_individual_id is not None)
+    else:
+        audit.log(db, user, "delete", kind, line.id, dict(trip_id=trip_id, stockyard_id=line.stockyard_id, no_of_loaded_bags=bags))
     await db.delete(line)
     await db.flush()
-    await renumber_remaining(db, entry_id)
+    if renumber:
+        await renumber_remaining(db, *renumber)
     if trip.bilty is not None:
         trip.bilty.total_bags_in_truck = new_bags
     await db.commit()
     return Response(status_code=204, headers={"HX-Redirect": f"/Trips/{trip_id}"})
+
+
+@router.post("/Lines/{line_id}/Delete", response_class=HTMLResponse)
+async def delete_line(request: Request, line_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
+    await csrf.validate_csrf(request)
+    return await _delete_load(request, user, db, await db.get(FarmersTruckLoadLine, line_id), "farmers_truck_load_lines")
+
+
+@router.post("/StockyardLines/{line_id}/Delete", response_class=HTMLResponse)
+async def delete_stockyard_line(request: Request, line_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
+    await csrf.validate_csrf(request)
+    return await _delete_load(request, user, db, await db.get(StockyardTruckLoadLine, line_id), "stockyard_truck_load_lines")
 
 
 # ================================================================== bilty

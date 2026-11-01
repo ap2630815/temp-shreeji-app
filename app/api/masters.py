@@ -145,6 +145,7 @@ async def new_page(
     # the toolbar's village / grain start the matching field (still editable)
     values = apply_toolbar(request, {})
     values = {k: v for k, v in values.items() if any(f.name == k for f in spec.fields)}
+    values = {**{f.name: f.default for f in spec.fields if f.default}, **values}
     return render_with_csrf(request, csrf, "master_form_page.html", **await _form_ctx(spec, user, values, {}, None, db))
 
 

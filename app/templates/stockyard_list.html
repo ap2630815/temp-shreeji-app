@@ -1,0 +1,145 @@
+{% extends "layout.html" %}
+{% from "partials/bilabel.html" import t, th %}
+{% block title %}Stockyard purchase{% endblock %}
+{% block content %}
+{% set tabs = [('purchases', 'Stockyard purchases', 'સ્ટોકયાર્ડ ખરીદી'), ('entries', 'Purchase entries', 'ખરીદી નોંધ'), ('arrangements', 'Arrangement entries', 'ગોઠવણી નોંધ'),
+  ('transfers', 'Farmer → stockyard', 'ખેડૂતથી સ્ટોકયાર્ડ'), ('empty_bags', 'Empty bags', 'ખાલી બેગ'), ('stock', 'Stockyard bag ledger', 'સ્ટોકયાર્ડ બેગ ખાતું'), ('farmer_bags', 'Farmer bag ledger', 'ખેડૂત બેગ ખાતું')] %}
+<div class="stackbi">
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-xl font-semibold">{{ t('Stockyard purchase', 'સ્ટોકયાર્ડ ખરીદી') }}</h1>
+  <span class="flex-1"></span>
+  {% if view == 'entries' %}
+    <span class="flex flex-col leading-tight text-sm font-semibold text-center"><span>{{ rows | sum(attribute='no_of_filled_bags') }} bags</span><span>{{ rows | sum(attribute='net_payable') | inr }}</span></span>
+  {% elif view == 'arrangements' %}
+    <span class="flex flex-col leading-tight text-sm font-semibold text-center"><span>{{ rows | sum(attribute='no_of_arranged_bags') }} bags</span><span>{{ rows | sum(attribute='amount') | inr }}</span></span>
+  {% endif %}
+  {% if view not in ('stock', 'farmer_bags') %}<a href="/StockyardPurchase/{{ view }}/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
+  {% if view != 'stock' %}<form method="get" class="flex items-center gap-2">
+    <input type="hidden" name="view" value="{{ view }}">
+    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
+    <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
+    {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
+  </form>{% endif %}
+</div>
+<div class="tabs tabs-boxed bg-base-100 mb-3 w-fit">
+  {% for key, en, gu in tabs %}
+  <a class="tab h-auto py-1 {{ 'tab-active' if view == key }}" href="/StockyardPurchase?view={{ key }}&year={{ year }}"><span class="flex flex-col leading-tight text-center"><span>{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span></a>
+  {% endfor %}
+</div>
+<div class="overflow-x-auto bg-base-100 rounded-box shadow">
+{% if view == 'purchases' %}
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Stockyard', 'સ્ટોકયાર્ડ') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Grain', 'અનાજ') }}{{ th('Rate / 20 kg', 'ભાવ / 20 કિ') }}{{ th('Pay after', 'ચુકવણી') }}{{ th('Empty bags', 'ખાલી બેગ') }}<th></th></tr></thead>
+    <tbody>
+    {% for p in rows %}
+      <tr>
+        <td class="whitespace-nowrap">{{ p.stockyard_purchase_date }}</td>
+        <td>{{ p.stockyard.name_of_stockyard }}</td>
+        <td>{{ p.farmer.village.village_name }} — {{ p.farmer.farmer_name }}</td>
+        <td>{{ p.grain.grain_name }}</td>
+        <td>{{ p.grain_rate_per_20kg | inr }}</td>
+        <td>{{ p.pay_after_no_of_days }} {{ t('days', 'દિવસ') }}</td>
+        <td>{{ p.no_of_empty_bags }}</td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/StockyardPurchase/purchases/{{ p.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+      </tr>
+    {% else %}<tr><td colspan="8" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% elif view == 'entries' %}
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Purchase', 'ખરીદી') }}{{ th('Filled bags', 'ભરેલી બેગ') }}{{ th('Extra kg', 'વધારાના કિ') }}{{ th('Payable', 'ચૂકવવાપાત્ર') }}{{ th('Borrowed', 'ઉધાર') }}{{ th('Net', 'ચોખ્ખું') }}{{ th('Due date', 'મુદત') }}{{ th('Labour group', 'મજૂર જૂથ') }}<th></th></tr></thead>
+    <tbody>
+    {% for e in rows %}
+      <tr>
+        <td class="whitespace-nowrap">{{ e.stockyard_purchase_entry_date }}</td>
+        <td>#{{ e.stockyard_purchase_id }} · {{ e.purchase.farmer.farmer_name }} · {{ e.purchase.grain.grain_name }}</td>
+        <td>{{ e.no_of_filled_bags }}</td><td>{{ e.extra_kilos }}</td>
+        <td>{{ e.payable_amount | inr }}</td><td>{{ e.borrowed_amount | inr }}</td><td class="font-semibold">{{ e.net_payable | inr }}</td>
+        <td class="whitespace-nowrap">{{ e.due_date }}</td>
+        <td>{{ e.labour_group.group_name if e.labour_group else '—' }}</td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/StockyardPurchase/entries/{{ e.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+      </tr>
+    {% else %}<tr><td colspan="10" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% elif view == 'transfers' %}
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Farmer entry', 'ખેડૂત નોંધ') }}{{ th('Grain', 'અનાજ') }}{{ th('To stockyard', 'સ્ટોકયાર્ડમાં') }}{{ th('Bags', 'બેગ') }}<th></th></tr></thead>
+    <tbody>
+    {% for x in rows %}
+      <tr>
+        <td class="whitespace-nowrap">{{ x.transfer_date }}</td>
+        <td>{{ x.entry.village.village_name }} · {{ x.entry.farmer.farmer_name }} <span class="opacity-60 text-xs">{{ x.entry.entry_date }} · {{ t('group', 'ગ્રુપ') if x.group_entry else t('individual', 'વ્યક્તિગત') }}</span></td>
+        <td>{{ x.grain.grain_name }}</td>
+        <td>{{ x.stockyard.name_of_stockyard }}</td>
+        <td class="font-semibold">{{ x.no_of_bags }}</td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/StockyardPurchase/transfers/{{ x.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% elif view == 'empty_bags' %}
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Stockyard', 'સ્ટોકયાર્ડ') }}{{ th('Grain', 'અનાજ') }}{{ th('Movement', 'હેરફેર') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Bags', 'બેગ') }}<th></th></tr></thead>
+    <tbody>
+    {% for m in rows %}
+      <tr>
+        <td class="whitespace-nowrap">{{ m.movement_date }}</td>
+        <td>{{ m.stockyard.name_of_stockyard }}</td><td>{{ m.grain.grain_name }}</td>
+        <td>{{ t('Received', 'મળેલી') if m.movement_type == 'received' else t('Given to farmer', 'ખેડૂતને આપેલી') }}</td>
+        <td>{{ (m.farmer.village.village_name ~ ' — ' ~ m.farmer.farmer_name) if m.farmer else '—' }}</td>
+        <td class="font-semibold">{{ m.no_of_bags }}</td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/StockyardPurchase/empty_bags/{{ m.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% elif view == 'stock' %}
+  <table class="table table-zebra table-sm">
+    <thead>
+      <tr><th colspan="2"></th><th colspan="4" class="text-center">{{ t('Filled bags', 'ભરેલી બેગ') }}</th><th colspan="4" class="text-center">{{ t('Empty bags', 'ખાલી બેગ') }}</th></tr>
+      <tr>{{ th('Stockyard', 'સ્ટોકયાર્ડ') }}{{ th('Grain', 'અનાજ') }}{{ th('Bought here', 'અહીં ખરીદી') }}{{ th('From farmers', 'ખેડૂતો પાસેથી') }}{{ th('Loaded', 'ભરેલી') }}{{ th('In stock', 'સ્ટોકમાં') }}{{ th('Received', 'મળેલી') }}{{ th('Given to farmers', 'ખેડૂતોને') }}{{ th('Used in purchases', 'ખરીદીમાં વપરાયેલી') }}{{ th('In stock', 'સ્ટોકમાં') }}</tr>
+    </thead>
+    <tbody>
+    {% for yard, grain, f, e in stock_rows %}
+      <tr>
+        <td>{{ yard.name_of_stockyard }}</td><td>{{ grain.grain_name }}</td>
+        <td>{{ f.purchased }}</td><td>{{ f.from_farmers }}</td><td>{{ f.loaded }}</td><td class="font-semibold {{ 'text-error' if f.balance < 0 }}">{{ f.balance }}</td>
+        <td>{{ e.received }}</td><td>{{ e.given }}</td><td>{{ e.used }}</td><td class="font-semibold {{ 'text-error' if e.balance < 0 }}">{{ e.balance }}</td>
+      </tr>
+    {% else %}<tr><td colspan="10" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% elif view == 'farmer_bags' %}
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Source', 'સ્ત્રોત') }}{{ th('Village', 'ગામ') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Grain', 'અનાજ') }}{{ th('Total available', 'કુલ ઉપલબ્ધ') }}{{ th('Loaded on trucks', 'ટ્રકમાં ભરેલી') }}{{ th('Taken to stockyard', 'સ્ટોકયાર્ડમાં') }}{{ th('Remaining', 'બાકી') }}</tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="whitespace-nowrap">{{ r.entry.entry_date }}</td>
+        <td><a class="link" href="{{ r.link }}">{{ t('Group', 'ગ્રુપ') if r.kind == 'PurchaseGroup' else t('Individual', 'વ્યક્તિગત') }}</a></td>
+        <td>{{ r.entry.village.village_name }}</td><td>{{ r.entry.farmer.farmer_name }}</td><td>{{ r.entry.grain.grain_name }}</td>
+        <td>{{ r.stock.bought }}</td><td>{{ r.stock.loaded }}</td><td>{{ r.stock.moved }}</td><td class="font-semibold">{{ r.stock.available }}</td>
+      </tr>
+    {% else %}<tr><td colspan="9" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Purchase entry', 'ખરીદી નોંધ') }}{{ th('Labour group', 'મજૂર જૂથ') }}{{ th('Arranged bags', 'ગોઠવેલી બેગ') }}{{ th('Rate / bag', 'ભાવ / બેગ') }}{{ th('Amount', 'રકમ') }}<th></th></tr></thead>
+    <tbody>
+    {% for a in rows %}
+      <tr>
+        <td class="whitespace-nowrap">{{ a.stockyard_arrangement_date }}</td>
+        <td>{% if a.purchase_entry %}#{{ a.purchase_entry.id }} · {{ a.purchase_entry.purchase.farmer.farmer_name }} · {{ a.purchase_entry.purchase.grain.grain_name }}{% else %}—{% endif %}</td>
+        <td>{{ a.labour_group.group_name if a.labour_group else '—' }}</td>
+        <td>{{ a.no_of_arranged_bags }}</td><td>{{ a.rate_per_arranged_bag | inr }}</td><td class="font-semibold">{{ a.amount | inr }}</td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/StockyardPurchase/arrangements/{{ a.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+</div>
+</div>
+{% endblock %}

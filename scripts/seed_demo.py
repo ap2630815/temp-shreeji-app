@@ -17,7 +17,7 @@ from sqlalchemy import delete, select
 from app.core.db import SessionLocal, engine
 from app.models import (
     AuditLog, BagSupplier, BagSupply, Bilty, Broker, BrokerBooking, Brokerage, PurchaseIndividual, Farmer, Grain, Industry, Labour, LabourGroup, LabourGroupWage,
-    LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, Receipt, ReceiptAllocation, Transporter, Truck, TruckLoadLine,
+    LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, Receipt, ReceiptAllocation, Transporter, Truck, FarmersTruckLoadLine,
     TruckTrip, User, Village,
 )
 from app.services import audit
@@ -81,7 +81,7 @@ async def seed() -> None:
 
         # ---- masters
         villages = [Village(village_name=n, village_name_gu=g) for n, g in VILLAGES]
-        grains = [Grain(grain_name=n, grain_name_gu=g, net_bag_weight=w, booking_weight=20 if i % 3 else 100, grain_terms=t) for i, (n, g, w, _, t) in enumerate(GRAINS)]
+        grains = [Grain(grain_name=n, grain_name_gu=g, net_bag_weight=w, expected_raw_weight_per_bag=w + 0.5, booking_weight=20 if i % 3 else 100, grain_terms=t) for i, (n, g, w, _, t) in enumerate(GRAINS)]
         labour = [LabourGroup(group_name=gn, group_name_gu=gg) for gn, gg, _ in LABOUR]
         db.add_all(villages + grains + labour)
         await db.flush()
@@ -139,7 +139,7 @@ async def seed() -> None:
                 purchase_entry_date=p.purchase_group_date, business_year=p.business_year, purchase_group_id=p.id, farmer_id=farmers[i].id, labour_group_id=labour[i].id,
                 no_of_filled_bags=bags, extra_kilos=kilos, no_of_handful_bags=handful, total_available_bags=total_available_bags(bags, handful),
                 payable_amount=amount, borrowed_amount=borrowing, due_date=p.purchase_group_date + timedelta(days=p.pay_after_no_of_days),
-                expected_raw_weight_per_bag=net + rng.randint(0, 2), grain_quality_code=rng.choice([None, "A", "B"]), grain_store_at=rng.choice([None, "Farmer's shed", "Godown"]),
+                expected_raw_weight_per_bag=net + rng.randint(0, 2), grain_quality_code=rng.choice([None, "A", "B"]), grain_stored_location=rng.choice([None, "Farmer's shed", "Godown"]),
                 description=rng.choice([None, None, "2 quality grains", "warning: moisture"]), created_by=user.id))
         db.add_all(entries)
         await db.flush()
@@ -155,7 +155,7 @@ async def seed() -> None:
             direct.append(PurchaseIndividual(
                 purchase_individual_date=d, business_year=business_year_of(d), village_id=farmers[fi].village_id, grain_id=g.id, grain_rate_per_20kg=rate, pay_after_no_of_days=7,
                 terms=g.grain_terms, farmer_id=farmers[fi].id, labour_group_id=labour[fi].id, no_of_filled_bags=bags_d, extra_kilos=0, no_of_handful_bags=0,
-                total_available_bags=bags_d, payable_amount=payable_amount(bags_d, 0, g.net_bag_weight, rate), borrowed_amount=0, due_date=d + timedelta(days=7),
+                total_available_bags=bags_d, payable_amount=payable_amount(bags_d, 0, g.net_bag_weight, rate), borrowed_amount=0, due_date=d + timedelta(days=7), expected_raw_weight_per_bag=g.expected_raw_weight_per_bag,
                 description="Demo direct entry", created_by=user.id))
         db.add_all(direct)
         await db.flush()
@@ -190,7 +190,7 @@ async def seed() -> None:
         await db.flush()
         for i, t in enumerate(trips):
             bags = int(entries[i].total_available_bags * 0.8)
-            lines.append(TruckLoadLine(trip_id=t.id, purchase_farmer_entry_id=entries[i].id, no_of_loaded_bags=bags, total_remaining_bags=entries[i].total_available_bags - bags))
+            lines.append(FarmersTruckLoadLine(trip_id=t.id, purchase_farmer_entry_id=entries[i].id, no_of_loaded_bags=bags, total_remaining_bags=entries[i].total_available_bags - bags))
         db.add_all(lines)
         await db.flush()
         ids["truck_trips"], ids["truck_load_lines"] = [t.id for t in trips], [ln.id for ln in lines]
@@ -298,7 +298,7 @@ async def remove() -> None:
         await db.execute(delete(Payment).where(Payment.id.in_(pay_ids)))
         await db.execute(delete(ReceiptAllocation).where(ReceiptAllocation.receipt_id.in_(rec_ids)))
         await db.execute(delete(Receipt).where(Receipt.id.in_(rec_ids)))
-        for model, key in ((Bilty, "bilties"), (TruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BrokerBooking, "broker_bookings"),
+        for model, key in ((Bilty, "bilties"), (FarmersTruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BrokerBooking, "broker_bookings"),
                            (BagSupply, "bag_supplies"), (LabourWork, "labour_work"), (PurchaseIndividual, "purchase_individuals"), (PurchaseFarmerEntry, "purchase_farmers_entries"), (PurchaseGroupFarmer, "purchase_group_farmers"), (PurchaseGroup, "purchase_group"),
                            (LabourGroupWage, "labour_group_wages"), (Brokerage, "brokerages"), (Labour, "labours"), (Farmer, "farmers"), (BagSupplier, "bag_suppliers"),
                            (LabourGroup, "labour_groups"), (Transporter, "transporters"), (Truck, "trucks"), (Industry, "industries"), (Broker, "brokers"),

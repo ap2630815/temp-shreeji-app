@@ -1,0 +1,44 @@
+{% extends "master_form_page.html" %}
+{% block post_form %}
+{# chosen entry -> its filled bags (the arranged bags); rate -> remembered in this browser from the last save #}
+<script id="arr-data" type="application/json">{{ {'bags': entry_bags, 'last_rate': last_rate, 'is_new': obj_id is none} | tojson }}</script>
+<script>
+(function () {
+  const data = JSON.parse(document.getElementById('arr-data').textContent);
+  const KEY = 'stockyard_arrangement_rate';
+  const form = () => document.getElementById('master-form');
+  function syncBags() {
+    const f = form();
+    if (!f) return;
+    const entry = f.stockyard_purchase_entry_id, bags = f.no_of_arranged_bags;
+    if (entry.value && data.bags[entry.value] !== undefined) {
+      bags.value = data.bags[entry.value];
+      bags.readOnly = true;  // taken from the entry; the server sets it again on save
+      bags.classList.add('opacity-60');
+    } else {
+      bags.readOnly = false;
+      bags.classList.remove('opacity-60');
+    }
+  }
+  function validRate(v) { v = parseInt(v, 10); return v >= 1 && v <= 20 ? String(v) : ''; }
+  function loadRate() {
+    const f = form();
+    if (!f || !data.is_new) return;
+    let saved = '';
+    try { saved = validRate(localStorage.getItem(KEY)); } catch (e) {}
+    const rate = saved || validRate(data.last_rate);
+    if (rate && !f.rate_per_arranged_bag.value) f.rate_per_arranged_bag.value = rate;
+  }
+  document.addEventListener('change', e => { if (e.target.name === 'stockyard_purchase_entry_id') syncBags(); });
+  document.body.addEventListener('htmx:afterSwap', syncBags);  // the form is re-rendered when it has errors
+  document.body.addEventListener('htmx:beforeRequest', e => {
+    const f = form();
+    if (!f || e.detail.elt !== f) return;
+    const rate = validRate(f.rate_per_arranged_bag.value);
+    if (rate) { try { localStorage.setItem(KEY, rate); } catch (err) {} }
+  });
+  loadRate();
+  syncBags();
+})();
+</script>
+{% endblock %}

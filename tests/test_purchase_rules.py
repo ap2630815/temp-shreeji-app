@@ -196,7 +196,8 @@ def test_direct_and_purchase_entries_answer_to_the_same_names():
                                  payable_amount=500, borrowed_amount=0)
     assert not bought.is_direct and (bought.entry_date, bought.grain_rate_per_20kg, bought.pay_after_no_of_days, bought.total_kg) == (date(2026, 10, 6), 300, 10, 70)
     assert bought.purchase_group.village.village_name == "Vanthali"  # reached through the purchase (its # link); the ledger shows the farmer's village instead
-    assert not hasattr(PurchaseFarmerEntry, "village")
+    assert bought.village is deal.village  # a purchase entry reads its village from its purchase_group, it has no village column of its own
+    assert "village_id" not in PurchaseFarmerEntry.__table__.columns
 
 
 def test_a_direct_entry_has_one_description_and_no_purchase_link():

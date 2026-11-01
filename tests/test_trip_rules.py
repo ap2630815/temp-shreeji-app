@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from app.models import Bilty, BrokerBooking, Brokerage, Grain, PurchaseFarmerEntry, TruckLoadLine, TruckTrip
+from app.models import Bilty, BrokerBooking, Brokerage, Grain, PurchaseFarmerEntry, FarmersTruckLoadLine, TruckTrip
 from app.services import money
 
 
@@ -9,7 +9,7 @@ def bilty(*, rate=2000, booking_weight=100, deduction=None, rate_change=0, per_b
     grain = Grain(booking_weight=booking_weight)
     booking = BrokerBooking(grain_rate_per_booking_weight=rate, percentage_deduction=deduction, brokerage=Brokerage(brokerage_per_bag=per_bag, grain=grain))
     trip = TruckTrip(rent_per_ton=0, rent_per_bag=0, advance_amount=0, other_payable=0, other_deduction=0, broker_booking=booking)
-    trip.load_lines = [TruckLoadLine(no_of_loaded_bags=b, entry=PurchaseFarmerEntry(expected_raw_weight_per_bag=expected)) for b in line_bags]
+    trip.load_lines = [FarmersTruckLoadLine(no_of_loaded_bags=b, purchase_farmer_entry_id=1, group_entry=PurchaseFarmerEntry(expected_raw_weight_per_bag=expected)) for b in line_bags]
     base = dict(any_rate_change=rate_change, total_bags_in_truck=sum(line_bags), merchant_total_weight=30_000, merchant_tare_weight=10_000,
                 industry_total_weight=None, industry_tare_weight=None)
     b = Bilty(**{**base, **kw})
@@ -86,7 +86,7 @@ def test_brokerage_is_bags_times_rate_per_bag():
 # ---------------------------------------------------------------- freight (truck trip total)
 def trip_with(bags, **kw):
     t = TruckTrip(**{**dict(rent_per_ton=0, rent_per_bag=0, advance_amount=0, other_payable=0, other_deduction=0), **kw})
-    t.load_lines = [TruckLoadLine(no_of_loaded_bags=b) for b in bags]
+    t.load_lines = [FarmersTruckLoadLine(no_of_loaded_bags=b) for b in bags]
     return t
 
 

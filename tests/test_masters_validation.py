@@ -50,9 +50,9 @@ def test_ifsc_uppercased_and_validated():
 
 
 def test_grain_bag_and_booking_weights_must_be_allowed_sizes():
-    ok, errors = check("Grains", dict(grain_name="Wheat", net_bag_weight="50", booking_weight="20"))
+    ok, errors = check("Grains", dict(grain_name="Wheat", net_bag_weight="50", expected_raw_weight_per_bag="50.5", booking_weight="20"))
     assert not errors and (ok["net_bag_weight"], ok["booking_weight"]) == (50, 20)
-    _, errors = check("Grains", dict(grain_name="Wheat", net_bag_weight="45", booking_weight="30"))
+    _, errors = check("Grains", dict(grain_name="Wheat", net_bag_weight="45", expected_raw_weight_per_bag="45.5", booking_weight="30"))
     assert {"net_bag_weight", "booking_weight"} <= set(errors)
 
 

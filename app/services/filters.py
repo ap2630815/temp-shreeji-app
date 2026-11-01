@@ -2,7 +2,7 @@
 
 from sqlalchemy import select
 
-from app.models import BrokerBooking, Brokerage, PurchaseFarmerEntry, PurchaseGroup, TruckLoadLine, TruckTrip
+from app.models import BrokerBooking, Brokerage, PurchaseFarmerEntry, PurchaseGroup, PurchaseIndividual, FarmersTruckLoadLine, TruckTrip
 
 
 def trip_conditions(grain_id: int = 0, village_id: int = 0) -> list:
@@ -12,9 +12,14 @@ def trip_conditions(grain_id: int = 0, village_id: int = 0) -> list:
         conds.append(TruckTrip.broker_booking_id.in_(
             select(BrokerBooking.id).join(Brokerage, Brokerage.id == BrokerBooking.brokerage_id).where(Brokerage.grain_id == grain_id)))
     if village_id:
-        conds.append(TruckTrip.id.in_(
-            select(TruckLoadLine.trip_id)
-            .join(PurchaseFarmerEntry, PurchaseFarmerEntry.id == TruckLoadLine.purchase_farmer_entry_id)
+        from_group = (
+            select(FarmersTruckLoadLine.trip_id)
+            .join(PurchaseFarmerEntry, PurchaseFarmerEntry.id == FarmersTruckLoadLine.purchase_farmer_entry_id)
             .join(PurchaseGroup, PurchaseGroup.id == PurchaseFarmerEntry.purchase_group_id)
-            .where(PurchaseGroup.village_id == village_id)))
+            .where(PurchaseGroup.village_id == village_id))
+        from_individual = (
+            select(FarmersTruckLoadLine.trip_id)
+            .join(PurchaseIndividual, PurchaseIndividual.id == FarmersTruckLoadLine.purchase_individual_id)
+            .where(PurchaseIndividual.village_id == village_id))
+        conds.append(TruckTrip.id.in_(from_group) | TruckTrip.id.in_(from_individual))
     return conds

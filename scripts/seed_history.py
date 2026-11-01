@@ -21,7 +21,7 @@ from sqlalchemy import delete, select
 from app.core.db import SessionLocal, engine
 from app.models import (
     AuditLog, BagSupply, Bilty, BrokerBooking, Brokerage, Farmer, Grain, Industry, LabourGroup, LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry,
-    PurchaseGroup, PurchaseGroupFarmer, Receipt, ReceiptAllocation, Truck, Transporter, TruckLoadLine, TruckTrip, User, BagSupplier,
+    PurchaseGroup, PurchaseGroupFarmer, Receipt, ReceiptAllocation, Truck, Transporter, FarmersTruckLoadLine, TruckTrip, User, BagSupplier,
 )
 from app.services import audit
 from app.services import payables as pay_svc
@@ -112,7 +112,7 @@ async def seed(label: str, chains: int) -> None:
                 db.add(trip)
                 await db.flush()
                 loaded = int(entry.total_available_bags * 0.8)
-                line = TruckLoadLine(trip_id=trip.id, purchase_farmer_entry_id=entry.id, no_of_loaded_bags=loaded, total_remaining_bags=entry.total_available_bags - loaded)
+                line = FarmersTruckLoadLine(trip_id=trip.id, purchase_farmer_entry_id=entry.id, no_of_loaded_bags=loaded, total_remaining_bags=entry.total_available_bags - loaded)
                 m_net = loaded * net + rng.randint(0, 40)
                 m_tare = rng.randrange(9000, 11000, 10)
                 i_net = m_net - int(m_net * rng.uniform(0.0, 0.008))
@@ -195,7 +195,7 @@ async def remove() -> None:
         await db.execute(delete(Payment).where(Payment.id.in_(pay_ids)))
         await db.execute(delete(ReceiptAllocation).where(ReceiptAllocation.receipt_id.in_(rec_ids)))
         await db.execute(delete(Receipt).where(Receipt.id.in_(rec_ids)))
-        for model, key in ((Bilty, "bilties"), (TruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BrokerBooking, "broker_bookings"),
+        for model, key in ((Bilty, "bilties"), (FarmersTruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BrokerBooking, "broker_bookings"),
                            (BagSupply, "bag_supplies"), (LabourWork, "labour_work"), (PurchaseFarmerEntry, "purchase_farmers_entries"),
                            (PurchaseGroupFarmer, "purchase_group_farmers"), (PurchaseGroup, "purchase_group")):
             await db.execute(delete(model).where(model.id.in_(ids.get(key, []))))

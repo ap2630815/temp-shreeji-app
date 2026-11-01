@@ -7,7 +7,7 @@ the farmer cannot be removed: that is reported on the form, nothing is deleted."
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Farmer, PaymentAllocation, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, TruckLoadLine, User
+from app.models import Farmer, FarmerStockyardTransfer, PaymentAllocation, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, FarmersTruckLoadLine, User
 from app.services import audit
 
 Pair = tuple[str, str]
@@ -49,7 +49,8 @@ async def in_use(db: AsyncSession, entries: list[PurchaseFarmerEntry]) -> list[F
     if not entries:
         return []
     ids = [e.id for e in entries]
-    used = set((await db.scalars(select(TruckLoadLine.purchase_farmer_entry_id).where(TruckLoadLine.purchase_farmer_entry_id.in_(ids)))).all())
+    used = set((await db.scalars(select(FarmersTruckLoadLine.purchase_farmer_entry_id).where(FarmersTruckLoadLine.purchase_farmer_entry_id.in_(ids)))).all())
+    used |= set((await db.scalars(select(FarmerStockyardTransfer.purchase_farmer_entry_id).where(FarmerStockyardTransfer.purchase_farmer_entry_id.in_(ids)))).all())
     used |= set((await db.scalars(select(PaymentAllocation.payable_id).where(PaymentAllocation.payable_type == "farmer", PaymentAllocation.payable_id.in_(ids)))).all())
     farmers = {e.farmer_id: e.farmer for e in entries if e.id in used}
     return sorted(farmers.values(), key=lambda f: f.farmer_name)

@@ -1,7 +1,7 @@
 """Master (reference) tables: file1-master1.txt and file2-master2.txt. Running totals are deliberately absent:
 they are derived from transaction/ledger rows, never stored."""
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -136,6 +136,7 @@ class Grain(TimestampMixin, Base):
     grain_name: Mapped[str] = mapped_column(String(30), unique=True)
     grain_name_gu: Mapped[str | None] = mapped_column(String(30))
     net_bag_weight: Mapped[int] = mapped_column(Integer)
+    expected_raw_weight_per_bag: Mapped[float] = mapped_column(Float)
     booking_weight: Mapped[int] = mapped_column(Integer)
     grain_terms: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
@@ -225,3 +226,24 @@ class Brokerage(TimestampMixin, Base):
 
     broker: Mapped[Broker] = relationship(lazy="joined")
     grain: Mapped[Grain] = relationship(lazy="joined")
+
+
+class Stockyard(TimestampMixin, Base):
+    """A place where bought grain is stored; its owner is paid rent (owner 'Self' when it is ours)."""
+
+    __tablename__ = "stockyards"
+    __table_args__ = (
+        CheckConstraint("rent_of_stockyard >= 0", name="ck_stockyards_rent_of_stockyard_nonneg"),
+        _digits_check("stockyard_owner_mobile", name="ck_stockyards_owner_mobile_10_digits"),
+        _digits_check("stockyard_upi_number", name="ck_stockyards_upi_number_10_digits", nullable=True),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name_of_stockyard: Mapped[str] = mapped_column(Text)
+    location: Mapped[str] = mapped_column(Text)
+    stockyard_owner_name: Mapped[str] = mapped_column(String(120), default="Self", server_default="Self")
+    stockyard_owner_mobile: Mapped[str] = mapped_column(String(10))
+    stockyard_upi_number: Mapped[str | None] = mapped_column(String(10))
+    storage_capacity: Mapped[int] = mapped_column(BigInteger)
+    rent_of_stockyard: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    description: Mapped[str | None] = mapped_column(Text)

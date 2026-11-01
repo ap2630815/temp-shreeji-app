@@ -1,0 +1,183 @@
+FORMULAS USED IN THE APPLICATION
+================================
+Units: money = whole rupees (integer), weight = whole kg (integer).
+Source of truth: app/services/money.py (pure functions), used by app/models/transactions.py and app/api/*.
+Rounding: every amount is rounded UP to the next whole rupee (ceil), except the receivable
+percentage deduction, which is rounded half-up.
+
+Notation: ceil(a / b) = -(-a // b)
+
+
+1. PURCHASE FROM FARMER  (purchase_farmers_entries, purchase_individuals)
+-------------------------------------------------------------------------
+total_kg              = no_of_filled_bags * grain.net_bag_weight + extra_kilos
+payable_amount        = ceil( total_kg * grain_rate_per_20kg / 20 )
+                        i.e. (total_kg / 20) * grain_rate_per_20kg
+total_available_bags  = no_of_filled_bags + no_of_handful_bags
+due_date              = entry_date + pay_after_no_of_days (days)
+net_payable           = payable_amount - borrowed_amount
+paid                  = SUM(payment_allocations.amount) for this entry
+due                   = net_payable - paid
+status                = "paid"    if due <= 0
+                        "partial" if paid > 0
+                        "pending" otherwise
+overdue               = due > 0 AND due_date < today
+Rules: borrowed_amount <= payable_amount;  net_payable must stay >= paid.
+
+
+2. STOCK / LOADING  (app/services/stock.py)
+-------------------------------------------
+bought (per entry)            = total_available_bags
+loaded (per entry)            = SUM(truck_load_lines.no_of_loaded_bags)
+available                     = bought - loaded
+total_remaining_bags (line)   = total_available_bags - running sum of no_of_loaded_bags
+                                (lines of the entry taken in id order)
+total_bags_in_truck (trip)    = SUM(no_of_loaded_bags) over the trip's load lines
+expected_total_loaded_weight  = SUM(no_of_loaded_bags * expected_raw_weight_per_bag)   (farmer entries and stockyard lines; rounded to whole kg)
+                                (None if any entry has no expected weight)
+
+
+3. WEIGHTS  (bilty)
+-------------------
+merchant_net_weight           = merchant_total_weight - merchant_tare_weight
+industry_net_weight           = industry_total_weight - industry_tare_weight   (None until weighed)
+difference_in_loading_weight  = merchant_net_weight - expected_total_loaded_weight
+average_per_bag_difference    = difference_in_loading_weight / total_bags_in_truck        (2 decimals, half-up)
+difference_in_delivering_weight = industry_net_weight - merchant_net_weight               (negative = industry weighed less)
+total_weight_difference       = industry_total_weight - merchant_total_weight
+tare_weight_difference        = industry_tare_weight - merchant_tare_weight
+percentage_difference         = (-difference_in_delivering_weight * 100) / merchant_net_weight   (2 decimals, half-up; positive = shortage)
+
+
+4. TRUCK TRIP / FREIGHT  (payable to the truck owner)
+-----------------------------------------------------
+Freight is charged on the industry's weight; until it is entered our own (merchant) weight is used as a provisional stand-in.
+freight_weight_kg     = industry_net_weight, else merchant_net_weight   (0 / none if no bilty yet)
+freight_by_weight     = ceil( freight_weight_kg * rent_per_ton / 1000 )
+freight_by_bags       = total_bags_in_truck * rent_per_bag
+trip_total            = freight_by_weight + freight_by_bags
+                        (exactly one of rent_per_ton / rent_per_bag is non-zero)
+truck_trip_total_amount = max( trip_total - advance_amount + other_payable - other_deduction , 0 )
+
+
+5. RECEIVABLE FROM INDUSTRY  (bilty)
+------------------------------------
+booking_weight        = grain.booking_weight
+effective_rate        = grain_rate_per_booking_weight - any_rate_change
+receivable_amount     = ceil( industry_net_weight * (grain_rate_per_booking_weight - any_rate_change) / booking_weight )
+                        (None until the industry weight is in)
+receivable_after_deduction = round_half_up( receivable_amount * (1 - percentage_deduction / 100) )
+                        = what the industry is actually billed
+estimated_amount      = same two steps, but using merchant_net_weight (our own weight)
+error_receivable_amount = receivable_after_deduction - estimated_amount
+received              = SUM(receipt_allocations.amount) for the bilty
+due                   = receivable_after_deduction - received
+status                = "unweighed" if receivable is None
+                        "paid"      if due <= 0
+                        "partial"   if received > 0
+                        "pending"   otherwise
+
+
+6. BROKERAGE  (payable to the broker)
+-------------------------------------
+brokerage_amount      = total_bags_in_truck * brokerage_per_bag     (broker's rate for the grain)
+
+
+7. LABOUR  (labour_work)
+------------------------
+net_payable           = payable_amount (wages) - borrowing_amount
+petrol, meal          = business cost; NOT deducted from the labour group
+Rule: borrowing_amount <= payable_amount.
+
+
+8. BAG SUPPLY  (bag_supplies)
+-----------------------------
+payable_amount        = rate_per_bag * no_of_bags
+(a business cost, never deducted from the farmer)
+
+
+9. PAYMENT ALLOCATION  (oldest due first)  (app/services/ledger.py: allocate)
+-----------------------------------------------------------------------------
+Spread amount over (payable, due) pairs in due-date order:
+    take = min(due, remaining);  remaining -= take      (skip items with due <= 0)
+Error if amount <= 0 or amount > total outstanding.
+Payable sort order   = (due_date or doc_date, doc_date, payable_type, payable_id)
+payment.status       = "partial"  if amount < total outstanding before the payment
+                       "final"    if it clears everything and the party had earlier payments
+                       "complete" if it clears everything and it is the party's only payment
+Paid / due / status are always derived from allocations, never stored.
+
+
+10. REPORT / ANALYSIS FORMULAS  (app/services/analysis.py)
+----------------------------------------------------------
+pct(part, whole)      = part * 100 / whole, 2 decimals half-up (None if whole = 0)
+Paid % of net         = pct(paid, net_payable)
+Average rate / 20 kg  = round( gross payable * 20 / kg )
+Average per trip      = round( payable / number of trips )
+Average per bag       = round( amount / bags, 2 )
+Ageing buckets (days past due_date, only amounts with due > 0):
+    Not yet due (<=0), 1-7, 8-30, 31-90, Over 90 days late
+Monthly totals        = sums grouped by month in business-year order Oct..Sep
+Business year         = October to September (label like 2025-26)
+
+
+11. TOOLBAR DATE FILTER  (app/core/periods.py)
+----------------------------------------------
+Window = (first day, today), both inclusive
+    d3 / w1 / w2 / w3 : today - (n-1) days, with n = 3 / 7 / 14 / 21
+    m1 / m2 / q1 / q2 : today minus 1 / 2 / 3 / 6 months (day clipped to month length)
+    date              : one specific day (on_date)
+
+
+12. STOCK LEDGER SUMMARY  (see leder-entry.txt section E)
+---------------------------------------------------------
+available bags (entry or purchase group) = SUM(total_available_bags) - SUM(no_of_loaded_bags)
+total_remaining_bags (after each load line) = total_available_bags - running sum of no_of_loaded_bags
+
+
+13. STOCKYARD PURCHASE  (/StockyardPurchase: stockyard_purchases, stockyard_purchase_entries, stockyard_arrangement_entries)
+--------------------------------------------------------------------------------------------------------------------------
+Entry (stockyard_purchase_entries) - grain, rate and pay-after come from its stockyard_purchases row:
+total_kg              = no_of_filled_bags * grain.net_bag_weight + extra_kilos
+payable_amount        = ceil( total_kg * grain_rate_per_20kg / 20 )          (same as farmer purchase, section 1)
+due_date              = stockyard_purchase_entry_date + pay_after_no_of_days (days)
+net_payable           = payable_amount - borrowed_amount
+Rules: borrowed_amount <= payable_amount.
+When the purchase's rate, grain or pay_after_no_of_days is edited, payable_amount and due_date of all its entries are
+recalculated; the edit is refused if an entry's borrowed_amount would then exceed its new payable_amount.
+
+Arrangement (stockyard_arrangement_entries):
+no_of_arranged_bags   = entry.no_of_filled_bags      if stockyard_purchase_entry_id is set (kept in step when the entry's bags change)
+                        entered by the user          if stockyard_purchase_entry_id is empty (must be > 0)
+amount                = no_of_arranged_bags * rate_per_arranged_bag          (not stored; rate is 1 to 20)
+Rule: a purchase entry can be arranged only once (no duplicate arrangement for the same entry).
+
+Stockyard payments are not part of Payables yet: payable_amount / net_payable are recorded but not allocated.
+
+Stockyard bag ledgers (nothing stored; app/services/stockyard_stock.py), per stockyard and grain:
+filled bags in stock  = SUM(stockyard_purchase_entries.no_of_filled_bags)
+                        + SUM(farmer_stockyard_transfers.no_of_bags)
+                        - SUM(stockyard_load_lines.no_of_loaded_bags)
+empty bags used       = SUM over stockyard purchase entries of max(0, entry.no_of_filled_bags - stockyard_purchases.no_of_empty_bags)
+                        i.e. when an entry's filled bags are more than the empty bags given on its purchase, the extra empty bags
+                        are taken from the stockyard's own empty bags (each entry on its own; only stockyard purchase entries use the pool)
+empty bags in stock   = SUM(movements 'received') - SUM(movements 'given_to_farmer') - empty bags used (above)
+A save that would leave filled or empty bags below zero is refused (unless the balance was already negative and did not get worse).
+
+Farmer bags (per farmer entry, either purchase_farmers_entries or purchase_individuals):
+bought     = total_available_bags
+loaded     = SUM(truck_load_lines.no_of_loaded_bags)
+moved      = SUM(farmer_stockyard_transfers.no_of_bags)          (taken to a stockyard)
+available  = bought - loaded - moved                              (the bags still at the farmer's place)
+truck_load_lines.total_remaining_bags = total_available_bags - moved - running sum of loaded bags (lines in id order)
+
+Bag movements:
+filled bags : farmer -> truck (truck_load_lines), farmer -> stockyard (farmer_stockyard_transfers), stockyard -> truck (stockyard_load_lines)
+empty bags  : stockyard -> farmer (movement 'given_to_farmer'), used at the stockyard by stockyard purchase entries (formula above)
+total_bags_in_truck (trip) = SUM(truck_load_lines) + SUM(stockyard_load_lines); expected loaded weight also counts the stockyard lines:
+    stockyard_load_lines.expected_raw_weight_per_bag starts at grains.expected_raw_weight_per_bag (filled in when the trip's
+    grain is known) and can be edited while adding the line; required for every stockyard line.
+
+Storage place: purchase_farmers_entries / purchase_individuals.grain_stored_location. The drop-down lists the distinct places used so far;
+text in brackets is ignored when comparing, e.g. "Godown (behind shop)" and "godown" are one place.
+

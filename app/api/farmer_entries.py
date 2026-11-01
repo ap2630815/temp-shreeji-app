@@ -1,6 +1,6 @@
 """The farmer ledger screens.
 
-/PurchaseFarmersEntries   every farmer ledger entry of the business year: purchase entries and direct entries together
+/PurchaseFarmers          tabs (like /StockyardPurchase): entries = every farmer ledger entry of the business year (purchase and direct\n                          entries together), groups = the purchase groups (deals), individuals = the direct entries
 /PurchaseIndividual       direct entries (+ add / + edit): ONE form holding the purchase columns (date, village, grain, rate,
                           pay-after, terms) and the entry columns (farmer, labour group, bags, amounts...) with ONE description.
                           One flat row per farmer entry in purchase_individuals, no purchase_group.
@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi_csrf_protect import CsrfProtect
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -27,6 +27,9 @@ from app.core.db import get_db
 from app.core.templating import format_mobile, render, render_with_csrf
 from app.models import PurchaseIndividual, Farmer, Grain, LabourGroup, PurchaseFarmerEntry, User, Village
 from app.services import audit
+from app.services.duplicates import DUPLICATE_MSG, find_duplicate
+from app.services.locations import stored_locations
+from app.services.stock import Stock, stock_by_entry
 from app.services.ledger import all_entry_views, direct_entry_views, paid_for_direct, totals
 from app.services.money import payable_amount, total_available_bags
 from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label
@@ -44,31 +47,52 @@ async def _years(db: AsyncSession, user: User) -> list[str]:
     return allowed_years(user, found)
 
 
-async def _ledger_page(request, csrf, db, user, *, year, grain_id, village_id, direct):
-    years = await _years(db, user)
+VIEWS = ("entries", "groups", "individuals")
+
+
+async def _ledger_page(request, csrf, db, user, *, view, year, grain_id, village_id):
+    from app.api.purchase_group import group_rows  # imported late: purchase_group is the other farmer-ledger module
+
+    years = sorted(set(await _years(db, user)) | set(await _group_years(db, user)), reverse=True)
     year = year if year in years else current_year_label()
-    source = direct_entry_views(db) if direct else all_entry_views(db)
+    now = today()
+    ctx = dict(view=view, today=now, year=year, years=years, year_locked=year != current_year_label(), views=[], totals=None, rows=[])
+    if view == "groups":
+        ctx["rows"] = await group_rows(db, year, grain_id, village_id, toolbar_window(request))
+        return render_with_csrf(request, csrf, "farmers_entries.html", user=user, **ctx)
+    source = direct_entry_views(db) if view == "individuals" else all_entry_views(db)
     views = [v for v in await source if v.entry.business_year == year and (not grain_id or v.entry.grain.id == grain_id) and (not village_id or v.entry.farmer.village_id == village_id)]  # the village of the farmer; a purchase's own village is reached through its # link
     if window := toolbar_window(request):
         views = [v for v in views if window[0] <= v.entry.entry_date <= window[1]]
     views.sort(key=lambda v: (v.entry.entry_date, v.entry.id), reverse=True)
-    now = today()
-    return render_with_csrf(request, csrf, "farmers_entries.html", user=user, views=views, totals=totals(views, now), today=now, year=year, years=years,
-                            year_locked=year != current_year_label(), direct=direct)
+    ctx.update(views=views, totals=totals(views, now))
+    return render_with_csrf(request, csrf, "farmers_entries.html", user=user, **ctx)
 
 
-@router.get("/PurchaseFarmersEntries", response_class=HTMLResponse)
-async def all_entries(
-    request: Request, year: str = "", grain_id: int = 0, village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
+async def _group_years(db: AsyncSession, user: User) -> list[str]:
+    from app.models import PurchaseGroup
+
+    return allowed_years(user, (await db.scalars(select(PurchaseGroup.business_year).distinct())).all())
+
+
+@router.get("/PurchaseFarmers", response_class=HTMLResponse)
+async def farmers_page(
+    request: Request, view: str = "entries", year: str = "", grain_id: int = 0, village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
 ):
-    return await _ledger_page(request, csrf, db, user, year=year, grain_id=grain_id, village_id=village_id, direct=False)
+    return await _ledger_page(request, csrf, db, user, view=view if view in VIEWS else "entries", year=year, grain_id=grain_id, village_id=village_id)
 
 
-@router.get("/PurchaseIndividual", response_class=HTMLResponse)
-async def direct_list(
-    request: Request, year: str = "", grain_id: int = 0, village_id: int = 0, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)
-):
-    return await _ledger_page(request, csrf, db, user, year=year, grain_id=grain_id, village_id=village_id, direct=True)
+@router.get("/PurchaseFarmersEntries")
+async def old_all_entries_url(request: Request):
+    q = request.url.query
+    return RedirectResponse("/PurchaseFarmers" + (f"?{q}" if q else ""), status_code=307)
+
+
+@router.get("/PurchaseIndividual")
+async def direct_list(request: Request, user: User = Depends(current_user)):
+    """The direct entries are the 'individuals' tab of /PurchaseFarmers."""
+    q = request.url.query
+    return RedirectResponse("/PurchaseFarmers?view=individuals" + (f"&{q}" if q else ""), status_code=307)
 
 
 # ---------------------------------------------------------------- the one form
@@ -85,9 +109,9 @@ class PurchaseIndividualIn(BaseModel):
     no_of_filled_bags: Annotated[int, Field(ge=0, le=INT_MAX)]
     extra_kilos: Annotated[int, Field(ge=0, le=INT_MAX)] | None = None  # blank means 0
     no_of_handful_bags: Annotated[int, Field(ge=0, le=INT_MAX)] | None = None  # blank means 0
-    expected_raw_weight_per_bag: Annotated[int, Field(ge=0, le=INT_MAX)] | None = None
+    expected_raw_weight_per_bag: Annotated[float, Field(ge=0, le=1000)] | None = None  # blank: the grain's value
     grain_quality_code: str | None = None
-    grain_store_at: str | None = None
+    grain_stored_location: str | None = None
     borrowed_amount: Annotated[int, Field(ge=0, le=INT_MAX)] | None = None  # blank means 0
     description: str | None = None
 
@@ -113,9 +137,11 @@ async def direct_fields(db: AsyncSession) -> tuple[list[F], list[F], dict[int, i
         F("no_of_filled_bags", "Filled bags", "ભરેલી બેગ", kind="int", required=True),
         F("extra_kilos", "Extra kilos (loose, beyond full bags)", "વધારાના કિલો (પૂરી બેગ ઉપરાંત)", kind="int"),
         F("no_of_handful_bags", "Handful bags", "હેન્ડફુલ બેગ", kind="int", help=("Counted in the stock, not in the payment", "સ્ટોકમાં ગણાય છે, ચુકવણીમાં નહીં")),
-        F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)", kind="int"),
+        F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)", kind="decimal",
+          help=("Used only to compare with the weighbridge, never in the payment. Blank starts at the grain's value", "ફક્ત કાંટા સાથે સરખામણી માટે, ચુકવણીમાં ક્યારેય નહીં. ખાલી રાખો તો અનાજના મૂલ્યથી શરૂ")),
         F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ"),
-        F("grain_store_at", "Grain stored at", "અનાજ ક્યાં સંગ્રહ્યું"),
+        F("grain_stored_location", "Grain stored location", "અનાજ સંગ્રહ સ્થળ", options=await stored_locations(db),
+          help=("Pick a place used before, or type a new one (text in brackets is ignored when matching)", "પહેલાં વપરાયેલ સ્થળ પસંદ કરો અથવા નવું લખો (કૌંસનો લખાણ ગણાતું નથી)")),
         F("borrowed_amount", "Borrowing / advance to deduct (₹)", "ઉધાર / એડવાન્સ કાપવાના (₹)", kind="int"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ]
@@ -128,7 +154,7 @@ def direct_values(e: PurchaseIndividual) -> dict:
         purchase_individual_date=e.purchase_individual_date.isoformat(), village_id=str(e.village_id), grain_id=str(e.grain_id), grain_rate_per_20kg=str(e.grain_rate_per_20kg),
         pay_after_no_of_days=str(e.pay_after_no_of_days), terms=e.terms or "", farmer_id=str(e.farmer_id), labour_group_id=str(e.labour_group_id),
         no_of_filled_bags=str(e.no_of_filled_bags), extra_kilos=str(e.extra_kilos), no_of_handful_bags=str(e.no_of_handful_bags),
-        expected_raw_weight_per_bag=n(e.expected_raw_weight_per_bag), grain_quality_code=e.grain_quality_code or "", grain_store_at=e.grain_store_at or "",
+        expected_raw_weight_per_bag=f"{e.expected_raw_weight_per_bag:g}", grain_quality_code=e.grain_quality_code or "", grain_stored_location=e.grain_stored_location or "",
         borrowed_amount=str(e.borrowed_amount), description=e.description or "",
     )
 
@@ -152,7 +178,7 @@ async def _get_direct(db: AsyncSession, entry_id: int) -> PurchaseIndividual:
 def _ctx(purchase_fields, entry_fields, values, errors, action, heading, nets, editing, farmer_villages):
     return form_context(
         fields=purchase_fields + entry_fields, purchase_fields=purchase_fields, entry_fields=entry_fields, values=values, errors=errors, action=action,
-        heading=heading, back_url="/PurchaseIndividual", nets=nets, editing=editing, farmer_villages=farmer_villages,
+        heading=heading, back_url="/PurchaseFarmers?view=individuals", nets=nets, editing=editing, farmer_villages=farmer_villages,
     )
 
 
@@ -168,7 +194,7 @@ async def direct_new(request: Request, like: int = 0, user: User = Depends(curre
     village_id = toolbar_ids(request)[0]
     if village_id:  # and the farmers of that village
         entry = [replace(f, options=tuple(o for o in f.options if farmer_villages.get(int(o[0])) == village_id)) if f.name == "farmer_id" else f for f in entry]
-    ctx = _ctx(purchase, entry, values, {}, "/PurchaseIndividual", ("Add purchase individual", "ખરીદી વ્યક્તિગત ઉમેરો"), nets, False, farmer_villages)
+    ctx = _ctx(purchase, entry, values, {}, "/PurchaseFarmers?view=individuals", ("Add purchase individual", "ખરીદી વ્યક્તિગત ઉમેરો"), nets, False, farmer_villages)
     return render_with_csrf(request, csrf, "direct_form_page.html", user=user, **ctx)
 
 
@@ -228,6 +254,8 @@ async def _save_direct(request: Request, e: PurchaseIndividual | None, user: Use
     if farmer_villages.get(clean["farmer_id"]) != clean["village_id"]:  # the farmer list only offers the selected village's farmers
         return rerender({"farmer_id": (f"This farmer is not from {village.village_name}; pick a {village.village_name} farmer or change the village",
                                        f"આ ખેડૂત {village.village_name} નો નથી; {village.village_name} નો ખેડૂત પસંદ કરો અથવા ગામ બદલો")})
+    if clean["expected_raw_weight_per_bag"] is None:  # starts at the grain's value, editable
+        clean["expected_raw_weight_per_bag"] = grain.expected_raw_weight_per_bag
     if clean["extra_kilos"] >= grain.net_bag_weight:
         return rerender({"extra_kilos": (f"Must be less than one bag ({grain.net_bag_weight} kg); add it to the bag count", f"એક બેગ ({grain.net_bag_weight} કિલો) કરતાં ઓછા હોવા જોઈએ")})
     try:
@@ -246,6 +274,15 @@ async def _save_direct(request: Request, e: PurchaseIndividual | None, user: Use
     if clean["payable_amount"] - clean["borrowed_amount"] < paid:
         return rerender({"no_of_filled_bags": (f"₹ {paid} is already paid against this entry; the amount cannot go below that", f"આ એન્ટ્રી સામે ₹ {paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
 
+    if (dup := await find_duplicate(db, clean["farmer_id"], clean["purchase_individual_date"], clean["grain_id"], clean["grain_rate_per_20kg"],
+                                    clean["no_of_filled_bags"], clean["extra_kilos"], ("purchase_individuals", e.id) if e else None)):
+        return rerender({"no_of_filled_bags": DUPLICATE_MSG(dup)})
+    if e is not None:
+        stock = (await stock_by_entry(db, [e.id], individual=True)).get(e.id, Stock())
+        used = stock.loaded + stock.moved
+        if clean["total_available_bags"] < used:
+            return rerender({"no_of_filled_bags": (f"{used} bags of this entry are already loaded on trucks or taken to a stockyard; the total cannot go below that",
+                                                   f"આ એન્ટ્રીની {used} બેગ ટ્રકમાં ભરાઈ કે સ્ટોકયાર્ડમાં લઈ જવાઈ ગઈ છે; કુલ તેથી ઓછી ન થઈ શકે")})
     before = None
     if e is not None:
         before = direct_snapshot(e)
@@ -262,4 +299,4 @@ async def _save_direct(request: Request, e: PurchaseIndividual | None, user: Use
     except IntegrityError:
         await db.rollback()
         return rerender({"no_of_filled_bags": GENERIC_ERROR})
-    return Response(status_code=204, headers={"HX-Redirect": f"/PurchaseIndividual/New?like={new_id}" if again else "/PurchaseIndividual"})
+    return Response(status_code=204, headers={"HX-Redirect": f"/PurchaseIndividual/New?like={new_id}" if again else "/PurchaseFarmers?view=individuals"})

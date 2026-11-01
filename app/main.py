@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_csrf_protect import CsrfProtect
 from fastapi_csrf_protect.exceptions import CsrfProtectError
 
-from app.api import account, analysis, auth, bookings, costs, farmer_entries, masters, payments, purchase_group, receivables, reports, trips, years
+from app.api import account, analysis, auth, bookings, costs, farmer_entries, masters, payments, purchase_group, receivables, reports, stockyard, trips, years
 from app.api.masters_config import SPECS
 from app.api.deps import current_user
 from app.core.config import settings
@@ -61,6 +61,7 @@ app.include_router(farmer_entries.router)
 app.include_router(purchase_group.router)
 app.include_router(bookings.router)
 app.include_router(costs.router)
+app.include_router(stockyard.router)
 app.include_router(reports.router)
 app.include_router(trips.router)
 app.include_router(payments.router)
@@ -76,7 +77,7 @@ async def csrf_error_handler(request: Request, exc: CsrfProtectError):
 
 @app.get("/Purchases")
 async def old_purchases_url():
-    return RedirectResponse("/PurchaseFarmersEntries", status_code=307)
+    return RedirectResponse("/PurchaseFarmers", status_code=307)
 
 
 @app.get("/Purchases/{rest:path}")

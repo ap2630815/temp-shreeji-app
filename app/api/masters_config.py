@@ -31,7 +31,7 @@ class F:
     name: str
     en: str
     gu: str
-    kind: str = "text"  # text | tel | email | textarea | int | choice | date | select | fk (select of a master row, int id)
+    kind: str = "text"  # text | tel | email | textarea | int | decimal | choice | date | select | fk (select of a master row, int id)
     required: bool = False
     pattern: str | None = None
     hint: tuple[str, str] | None = None
@@ -43,6 +43,7 @@ class F:
     help: tuple[str, str] | None = None
     locked: bool = False  # shown but not editable; the handler keeps the stored value
     fk: str | None = None  # for kind="fk": key into app.api.masters.FK_SOURCES
+    default: str | None = None  # what a new record's form starts with
     @property
     def is_account(self) -> bool:
         """A bank account number: digits only in the column, shown in groups of five (12345 67890 12345 678)."""
@@ -120,12 +121,14 @@ _add(Spec(
         F("grain_name", "Grain name", "અનાજનું નામ", required=True, max_length=30),
         F("grain_name_gu", "Grain name (Gujarati)", "અનાજનું નામ (ગુજરાતી)", max_length=30),
         F("net_bag_weight", "Net bag weight (kg)", "બેગનું ચોખ્ખું વજન (કિલો)", kind="choice", required=True, choices=(35, 50, 70, 100)),
+        F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)", kind="decimal", required=True,
+          help=("Starts the expected weight of stockyard load lines; never used in a payment", "સ્ટોકયાર્ડ લોડ લાઇનનું અપેક્ષિત વજન આનાથી શરૂ થાય છે; ચુકવણીમાં ક્યારેય નહીં")),
         F("booking_weight", "Booking weight (kg)", "બુકિંગ વજન (કિલો)", kind="choice", required=True, choices=(20, 100),
           help=("The rate to industries is per this weight", "ઉદ્યોગને ભાવ આ વજન દીઠ")),
         F("grain_terms", "Default terms & conditions (clean, moisture, variety…)", "ડિફોલ્ટ શરતો (સાફ, ભેજ, જાત…)", kind="textarea"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ),
-    list_columns=("grain_name", "grain_name_gu", "net_bag_weight", "booking_weight"),
+    list_columns=("grain_name", "grain_name_gu", "net_bag_weight", "expected_raw_weight_per_bag", "booking_weight"),
     search_columns=("grain_name", "grain_name_gu"),
     order_by="grain_name",
 ))
@@ -290,6 +293,23 @@ _add(Spec(
     order_by="id",
 ))
 
+_add(Spec(
+    slug="Stockyards", model=models.Stockyard, label=("Stockyard", "સ્ટોકયાર્ડ"),
+    fields=(
+        F("name_of_stockyard", "Stockyard name", "સ્ટોકયાર્ડનું નામ", required=True, max_length=120),
+        F("location", "Location", "સ્થળ", required=True, max_length=120),
+        F("stockyard_owner_name", "Owner name (Self if it is ours)", "માલિકનું નામ (આપણું હોય તો Self)", required=True, max_length=120, default="Self"),
+        _mobile("stockyard_owner_mobile", "Owner mobile", "માલિકનો મોબાઇલ"),
+        _mobile("stockyard_upi_number", "Owner UPI number (if different from mobile)", "માલિકનો UPI નંબર (મોબાઇલથી અલગ હોય તો)", required=False),
+        F("storage_capacity", "Storage capacity (bags)", "સંગ્રહ ક્ષમતા (બેગ)", kind="int", required=True),
+        F("rent_of_stockyard", "Rent of stockyard (₹)", "સ્ટોકયાર્ડનું ભાડું (₹)", kind="int", required=True, default="0"),
+        F("description", "Description", "વર્ણન", kind="textarea"),
+    ),
+    list_columns=("name_of_stockyard", "location", "stockyard_owner_name", "rent_of_stockyard"),
+    search_columns=("name_of_stockyard", "location", "stockyard_owner_name", "stockyard_owner_mobile"),
+    order_by="name_of_stockyard",
+))
+
 
 def compose_email(local: str | None, domain: str | None) -> str:
     """The two sections of the email field -> the stored address, lower-case: ('dfgh', '@gmail.com') -> 'dfgh@gmail.com'. A full address pasted into the
@@ -354,6 +374,11 @@ def normalize(spec: Spec, raw: dict[str, str], include_owner_only: bool) -> dict
                 value = int(value)
             except ValueError:
                 pass  # left as a string so validation reports it
+        elif f.kind == "decimal":
+            try:
+                value = float(value)
+            except ValueError:
+                pass
         out[f.name] = value
     return out
 
@@ -367,6 +392,8 @@ def _validator(spec: Spec) -> type[BaseModel]:
         for f in spec.fields:
             if f.kind == "int":
                 ann: Any = Annotated[int, Field(ge=0, le=10_000_000)]
+            elif f.kind == "decimal":
+                ann = Annotated[float, Field(gt=0, le=1000)]
             elif f.kind == "fk":
                 ann = Annotated[int, Field(gt=0)]
             elif f.kind == "choice":

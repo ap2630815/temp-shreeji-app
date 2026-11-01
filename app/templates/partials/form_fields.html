@@ -75,9 +75,11 @@
       {% else %}
         {% if f.is_mobile %}<div class="join w-full"><select class="select select-bordered join-item w-24 shrink-0" data-cc aria-label="Country code" title="Country code / trunk prefix (+91 or 0): the number is the same" {{ 'disabled' if f.locked }}><option>+91</option><option>0</option></select>{% endif %}
         <input name="{{ f.name }}" autocomplete="off" value="{{ v | mob if f.is_mobile else (v | acct if f.is_account else v) }}" maxlength="{{ 24 if (f.is_mobile or f.is_account) else f.max_length }}" {% if f.is_mobile %}placeholder="98765 43210" {% endif %} {% if f.normalize == 'truck_no' %}data-fmt="truck" autocapitalize="characters"{% elif f.is_mobile %}data-fmt="mobile"{% elif f.is_account %}data-fmt="account"{% endif %}
-               {% if f.kind == 'tel' %}inputmode="numeric"{% elif f.kind == 'int' %}type="number" min="0" inputmode="numeric"{% elif f.kind == 'date' %}type="date"{% endif %}
+               {% if f.kind == 'tel' %}inputmode="numeric"{% elif f.kind == 'int' %}type="number" min="0" inputmode="numeric"{% elif f.kind == 'decimal' %}type="number" step="0.01" min="0" inputmode="decimal"{% elif f.kind == 'date' %}type="date"{% endif %}
+               {% if f.options and f.kind == 'text' %}list="{{ f.name }}-suggest"{% endif %}
                class="input input-bordered {{ 'join-item flex-1 min-w-0' if f.is_mobile }} {{ 'input-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
         {% if f.is_mobile %}</div>{% endif %}
+        {% if f.options and f.kind == 'text' %}<datalist id="{{ f.name }}-suggest">{% for val, label in f.options %}<option value="{{ val }}">{% endfor %}</datalist>{% endif %}
       {% endif %}
       {% if f.help %}<span class="field-help text-xs opacity-60 mt-1">{{ f.help[0] }} <span class="gu">{{ f.help[1] }}</span></span>{% endif %}
       {% if f.name in errors %}

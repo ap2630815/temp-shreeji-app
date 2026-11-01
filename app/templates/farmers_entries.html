@@ -1,22 +1,17 @@
 {% extends "layout.html" %}
 {% from "partials/bilabel.html" import t, th, badge %}
-{% block title %}{{ 'Purchase Individual' if direct else 'Purchase Farmers Entries' }}{% endblock %}
+{% block title %}Purchase Farmers{% endblock %}
 {% block content %}
+{% set tabs = [('entries', 'Farmer entries', 'ખેડૂત નોંધ'), ('groups', 'Purchase groups', 'ખરીદી જૂથ'), ('individuals', 'Purchase individuals', 'ખરીદી વ્યક્તિગત')] %}
+{% set direct = view == 'individuals' %}
 <div class="stackbi">
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  {% if direct %}
-  <h1 class="text-xl font-semibold">{{ t('Purchase Individual', 'ખરીદી વ્યક્તિગત') }}</h1>
-  <a href="/PurchaseFarmersEntries" class="btn btn-sm">← {{ t('Purchase Farmers Entries', 'ખરીદી ખેડૂત નોંધ') }}</a>
+  <h1 class="text-xl font-semibold">{{ t('Purchase Farmers', 'ખરીદી ખેડૂત') }}</h1>
   <span class="flex-1"></span>
-  {% else %}
-  <h1 class="text-xl font-semibold">{{ t('Purchase Farmers Entries', 'ખરીદી ખેડૂત નોંધ') }}</h1>
-  {# 1. direct entries, 2. the purchase_group deals, 3. one deal's farmers and ledger #}
-  <a href="/PurchaseIndividual" class="btn btn-sm">{{ t('Purchase Individual', 'ખરીદી વ્યક્તિગત') }}</a>
-  <a href="/PurchaseGroup" class="btn btn-sm">{{ t('Purchase Group', 'ખરીદી જૂથ') }}</a>
-  <span class="flex-1"></span>
-  {% endif %}
+  {% if view == 'groups' %}<a href="/PurchaseGroup/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
   {% if direct %}<a href="/PurchaseIndividual/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
   <form method="get" class="flex items-center gap-2">
+    <input type="hidden" name="view" value="{{ view }}">
     <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
       {% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
@@ -24,7 +19,43 @@
     {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>
 </div>
+<div class="tabs tabs-boxed bg-base-100 mb-3 w-fit">
+  {% for key, en, gu in tabs %}
+  <a class="tab h-auto py-1 {{ 'tab-active' if view == key }}" href="/PurchaseFarmers?view={{ key }}&year={{ year }}"><span class="flex flex-col leading-tight text-center"><span>{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span></a>
+  {% endfor %}
+</div>
 
+{% if view == 'groups' %}
+<div class="overflow-x-auto bg-base-100 rounded-box shadow">
+  <table class="table table-zebra table-sm">
+    <thead><tr>
+      {{ th('Date', 'તારીખ') }}{{ th('Village', 'ગામ') }}{{ th('Grain', 'અનાજ') }}{{ th('Rate/20kg', '20 કિલો ભાવ') }}
+      {{ th('Bag kg', 'બેગ કિલો') }}{{ th('Pay after', 'ચુકવણી પછી') }}{{ th('Farmers', 'ખેડૂત') }}{{ th('Bags', 'બેગ') }}
+      {{ th('Payable', 'ચૂકવવાપાત્ર') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Due', 'બાકી') }}<th></th>
+    </tr></thead>
+    <tbody>
+    {% for p, tt, listed in rows %}
+      <tr>
+        <td class="whitespace-nowrap">{{ p.purchase_group_date }}</td>
+        <td>{{ p.village.village_name }}</td>
+        <td>{{ p.grain.grain_name }}</td>
+        <td>{{ p.grain_rate_per_20kg | inr }}</td>
+        <td>{{ p.grain.net_bag_weight }}</td>
+        <td>{{ p.pay_after_no_of_days }}d</td>
+        <td>{{ listed }}<span class="opacity-60 text-xs"> ({{ tt.farmers }} {{ t('with entries', 'નોંધ સાથે') }})</span></td>
+        <td>{{ tt.bags }}</td>
+        <td>{{ tt.net_payable | inr }}</td>
+        <td>{{ tt.paid | inr }}</td>
+        <td class="{{ 'text-error font-semibold' if tt.overdue }}">{{ tt.due | inr }}</td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/PurchaseGroup/{{ p.id }}">{{ t('Open', 'ખોલો') }}</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="12" class="text-center opacity-60">{{ t('No purchases in this year', 'આ વર્ષમાં કોઈ ખરીદી નથી') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
 <div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
   <div class="stat py-2"><div class="stat-title">{{ t('Entries / farmers', 'નોંધ / ખેડૂત') }}</div><div class="stat-value text-2xl">{{ views | length }} / {{ totals.farmers }}</div>
     <div class="stat-desc">{{ totals.bags }} {{ t('bags', 'બેગ') }} + {{ totals.handful }} {{ t('handful', 'હેન્ડફુલ') }}</div></div>
@@ -67,5 +98,6 @@
     </tbody>
   </table>
 </div>
+{% endif %}
 </div>
 {% endblock %}

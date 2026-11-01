@@ -24,20 +24,30 @@
   <div class="card bg-base-100 shadow"><div class="card-body p-4">
     <h2 class="font-semibold">{{ t('Loaded from', 'ક્યાંથી ભર્યું') }} · {{ trip.bags }} {{ t('bags', 'બેગ') }}</h2>
     <table class="table table-sm"><tbody>
+      <tr><td colspan="3" class="text-xs uppercase opacity-60">{{ t('From farmers', 'ખેડૂતો પાસેથી') }}</td></tr>
       {% for line in trip.load_lines %}
       <tr>
-        <td><a class="link" href="/PurchaseGroup/{{ line.entry.purchase_group_id }}">{{ line.entry.purchase_group.village.village_name }}</a> · {{ line.entry.farmer.farmer_name }}
-          <span class="opacity-60 text-xs">{{ line.entry.purchase_entry_date }}</span></td>
+        <td>{% if line.individual %}<a class="link" href="/PurchaseIndividual">{{ line.entry.village.village_name }}</a>{% else %}<a class="link" href="/PurchaseGroup/{{ line.entry.purchase_group_id }}">{{ line.entry.village.village_name }}</a>{% endif %} · {{ line.entry.farmer.farmer_name }}
+          <span class="opacity-60 text-xs">{{ line.entry.entry_date }}</span></td>
         <td class="text-right">{{ line.no_of_loaded_bags }}<div class="text-xs opacity-60">{{ t('left', 'બાકી') }} {{ line.total_remaining_bags }}</div></td>
         <td class="text-right"><button class="btn btn-ghost btn-xs text-error" hx-post="/Trips/Lines/{{ line.id }}/Delete" hx-target="#flash"
             hx-confirm="Remove this load? / આ લોડ કાઢી નાખવો?">✕</button></td>
       </tr>
-      {% else %}<tr><td class="opacity-60">{{ t('Nothing loaded yet', 'હજી કંઈ ભર્યું નથી') }}</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="3" class="opacity-60">{{ t('Nothing loaded from farmers', 'ખેડૂતો પાસેથી કંઈ ભર્યું નથી') }}</td></tr>{% endfor %}
+      <tr><td colspan="3" class="text-xs uppercase opacity-60">{{ t('From stockyard', 'સ્ટોકયાર્ડમાંથી') }}</td></tr>
+      {% for line in trip.stockyard_lines %}
+      <tr>
+        <td><a class="link" href="/StockyardPurchase?view=stock">{{ line.stockyard.name_of_stockyard }}</a> · {{ trip.grain.grain_name }}</td>
+        <td class="text-right">{{ line.no_of_loaded_bags }}</td>
+        <td class="text-right"><button class="btn btn-ghost btn-xs text-error" hx-post="/Trips/StockyardLines/{{ line.id }}/Delete" hx-target="#flash"
+            hx-confirm="Remove this load? / આ લોડ કાઢી નાખવો?">✕</button></td>
+      </tr>
+      {% else %}<tr><td colspan="3" class="opacity-60">{{ t('Nothing loaded from a stockyard', 'સ્ટોકયાર્ડમાંથી કંઈ ભર્યું નથી') }}</td></tr>{% endfor %}
     </tbody></table>
-    {% if line_form['fields'][0].options %}
+    {% if line_form['fields'][0].options or line_form['fields'][2].options %}
       {% with fields=line_form['fields'], values=line_form['values'], errors=line_form['errors'], action=line_form['action'], back_url=line_form['back_url'] %}{% include "partials/master_form.html" %}{% endwith %}
     {% else %}
-      <p class="text-sm opacity-60">{{ t('No farmer entry of this grain has unloaded bags', 'આ અનાજની કોઈ ખેડૂત એન્ટ્રીમાં બિનલોડ બેગ નથી') }}</p>
+      <p class="text-sm opacity-60">{{ t('No farmer entry or stockyard has unloaded bags of this grain', 'આ અનાજની બિનલોડ બેગ કોઈ ખેડૂત એન્ટ્રી કે સ્ટોકયાર્ડમાં નથી') }}</p>
     {% endif %}
   </div></div>
 
