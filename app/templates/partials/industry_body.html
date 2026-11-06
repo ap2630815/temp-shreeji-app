@@ -20,9 +20,9 @@
   <div style="text-align:right">{{ t('Date', 'તારીખ') }}:&nbsp;&nbsp;{{ today }}</div>
 </div>
 <div class="meta">
-  <div class="f"><span>Industry<br><span class="gu">ઉદ્યોગ</span></span><span class="v"><b>{{ industry.industrialist_name }}</b>{% if industry.industrialist_name_gu %}<span class="gu">{{ industry.industrialist_name_gu }}</span>{% endif %}</span></div>
+  <div class="f"><span>Industry<br><span class="gu">ઉદ્યોગ</span></span><span class="v"><b>{{ industry.industry_name }}</b>{% if industry.industry_name_gu %}<span class="gu">{{ industry.industry_name_gu }}</span>{% endif %}</span></div>
   <div class="f"><span>Location<br><span class="gu">સ્થળ</span></span><span class="v">{{ industry.location }}</span></div>
-  <div class="f"><span>Owner<br><span class="gu">માલિક</span></span><span class="v">{{ industry.owner_name }}<span class="gu">{{ industry.owner_mobile | mobhtml }}</span></span></div>
+  <div class="f"><span>Owner<br><span class="gu">માલિક</span></span><span class="v">{{ industry.industry_owner_name }}<span class="gu">{{ industry.industry_owner_mobile | mobhtml }}</span></span></div>
   <div class="f"><span>Supervisor<br><span class="gu">સુપરવાઇઝર</span></span><span class="v">{{ industry.supervisor_name }}<span class="gu">{{ industry.supervisor_mobile | mobhtml }}</span></span></div>
 </div>
 <div class="sum">

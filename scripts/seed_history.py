@@ -20,8 +20,8 @@ from sqlalchemy import delete, select
 
 from app.core.db import SessionLocal, engine
 from app.models import (
-    AuditLog, BagSupply, Bilty, BrokerBooking, Brokerage, Farmer, Grain, Industry, LabourGroup, LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry,
-    PurchaseGroup, PurchaseGroupFarmer, Receipt, ReceiptAllocation, Truck, Transporter, FarmersTruckLoadLine, TruckTrip, User, BagSupplier,
+    AuditLog, EmptyBagSellerEntry, Bilty, BrokerBooking, Brokerage, Farmer, Grain, Industry, LabourGroup, LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry,
+    PurchaseGroup, PurchaseGroupFarmer, Receipt, ReceiptAllocation, Truck, Transporter, FarmersTruckLoadLine, TruckTrip, User, EmptyBagSeller,
 )
 from app.services import audit
 from app.services import payables as pay_svc
@@ -49,7 +49,7 @@ async def seed(label: str, chains: int) -> None:
     pay_svc.assert_year_open = rec_svc.assert_year_open = _open_year
     ids: dict[str, list[int]] = {k: [] for k in (
         "purchase_group", "purchase_group_farmers", "purchase_farmers_entries", "broker_bookings", "truck_trips", "truck_load_lines", "bilties", "labour_work",
-        "bag_supplies", "receipts", "payments")}
+        "empty_bag_sellers_entries", "receipts", "payments")}
     async with SessionLocal() as db:
         user = await db.scalar(select(User).where(User.role == "owner").order_by(User.id))
         if user is None:
@@ -61,7 +61,7 @@ async def seed(label: str, chains: int) -> None:
         trucks = list((await db.scalars(select(Truck).order_by(Truck.id))).unique().all())
         transporters = list((await db.scalars(select(Transporter).order_by(Transporter.id))).unique().all())
         groups = list((await db.scalars(select(LabourGroup).order_by(LabourGroup.id))).unique().all())
-        suppliers = list((await db.scalars(select(BagSupplier).order_by(BagSupplier.id))).unique().all())
+        suppliers = list((await db.scalars(select(EmptyBagSeller).order_by(EmptyBagSeller.id))).unique().all())
         if not (farmers and brokerages and industries and trucks and transporters and groups and suppliers):
             sys.exit("Masters are missing. Run scripts.seed_demo first.")
         bill_no = 1000  # clear of the demo bilties (201..), unique per business year
@@ -112,7 +112,7 @@ async def seed(label: str, chains: int) -> None:
                 db.add(trip)
                 await db.flush()
                 loaded = int(entry.total_available_bags * 0.8)
-                line = FarmersTruckLoadLine(trip_id=trip.id, purchase_farmer_entry_id=entry.id, no_of_loaded_bags=loaded, total_remaining_bags=entry.total_available_bags - loaded)
+                line = FarmersTruckLoadLine(trip_id=trip.id, purchase_farmer_entry_id=entry.id, no_of_loaded_bags=loaded)
                 m_net = loaded * net + rng.randint(0, 40)
                 m_tare = rng.randrange(9000, 11000, 10)
                 i_net = m_net - int(m_net * rng.uniform(0.0, 0.008))
@@ -134,14 +134,14 @@ async def seed(label: str, chains: int) -> None:
             lw = LabourWork(labour_group_id=groups[mi % len(groups)].id, work_date=day(10), business_year=label, payable_amount=rng.randrange(3000, 9000, 100),
                             borrowing_amount=rng.choice([0, 0, 500]), petrol=rng.choice([0, 200, 300]), meal=rng.choice([0, 150, 250]), description="Demo history", created_by=user.id)
             rate_bag, nbags = rng.randint(12, 25), rng.randrange(200, 600, 50)
-            bs = BagSupply(supplier_id=suppliers[mi % len(suppliers)].id, farmer_id=farmers[mi % len(farmers)].id, supply_date=day(6), business_year=label,
-                           rate_per_bag=rate_bag, no_of_bags=nbags, payable_amount=rate_bag * nbags, description="Demo history", created_by=user.id)
+            bs = EmptyBagSellerEntry(empty_bag_seller_id=suppliers[mi % len(suppliers)].id, farmer_id=farmers[mi % len(farmers)].id, selling_date=day(6), business_year=label,
+                           rate_per_bag=rate_bag, no_of_empty_bags=nbags, payable_amount=rate_bag * nbags, description="Demo history", created_by=user.id)
             db.add_all([lw, bs])
             await db.flush()
             ids["labour_work"].append(lw.id)
-            ids["bag_supplies"].append(bs.id)
+            ids["empty_bag_sellers_entries"].append(bs.id)
             audit.log(db, user, "create", "labour_work", lw.id, {"demo": True})
-            audit.log(db, user, "create", "bag_supplies", bs.id, {"demo": True})
+            audit.log(db, user, "create", "empty_bag_sellers_entries", bs.id, {"demo": True})
             await db.commit()
 
             # receipts (money in): four per month, from industries whose bilties are already dated before the receipt
@@ -155,14 +155,14 @@ async def seed(label: str, chains: int) -> None:
                 amount = min(due, max(10000, round(due * rng.choice([0.3, 0.5, 0.7]), -3)))
                 method = rng.choice(["bank", "upi", "cheque"])
                 r = await rec_svc.record_receipt(db, user, ind.id, dict(receipt_date=rd, amount=amount, method=method, reference_no=f"{method[:3].upper()}{rng.randint(100000, 999999)}",
-                                                                        payer_name=ind.owner_name, description="Demo history"))
+                                                                        payer_name=ind.industry_owner_name, description="Demo history"))
                 await db.commit()
                 ids["receipts"].append(r.id)
 
             # payments (money out): a farmer, a truck owner, a broker, the labour group and the bag supplier of this month
             grp, entry, booking, trip, *_ = booked[0]
             pd2 = day(28)
-            plan = [("farmer", entry.farmer_id), ("truck", trip.truck_id), ("broker", broker_of[booking.brokerage_id]), ("labour_group", lw.labour_group_id), ("bag_supplier", bs.supplier_id)]
+            plan = [("farmer", entry.farmer_id), ("truck", trip.truck_id), ("broker", broker_of[booking.brokerage_id]), ("labour_group", lw.labour_group_id), ("empty_bag_seller", bs.empty_bag_seller_id)]
             for j, (ptype, pid) in enumerate(plan):
                 rows = [p for p in await pay_svc.load_payables(db, ptype, pid) if p.due > 0 and p.sort_key[0] <= pd2]
                 if not rows:
@@ -196,10 +196,10 @@ async def remove() -> None:
         await db.execute(delete(ReceiptAllocation).where(ReceiptAllocation.receipt_id.in_(rec_ids)))
         await db.execute(delete(Receipt).where(Receipt.id.in_(rec_ids)))
         for model, key in ((Bilty, "bilties"), (FarmersTruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BrokerBooking, "broker_bookings"),
-                           (BagSupply, "bag_supplies"), (LabourWork, "labour_work"), (PurchaseFarmerEntry, "purchase_farmers_entries"),
+                           (EmptyBagSellerEntry, "empty_bag_sellers_entries"), (LabourWork, "labour_work"), (PurchaseFarmerEntry, "purchase_farmers_entries"),
                            (PurchaseGroupFarmer, "purchase_group_farmers"), (PurchaseGroup, "purchase_group")):
             await db.execute(delete(model).where(model.id.in_(ids.get(key, []))))
-        for table in ("purchase_group", "purchase_farmers_entries", "broker_bookings", "truck_trips", "bilties", "labour_work", "bag_supplies", "payments", "receipts"):
+        for table in ("purchase_group", "purchase_farmers_entries", "broker_bookings", "truck_trips", "bilties", "labour_work", "empty_bag_sellers_entries", "payments", "receipts"):
             await db.execute(delete(AuditLog).where(AuditLog.table_name == table, AuditLog.record_id.in_(ids.get(table, []))))
         await db.commit()
     IDS_FILE.unlink()

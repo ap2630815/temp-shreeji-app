@@ -1,14 +1,14 @@
 {% extends "layout.html" %}
 {% from "partials/bilabel.html" import t, th %}
-{% block title %}Bag supplies{% endblock %}
+{% block title %}Empty Bag Suppliers{% endblock %}
 {% block content %}
 <div class="stackbi">
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <h1 class="text-xl font-semibold">{{ t('Bag supplies', 'બારદાન સપ્લાય') }}</h1>
+  <h1 class="text-xl font-semibold">{{ t('Empty Bag Suppliers', 'બારદાન સપ્લાયર') }}</h1>
   <span class="flex-1"></span>
   <span class="flex flex-col leading-tight text-sm font-semibold text-center"><span>{{ total_units }} bags</span><span>{{ total_amount | inr }}</span></span>
-  <a href="/Payables?type=bag_supplier" class="btn btn-sm">{{ t('Pay suppliers', 'સપ્લાયરને ચુકવણી') }}</a>
-  <a href="/BagSupplies/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>
+  {% if view != 'movers' and view != 'storage' %}<a href="/Payables?type=empty_bag_seller" class="btn btn-sm">{{ t('Pay sellers', 'વેચનારને ચુકવણી') }}</a>{% endif %}
+  <a href="{{ '/EmptyBags/Movers/New' if view == 'movers' else '/EmptyBags/New' }}" class="btn btn-primary btn-sm {{ 'hidden' if view == 'storage' }}">+ {{ t('Add', 'ઉમેરો') }}</a>
   <form method="get" class="flex items-center gap-2">
     <input type="hidden" name="view" value="{{ view }}">
     <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
@@ -17,29 +17,40 @@
   </form>
 </div>
 <div class="tabs tabs-boxed bg-base-100 mb-3 w-fit">
-  <a class="tab h-auto py-1 {{ 'tab-active' if view != 'storage' }}" href="/BagSupplies?year={{ year }}"><span class="flex flex-col leading-tight text-center"><span>Supplies</span><span class="gu text-xs">સપ્લાય</span></span></a>
-  <a class="tab h-auto py-1 {{ 'tab-active' if view == 'storage' }}" href="/BagSupplies?year={{ year }}&view=storage"><span class="flex flex-col leading-tight text-center"><span>Storage by farmer</span><span class="gu text-xs">ખેડૂત મુજબ સંગ્રહ</span></span></a>
+  <a class="tab h-auto py-1 {{ 'tab-active' if view not in ('movers', 'storage') }}" href="/EmptyBags?year={{ year }}"><span class="flex flex-col leading-tight text-center"><span>Sellers</span><span class="gu text-xs">વેચનાર</span></span></a>
+  <a class="tab h-auto py-1 {{ 'tab-active' if view == 'movers' }}" href="/EmptyBags?year={{ year }}&view=movers"><span class="flex flex-col leading-tight text-center"><span>Movers</span><span class="gu text-xs">મૂવર</span></span></a>
+  <a class="tab h-auto py-1 {{ 'tab-active' if view == 'storage' }}" href="/EmptyBags?year={{ year }}&view=storage"><span class="flex flex-col leading-tight text-center"><span>Storage by farmer</span><span class="gu text-xs">ખેડૂત મુજબ સંગ્રહ</span></span></a>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
 {% if view == 'storage' %}
   <table class="table table-zebra table-sm">
-    <thead><tr>{{ th('Village', 'ગામ') }}{{ th('Farmer (storage)', 'ખેડૂત (સંગ્રહ)') }}{{ th('Bags', 'બેગ') }}{{ th('Value', 'કિંમત') }}{{ th('Suppliers', 'સપ્લાયર') }}</tr></thead>
+    <thead><tr>{{ th('Village', 'ગામ') }}{{ th('Farmer (storage)', 'ખેડૂત (સંગ્રહ)') }}{{ th('From sellers', 'વેચનાર પાસેથી') }}{{ th('From movers', 'મૂવર દ્વારા') }}{{ th('Total empty bags', 'કુલ ખાલી બેગ') }}{{ th('Sellers / movers', 'વેચનાર / મૂવર') }}</tr></thead>
     <tbody>
-    {% for s in storage %}<tr><td>{{ s.farmer.village.village_name }}</td><td>{{ s.farmer.farmer_name }}</td><td>{{ s.units }}</td><td>{{ s.amount | inr }}</td><td>{{ s.suppliers | sort | join(', ') }}</td></tr>
-    {% else %}<tr><td colspan="5" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    {% for s in storage %}<tr><td>{{ s.farmer.village.village_name }}</td><td>{{ s.farmer.farmer_name }}</td><td>{{ s.sold }}</td><td>{{ s.moved }}</td><td class="font-semibold">{{ s.units }}</td><td>{{ (s.suppliers | sort | list + s.movers | sort | list) | join(', ') }}</td></tr>
+    {% else %}<tr><td colspan="6" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% elif view == 'movers' %}
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Mover', 'મૂવર') }}{{ th('Delivered at', 'ક્યાં ઉતાર્યું') }}{{ th('Empty bags', 'ખાલી બેગ') }}{{ th('Cost', 'ખર્ચ') }}<th></th></tr></thead>
+    <tbody>
+    {% for m in movers %}
+      <tr><td class="whitespace-nowrap">{{ m.mover_date }}</td><td>{{ m.mover.pet_name }}</td><td>{{ m.farmer.village.village_name }} — {{ m.farmer.farmer_name }}</td><td>{{ m.no_of_empty_bags }}</td><td>{{ m.cost_per_mover | inr }}</td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/EmptyBags/Movers/{{ m.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td></tr>
+    {% else %}<tr><td colspan="6" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>
   </table>
 {% else %}
   <table class="table table-zebra table-sm">
-    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Supplier', 'સપ્લાયર') }}{{ th('Delivered at', 'ક્યાં ઉતાર્યું') }}{{ th('Bags', 'બેગ') }}{{ th('Rate', 'ભાવ') }}{{ th('Amount', 'રકમ') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Balance', 'બાકી') }}<th></th></tr></thead>
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Seller', 'વેચનાર') }}{{ th('Delivered at', 'ક્યાં ઉતાર્યું') }}{{ th('Bags', 'બેગ') }}{{ th('Rate', 'ભાવ') }}{{ th('Amount', 'રકમ') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Balance', 'બાકી') }}<th></th></tr></thead>
     <tbody>
     {% for b in rows %}{% set p = paid.get(b.id, 0) %}
       <tr>
-        <td class="whitespace-nowrap">{{ b.supply_date }}</td>
-        <td><a class="link" href="/Statements/bag_supplier/{{ b.supplier_id }}">{{ b.supplier.pet_name }}</a></td>
+        <td class="whitespace-nowrap">{{ b.selling_date }}</td>
+        <td><a class="link" href="/Statements/empty_bag_seller/{{ b.empty_bag_seller_id }}">{{ b.supplier.pet_name }}</a></td>
         <td>{{ b.farmer.village.village_name }} — {{ b.farmer.farmer_name }}</td>
-        <td>{{ b.no_of_bags }}</td><td>{{ b.rate_per_bag | inr }}</td><td>{{ b.payable_amount | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (b.payable_amount - p) | inr }}</td>
-        <td class="text-right"><a class="btn btn-primary btn-sm" href="/BagSupplies/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td>{{ b.no_of_empty_bags }}</td><td>{{ b.rate_per_bag | inr }}</td><td>{{ b.payable_amount | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (b.payable_amount - p) | inr }}</td>
+        <td class="text-right"><a class="btn btn-primary btn-sm" href="/EmptyBags/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
       </tr>
     {% else %}<tr><td colspan="9" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>

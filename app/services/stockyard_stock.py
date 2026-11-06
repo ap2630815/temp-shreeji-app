@@ -2,11 +2,9 @@
 
 Filled bags   in  = stockyard purchase entries (no_of_filled_bags) + farmer_stockyard_transfers (bags brought from a farmer's place)
               out = stockyard_truck_load_lines (bags loaded on a truck)
-Empty bags    in  = stockyard_empty_bag_movements 'received'
-              out = stockyard_empty_bag_movements 'given_to_farmer'
-                    + bags used by stockyard purchase entries: when one entry's filled bags exceed the empty bags given on its
-                      purchase (stockyard_purchases.no_of_empty_bags), the excess is taken from the stockyard's empty bags.
-                      Each entry is compared on its own; only stockyard purchase entries use the pool this way."""
+Empty bags    in  = empty_bags (bought into the stockyard) + no_of_received_empty_bags of the purchase entries (returned by the farmer)
+              out = no_of_given_empty_bags of the stockyard purchases (handed to the farmer to fill)
+              error (information only, not in the balance) = per purchase: given - filled bags of its entries - received"""
 
 from dataclasses import dataclass
 
@@ -14,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
-    BrokerBooking, Brokerage, FarmerStockyardTransfer, TruckTrip, PurchaseFarmerEntry, PurchaseGroup, PurchaseIndividual, StockyardEmptyBagMovement, StockyardTruckLoadLine,
+    BrokerBooking, Brokerage, FarmerStockyardTransfer, TruckTrip, PurchaseFarmerEntry, PurchaseGroup, PurchaseIndividual, EmptyBag, StockyardTruckLoadLine,
     StockyardPurchase, StockyardPurchaseEntry,
 )
 
@@ -34,18 +32,20 @@ class Filled:
 
 @dataclass
 class Empty:
-    received: int = 0
-    given: int = 0
-    used: int = 0  # taken for stockyard purchase entries
+    bought: int = 0
+    given: int = 0     # handed out on stockyard purchases
+    received: int = 0  # returned by the farmer on purchase entries
+    error: int = 0     # given - filled - received, summed per purchase
 
     @property
     def balance(self) -> int:
-        return self.received - self.given - self.used
+        return self.bought - self.given + self.received
 
 
-def empties_needed(filled_bags: int, empty_bags_given: int) -> int:
-    """Empty bags one stockyard purchase entry takes from the stockyard: its filled bags beyond the empty bags given on its purchase."""
-    return max(0, filled_bags - empty_bags_given)
+def default_received(given: int, filled_all_entries: int, received_other_entries: int) -> int:
+    """Empty bags a purchase entry gets back by default: what was given, less every filled bag of the purchase, less what other entries already returned.
+    Below zero means the farmer needed more empty bags than were given: the purchase's given bags must be raised."""
+    return given - filled_all_entries - received_other_entries
 
 
 async def filled_ledger(db: AsyncSession, stockyard_id: int | None = None, grain_id: int | None = None) -> dict[Key, Filled]:
@@ -66,12 +66,12 @@ async def filled_ledger(db: AsyncSession, stockyard_id: int | None = None, grain
         out.setdefault((sy, gr), Filled()).purchased = int(n)
 
     from_group = keep(
-        select(FarmerStockyardTransfer.stockyard_id, PurchaseGroup.grain_id, func.sum(FarmerStockyardTransfer.no_of_bags))
+        select(FarmerStockyardTransfer.stockyard_id, PurchaseGroup.grain_id, func.sum(FarmerStockyardTransfer.no_of_transferred_bags))
         .join(PurchaseFarmerEntry, PurchaseFarmerEntry.id == FarmerStockyardTransfer.purchase_farmer_entry_id)
         .join(PurchaseGroup, PurchaseGroup.id == PurchaseFarmerEntry.purchase_group_id)
         .group_by(FarmerStockyardTransfer.stockyard_id, PurchaseGroup.grain_id), FarmerStockyardTransfer.stockyard_id, PurchaseGroup.grain_id)
     from_individual = keep(
-        select(FarmerStockyardTransfer.stockyard_id, PurchaseIndividual.grain_id, func.sum(FarmerStockyardTransfer.no_of_bags))
+        select(FarmerStockyardTransfer.stockyard_id, PurchaseIndividual.grain_id, func.sum(FarmerStockyardTransfer.no_of_transferred_bags))
         .join(PurchaseIndividual, PurchaseIndividual.id == FarmerStockyardTransfer.purchase_individual_id)
         .group_by(FarmerStockyardTransfer.stockyard_id, PurchaseIndividual.grain_id), FarmerStockyardTransfer.stockyard_id, PurchaseIndividual.grain_id)
     for q in (from_group, from_individual):
@@ -92,23 +92,22 @@ async def filled_ledger(db: AsyncSession, stockyard_id: int | None = None, grain
 
 async def empty_ledger(db: AsyncSession, stockyard_id: int | None = None, grain_id: int | None = None) -> dict[Key, Empty]:
     out: dict[Key, Empty] = {}
-    moves = select(StockyardEmptyBagMovement.stockyard_id, StockyardEmptyBagMovement.grain_id, StockyardEmptyBagMovement.movement_type,
-                   func.sum(StockyardEmptyBagMovement.no_of_bags)).group_by(
-        StockyardEmptyBagMovement.stockyard_id, StockyardEmptyBagMovement.grain_id, StockyardEmptyBagMovement.movement_type)
-    used = (select(StockyardPurchase.stockyard_id, StockyardPurchase.grain_id, StockyardPurchase.no_of_empty_bags, StockyardPurchaseEntry.no_of_filled_bags)
-            .join(StockyardPurchase, StockyardPurchase.id == StockyardPurchaseEntry.stockyard_purchase_id))
+    bought = select(EmptyBag.stockyard_id, EmptyBag.grain_id, func.sum(EmptyBag.no_of_empty_bags)).group_by(EmptyBag.stockyard_id, EmptyBag.grain_id)
+    per_purchase = (select(StockyardPurchase.stockyard_id, StockyardPurchase.grain_id, StockyardPurchase.no_of_given_empty_bags,
+                           func.coalesce(func.sum(StockyardPurchaseEntry.no_of_filled_bags), 0), func.coalesce(func.sum(StockyardPurchaseEntry.no_of_received_empty_bags), 0))
+                    .outerjoin(StockyardPurchaseEntry, StockyardPurchaseEntry.stockyard_purchase_id == StockyardPurchase.id)
+                    .group_by(StockyardPurchase.id))
     if stockyard_id is not None:
-        moves, used = moves.where(StockyardEmptyBagMovement.stockyard_id == stockyard_id), used.where(StockyardPurchase.stockyard_id == stockyard_id)
+        bought, per_purchase = bought.where(EmptyBag.stockyard_id == stockyard_id), per_purchase.where(StockyardPurchase.stockyard_id == stockyard_id)
     if grain_id is not None:
-        moves, used = moves.where(StockyardEmptyBagMovement.grain_id == grain_id), used.where(StockyardPurchase.grain_id == grain_id)
-    for sy, gr, kind, n in (await db.execute(moves)).all():
+        bought, per_purchase = bought.where(EmptyBag.grain_id == grain_id), per_purchase.where(StockyardPurchase.grain_id == grain_id)
+    for sy, gr, n in (await db.execute(bought)).all():
+        out.setdefault((sy, gr), Empty()).bought = int(n)
+    for sy, gr, given, filled, received in (await db.execute(per_purchase)).all():
         e = out.setdefault((sy, gr), Empty())
-        if kind == "received":
-            e.received = int(n)
-        else:
-            e.given = int(n)
-    for sy, gr, given_on_purchase, filled in (await db.execute(used)).all():
-        out.setdefault((sy, gr), Empty()).used += empties_needed(int(filled), given_on_purchase)
+        e.given += int(given)
+        e.received += int(received)
+        e.error += int(given) - int(filled) - int(received)
     return out
 
 

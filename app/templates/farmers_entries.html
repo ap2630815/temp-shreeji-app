@@ -2,7 +2,7 @@
 {% from "partials/bilabel.html" import t, th, badge %}
 {% block title %}Purchase Farmers{% endblock %}
 {% block content %}
-{% set tabs = [('entries', 'Farmer entries', 'ખેડૂત નોંધ'), ('groups', 'Purchase groups', 'ખરીદી જૂથ'), ('individuals', 'Purchase individuals', 'ખરીદી વ્યક્તિગત')] %}
+{% set tabs = [('entries', 'Farmer entries', 'ખેડૂત નોંધ'), ('groups', 'Purchase groups', 'ખરીદી જૂથ'), ('individuals', 'Purchase individuals', 'ખરીદી વ્યક્તિગત'), ('bags', 'Farmer bag ledger', 'ખેડૂત બેગ ખાતું')] %}
 {% set direct = view == 'individuals' %}
 <div class="stackbi">
 <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -52,6 +52,22 @@
     {% else %}
       <tr><td colspan="12" class="text-center opacity-60">{{ t('No purchases in this year', 'આ વર્ષમાં કોઈ ખરીદી નથી') }}</td></tr>
     {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% elif view == 'bags' %}
+<div class="overflow-x-auto bg-base-100 rounded-box shadow">
+  <table class="table table-zebra table-sm">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Source', 'સ્ત્રોત') }}{{ th('Village', 'ગામ') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Grain', 'અનાજ') }}{{ th('Total available', 'કુલ ઉપલબ્ધ') }}{{ th('Loaded on trucks', 'ટ્રકમાં ભરેલી') }}{{ th('Taken to stockyard', 'સ્ટોકયાર્ડમાં') }}{{ th('Remaining', 'બાકી') }}</tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="whitespace-nowrap">{{ r.entry.entry_date }}</td>
+        <td><a class="link" href="{{ r.link }}">{{ t('Group', 'ગ્રુપ') if r.kind == 'PurchaseGroup' else t('Individual', 'વ્યક્તિગત') }}</a></td>
+        <td>{{ r.entry.village.village_name }}</td><td>{{ r.entry.farmer.farmer_name }}</td><td>{{ r.entry.grain.grain_name }}</td>
+        <td>{{ r.stock.bought }}</td><td>{{ r.stock.loaded }}</td><td>{{ r.stock.moved }}</td><td class="font-semibold">{{ r.stock.available }}</td>
+      </tr>
+    {% else %}<tr><td colspan="9" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>
   </table>
 </div>

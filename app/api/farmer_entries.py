@@ -1,6 +1,6 @@
 """The farmer ledger screens.
 
-/PurchaseFarmers          tabs (like /StockyardPurchase): entries = every farmer ledger entry of the business year (purchase and direct\n                          entries together), groups = the purchase groups (deals), individuals = the direct entries
+/PurchaseFarmers          tabs (like /StockyardPurchase; bags = the farmer bag ledger): entries = every farmer ledger entry of the business year (purchase and direct\n                          entries together), groups = the purchase groups (deals), individuals = the direct entries
 /PurchaseIndividual       direct entries (+ add / + edit): ONE form holding the purchase columns (date, village, grain, rate,
                           pay-after, terms) and the entry columns (farmer, labour group, bags, amounts...) with ONE description.
                           One flat row per farmer entry in purchase_individuals, no purchase_group.
@@ -47,7 +47,22 @@ async def _years(db: AsyncSession, user: User) -> list[str]:
     return allowed_years(user, found)
 
 
-VIEWS = ("entries", "groups", "individuals")
+VIEWS = ("entries", "groups", "individuals", "bags")
+
+
+async def farmer_bag_rows(db: AsyncSession, year: str, village_id: int = 0, grain_id: int = 0) -> list[dict]:
+    """The farmer bag ledger of the year: purchase group entries and purchase individuals side by side."""
+    group = list((await db.scalars(select(PurchaseFarmerEntry).where(PurchaseFarmerEntry.business_year == year)
+                                   .order_by(PurchaseFarmerEntry.purchase_entry_date.desc(), PurchaseFarmerEntry.id.desc()))).unique().all())
+    direct = list((await db.scalars(select(PurchaseIndividual).where(PurchaseIndividual.business_year == year)
+                                    .order_by(PurchaseIndividual.purchase_individual_date.desc(), PurchaseIndividual.id.desc()))).unique().all())
+    group = [e for e in group if (not village_id or e.purchase_group.village_id == village_id) and (not grain_id or e.purchase_group.grain_id == grain_id)]
+    direct = [e for e in direct if (not village_id or e.village_id == village_id) and (not grain_id or e.grain_id == grain_id)]
+    g_stock = await stock_by_entry(db, [e.id for e in group]) if group else {}
+    d_stock = await stock_by_entry(db, [e.id for e in direct], individual=True) if direct else {}
+    rows = [dict(kind="PurchaseGroup", link=f"/PurchaseGroup/{e.purchase_group_id}", entry=e, stock=g_stock[e.id]) for e in group]
+    rows += [dict(kind="PurchaseIndividual", link="/PurchaseIndividual", entry=e, stock=d_stock[e.id]) for e in direct]
+    return sorted(rows, key=lambda r: (r["entry"].entry_date, r["entry"].id), reverse=True)
 
 
 async def _ledger_page(request, csrf, db, user, *, view, year, grain_id, village_id):
@@ -59,6 +74,9 @@ async def _ledger_page(request, csrf, db, user, *, view, year, grain_id, village
     ctx = dict(view=view, today=now, year=year, years=years, year_locked=year != current_year_label(), views=[], totals=None, rows=[])
     if view == "groups":
         ctx["rows"] = await group_rows(db, year, grain_id, village_id, toolbar_window(request))
+        return render_with_csrf(request, csrf, "farmers_entries.html", user=user, **ctx)
+    if view == "bags":  # bags bought / loaded on trucks / taken to a stockyard / still at the farmer, per entry
+        ctx["rows"] = await farmer_bag_rows(db, year, village_id, grain_id)
         return render_with_csrf(request, csrf, "farmers_entries.html", user=user, **ctx)
     source = direct_entry_views(db) if view == "individuals" else all_entry_views(db)
     views = [v for v in await source if v.entry.business_year == year and (not grain_id or v.entry.grain.id == grain_id) and (not village_id or v.entry.farmer.village_id == village_id)]  # the village of the farmer; a purchase's own village is reached through its # link

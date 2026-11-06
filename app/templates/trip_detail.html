@@ -7,7 +7,7 @@
 {% set booking = trip.broker_booking %}
 <div class="flex flex-wrap items-center gap-3 mb-4">
   <a href="/Trips?year={{ trip.business_year }}" class="btn btn-ghost btn-sm">←</a>
-  <h1 class="text-xl font-semibold flex-1">{{ trip.truck.truck_number }} → {{ trip.industry.industrialist_name }} · {{ trip.grain.grain_name }}</h1>
+  <h1 class="text-xl font-semibold flex-1">{{ trip.truck.truck_number }} → {{ trip.industry.industry_name }} · {{ trip.grain.grain_name }}</h1>
   <a href="/Trips/{{ trip.id }}/Edit" class="btn btn-primary btn-sm">{{ t('Edit trip', 'ટ્રીપ સુધારો') }}</a>
   <a href="/Trips/{{ trip.id }}/Bilty" class="btn btn-primary btn-sm">{{ t('Edit bilty', 'બિલ્ટી સુધારો') if bilty else t('Add bilty', 'બિલ્ટી ઉમેરો') }}</a>
 </div>

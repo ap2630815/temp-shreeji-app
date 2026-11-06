@@ -77,7 +77,7 @@ async def overview(request: Request, grain_id: int = 0, village_id: int = 0, use
             continue
         per.setdefault(v.bilty.trip.industry.id, []).append(v)
     industries = {i.id: i for i in (await db.scalars(select(Industry).where(Industry.id.in_(per)))).all()} if per else {}
-    rows = sorted(((industries[i], svc.summarize(vs)) for i, vs in per.items()), key=lambda r: (-r[1]["due"], r[0].industrialist_name))
+    rows = sorted(((industries[i], svc.summarize(vs)) for i, vs in per.items()), key=lambda r: (-r[1]["due"], r[0].industry_name))
     totals = {k: sum(s[k] for _, s in rows) for k in ("trucks", "awaiting_weight", "billed", "received", "due")}
     return render_with_csrf(request, csrf, "receivables.html", user=user, rows=rows, totals=totals)
 
@@ -100,7 +100,7 @@ async def account_pdf(industry_id: int, user: User = Depends(current_user), db: 
 def _ctx(industry: Industry, fields, values, errors):
     return form_context(
         fields=fields, values=values, errors=errors, action=f"/Industries/{industry.id}/Receive",
-        heading=(f"Receive from {industry.industrialist_name}", f"{industry.industrialist_name} પાસેથી પ્રાપ્તિ"), back_url=f"/Industries/{industry.id}/Account", industry=industry,
+        heading=(f"Receive from {industry.industry_name}", f"{industry.industry_name} પાસેથી પ્રાપ્તિ"), back_url=f"/Industries/{industry.id}/Account", industry=industry,
     )
 
 
@@ -108,7 +108,7 @@ def _ctx(industry: Industry, fields, values, errors):
 async def receive_page(request: Request, industry_id: int, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     industry = await _industry(db, industry_id)
     summary = svc.summarize(await svc.bilty_views(db, industry_id))
-    values = dict(receipt_date=today().isoformat(), method="bank", payer_name=industry.owner_name, amount=str(summary["due"]) if summary["due"] else "")
+    values = dict(receipt_date=today().isoformat(), method="bank", payer_name=industry.industry_owner_name, amount=str(summary["due"]) if summary["due"] else "")
     return render_with_csrf(request, csrf, "receive_form_page.html", user=user, summary=summary, **_ctx(industry, receipt_fields(), values, {}))
 
 

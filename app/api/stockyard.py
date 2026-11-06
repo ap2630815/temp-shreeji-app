@@ -6,15 +6,15 @@ from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi_csrf_protect import CsrfProtect
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
-from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, form_context, normalize_fields, read_form, toolbar_window, today
+from app.api.formkit import GENERIC_ERROR, YEAR_LOCKED, apply_toolbar, form_context, normalize_fields, read_form, toolbar_ids, toolbar_window, today
 from app.api.masters_config import F, run_validation
 from app.core.db import get_db
 from app.core.templating import render, render_with_csrf
@@ -24,9 +24,12 @@ from app.models import (
     Grain,
     LabourGroup,
     PurchaseFarmerEntry,
+    PurchaseGroup,
     PurchaseIndividual,
     Stockyard,
-    StockyardEmptyBagMovement,
+    EmptyBag,
+    EmptyBagMover,
+    EmptyBagSeller,
     StockyardArrangementEntry,
     StockyardPurchase,
     StockyardPurchaseEntry,
@@ -36,24 +39,23 @@ from app.services import audit
 from app.services.duplicates import DUPLICATE_MSG, find_duplicate
 from app.services.locks import advisory_lock
 from app.services.money import payable_amount
-from app.services.stock import renumber_remaining, stock_by_entry
-from app.services.stockyard_stock import Empty, Filled, empty_ledger, filled_ledger
+from app.services.stock import stock_by_entry
+from app.services.stockyard_stock import Empty, Filled, default_received, empty_ledger, filled_ledger
 from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label
 
 router = APIRouter(prefix="/StockyardPurchase")
 INT_MAX = 100_000_000
 Money = Annotated[int, Field(ge=0, le=INT_MAX)]
-TABS = ("purchases", "entries", "arrangements", "transfers", "empty_bags", "stock", "farmer_bags")
+TABS = ("purchases", "entries", "arrangements", "transfers", "empty_bags", "stock")
 FORM_TABS = ("purchases", "entries", "arrangements", "transfers", "empty_bags")  # the others are read-only ledgers
 TAB_MODELS = {"purchases": StockyardPurchase, "entries": StockyardPurchaseEntry, "arrangements": StockyardArrangementEntry,
-              "transfers": FarmerStockyardTransfer, "empty_bags": StockyardEmptyBagMovement}
-MOVEMENT_TYPES = (("received", "Received (into the stockyard)", "મળેલી (સ્ટોકયાર્ડમાં)"), ("given_to_farmer", "Given to a farmer", "ખેડૂતને આપેલી"))
+              "transfers": FarmerStockyardTransfer, "empty_bags": EmptyBag}
 HEADINGS = {
     "purchases": (("Stockyard purchase", "સ્ટોકયાર્ડ ખરીદી"), ("Edit stockyard purchase", "સ્ટોકયાર્ડ ખરીદી સુધારો")),
     "entries": (("Stockyard purchase entry", "સ્ટોકયાર્ડ ખરીદી નોંધ"), ("Edit stockyard purchase entry", "સ્ટોકયાર્ડ ખરીદી નોંધ સુધારો")),
     "arrangements": (("Stockyard arrangement entry", "સ્ટોકયાર્ડ ગોઠવણી નોંધ"), ("Edit stockyard arrangement entry", "સ્ટોકયાર્ડ ગોઠવણી નોંધ સુધારો")),
     "transfers": (("Farmer to stockyard", "ખેડૂતથી સ્ટોકયાર્ડ"), ("Edit farmer to stockyard", "ખેડૂતથી સ્ટોકયાર્ડ સુધારો")),
-    "empty_bags": (("Empty bags movement", "ખાલી બેગ હેરફેર"), ("Edit empty bags movement", "ખાલી બેગ હેરફેર સુધારો")),
+    "empty_bags": (("Empty bags", "ખાલી બેગ"), ("Edit empty bags", "ખાલી બેગ સુધારો")),
 }
 
 
@@ -80,54 +82,78 @@ async def _years(db: AsyncSession, model, user: User) -> list[str]:
 @router.get("", response_class=HTMLResponse)
 async def stockyard_list(request: Request, view: str = "purchases", year: str = "", user: User = Depends(current_user),
                          csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
+    if view == "farmer_bags":  # moved to the Purchase Farmers page
+        q = request.url.query.replace("view=farmer_bags", "view=bags")
+        return RedirectResponse(f"/PurchaseFarmers?{q}", status_code=307)
     view = view if view in TABS else "purchases"
-    if view == "stock":  # the stockyards' filled / empty bag ledgers: balances so far, not a year's records
+    village_id, grain_id = toolbar_ids(request)  # the toolbar's village (the farmer's) and grain
+    if view == "stock":  # the stockyards' filled / empty bag ledgers: balances so far, not a year's records (grain only: a stockyard has no village)
         return render_with_csrf(request, csrf, "stockyard_list.html", user=user, view=view, rows=[], year="", years=[], year_locked=False,
-                                **await _stock_context(db))
+                                **await _stock_context(db, grain_id))
     model = TAB_MODELS.get(view, PurchaseFarmerEntry)
     years = await _years(db, model, user)
     year = year if year in years else current_year_label()
-    if view == "farmer_bags":  # per farmer entry: bags bought, loaded on trucks, taken to a stockyard, still at the farmer
-        return render_with_csrf(request, csrf, "stockyard_list.html", user=user, view=view, rows=await _farmer_bag_rows(db, year), year=year, years=years,
-                                year_locked=year != current_year_label())
     date_col = {"purchases": StockyardPurchase.stockyard_purchase_date, "entries": StockyardPurchaseEntry.stockyard_purchase_entry_date,
                 "arrangements": StockyardArrangementEntry.stockyard_arrangement_date, "transfers": FarmerStockyardTransfer.transfer_date,
-                "empty_bags": StockyardEmptyBagMovement.movement_date}[view]
+                "empty_bags": EmptyBag.empty_bags_entry_date}[view]
     stmt = select(model).where(model.business_year == year)
     if window := toolbar_window(request):
         stmt = stmt.where(date_col.between(*window))
+    stmt = _toolbar_filter(stmt, view, village_id, grain_id)
     rows = list((await db.scalars(stmt.order_by(date_col.desc(), model.id.desc()))).unique().all())
     return render_with_csrf(request, csrf, "stockyard_list.html", user=user, view=view, rows=rows, year=year, years=years,
                             year_locked=year != current_year_label())
 
 
-async def _stock_context(db: AsyncSession) -> dict:
-    """One row per stockyard and grain: filled bags (bought here + brought from farmers - loaded) and empty bags (received - given - used)."""
+def _toolbar_filter(stmt, view: str, village_id: int, grain_id: int):
+    """Village = the farmer's village (for transfers: the village of the farmer entry); grain = the grain of the purchase / entry / movement.
+    Rows with no farmer or no grain behind them (arrangements without an entry) drop out while that filter is on."""
+    if view == "purchases":
+        if village_id:
+            stmt = stmt.where(StockyardPurchase.farmer_id.in_(select(Farmer.id).where(Farmer.village_id == village_id)))
+        if grain_id:
+            stmt = stmt.where(StockyardPurchase.grain_id == grain_id)
+    elif view in ("entries", "arrangements"):
+        entry_col = StockyardPurchaseEntry.id if view == "entries" else StockyardArrangementEntry.stockyard_purchase_entry_id
+        buys = select(StockyardPurchase.id)
+        if village_id:
+            buys = buys.where(StockyardPurchase.farmer_id.in_(select(Farmer.id).where(Farmer.village_id == village_id)))
+        if grain_id:
+            buys = buys.where(StockyardPurchase.grain_id == grain_id)
+        if village_id or grain_id:
+            entries = select(StockyardPurchaseEntry.id).where(StockyardPurchaseEntry.stockyard_purchase_id.in_(buys))
+            stmt = stmt.where(entry_col.in_(entries))
+    elif view == "transfers":
+        if village_id:
+            stmt = stmt.where(FarmerStockyardTransfer.purchase_farmer_entry_id.in_(
+                select(PurchaseFarmerEntry.id).join(PurchaseGroup, PurchaseGroup.id == PurchaseFarmerEntry.purchase_group_id).where(PurchaseGroup.village_id == village_id))
+                | FarmerStockyardTransfer.purchase_individual_id.in_(select(PurchaseIndividual.id).where(PurchaseIndividual.village_id == village_id)))
+        if grain_id:
+            stmt = stmt.where(FarmerStockyardTransfer.purchase_farmer_entry_id.in_(
+                select(PurchaseFarmerEntry.id).join(PurchaseGroup, PurchaseGroup.id == PurchaseFarmerEntry.purchase_group_id).where(PurchaseGroup.grain_id == grain_id))
+                | FarmerStockyardTransfer.purchase_individual_id.in_(select(PurchaseIndividual.id).where(PurchaseIndividual.grain_id == grain_id)))
+    elif view == "empty_bags":  # no farmer behind these rows: the village filter does not apply (the toolbar freezes it)
+        if grain_id:
+            stmt = stmt.where(EmptyBag.grain_id == grain_id)
+    return stmt
+
+
+async def _stock_context(db: AsyncSession, grain_id: int = 0) -> dict:
+    """One row per stockyard and grain: filled bags (bought here + brought from farmers - loaded) and empty bags (bought - used by purchase entries)."""
     filled, empty = await filled_ledger(db), await empty_ledger(db)
     yards = {y.id: y for y in (await db.scalars(select(Stockyard))).all()}
     grains = {g.id: g for g in (await db.scalars(select(Grain))).all()}
-    keys = sorted(set(filled) | set(empty), key=lambda k: (yards[k[0]].name_of_stockyard, grains[k[1]].grain_name))
+    keys = sorted((k for k in set(filled) | set(empty) if not grain_id or k[1] == grain_id), key=lambda k: (yards[k[0]].name_of_stockyard, grains[k[1]].grain_name))
     return dict(stock_rows=[(yards[sy], grains[gr], filled.get((sy, gr), Filled()), empty.get((sy, gr), Empty())) for sy, gr in keys])
-
-
-async def _farmer_bag_rows(db: AsyncSession, year: str) -> list[dict]:
-    """The farmer bag ledger of the year: purchase group entries and purchase individuals side by side."""
-    group = list((await db.scalars(select(PurchaseFarmerEntry).where(PurchaseFarmerEntry.business_year == year)
-                                   .order_by(PurchaseFarmerEntry.purchase_entry_date.desc(), PurchaseFarmerEntry.id.desc()))).unique().all())
-    direct = list((await db.scalars(select(PurchaseIndividual).where(PurchaseIndividual.business_year == year)
-                                    .order_by(PurchaseIndividual.purchase_individual_date.desc(), PurchaseIndividual.id.desc()))).unique().all())
-    g_stock = await stock_by_entry(db, [e.id for e in group]) if group else {}
-    d_stock = await stock_by_entry(db, [e.id for e in direct], individual=True) if direct else {}
-    rows = [dict(kind="PurchaseGroup", link=f"/PurchaseGroup/{e.purchase_group_id}", entry=e, stock=g_stock[e.id]) for e in group]
-    rows += [dict(kind="PurchaseIndividual", link="/PurchaseIndividual", entry=e, stock=d_stock[e.id]) for e in direct]
-    return sorted(rows, key=lambda r: (r["entry"].entry_date, r["entry"].id), reverse=True)
 
 
 # ================================================================== forms
 
-async def purchase_fields(db: AsyncSession) -> list[F]:
+async def purchase_fields(db: AsyncSession, village_id: int = 0, grain_id: int = 0) -> list[F]:
     yards = list((await db.scalars(select(Stockyard).order_by(Stockyard.name_of_stockyard))).all())
     farmers = list((await db.scalars(select(Farmer).order_by(Farmer.farmer_name))).unique().all())
+    if village_id:  # the toolbar village: only its farmers are offered
+        farmers = [f for f in farmers if f.village_id == village_id]
     farmers.sort(key=lambda f: (f.village.village_name, f.farmer_name))
     grains = list((await db.scalars(select(Grain).order_by(Grain.grain_name))).all())
     return [
@@ -137,7 +163,8 @@ async def purchase_fields(db: AsyncSession) -> list[F]:
         F("grain_id", "Grain", "અનાજ", kind="select", required=True, options=_opt(grains, lambda g: g.grain_name)),
         F("grain_rate_per_20kg", "Grain rate per 20 kg (₹)", "અનાજનો ભાવ 20 કિલો દીઠ (₹)", kind="int", required=True),
         F("pay_after_no_of_days", "Pay after (days)", "ચુકવણી (દિવસ પછી)", kind="int", required=True),
-        F("no_of_empty_bags", "Empty bags given", "આપેલી ખાલી બેગ", kind="int"),
+        F("no_of_given_empty_bags", "Empty bags given", "આપેલી ખાલી બેગ", kind="int",
+          help=("Handed to the farmer to fill; what comes back is recorded on each purchase entry", "ખેડૂતને ભરવા આપેલી; પાછી આવેલી દરેક ખરીદી નોંધમાં લખાય છે")),
         F("terms", "Terms & conditions", "શરતો", kind="textarea"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ]
@@ -150,7 +177,7 @@ class PurchaseIn(BaseModel):
     grain_id: int
     grain_rate_per_20kg: Annotated[int, Field(gt=0, le=1_000_000)]
     pay_after_no_of_days: Annotated[int, Field(ge=0, le=3650)]
-    no_of_empty_bags: Money | None = None
+    no_of_given_empty_bags: Money | None = None
     terms: str | None = None
     description: str | None = None
 
@@ -158,17 +185,22 @@ class PurchaseIn(BaseModel):
 def purchase_values(p: StockyardPurchase) -> dict:
     return dict(stockyard_purchase_date=p.stockyard_purchase_date.isoformat(), stockyard_id=str(p.stockyard_id), farmer_id=str(p.farmer_id),
                 grain_id=str(p.grain_id), grain_rate_per_20kg=str(p.grain_rate_per_20kg), pay_after_no_of_days=str(p.pay_after_no_of_days),
-                no_of_empty_bags=str(p.no_of_empty_bags), terms=p.terms or "", description=p.description or "")
+                no_of_given_empty_bags=str(p.no_of_given_empty_bags), terms=p.terms or "", description=p.description or "")
 
 
 def purchase_snapshot(p: StockyardPurchase) -> dict:
     return dict(stockyard_purchase_date=p.stockyard_purchase_date, stockyard_id=p.stockyard_id, farmer_id=p.farmer_id, grain_id=p.grain_id,
-                grain_rate_per_20kg=p.grain_rate_per_20kg, pay_after_no_of_days=p.pay_after_no_of_days, no_of_empty_bags=p.no_of_empty_bags,
+                grain_rate_per_20kg=p.grain_rate_per_20kg, pay_after_no_of_days=p.pay_after_no_of_days, no_of_given_empty_bags=p.no_of_given_empty_bags,
                 terms=p.terms, description=p.description)
 
 
-async def entry_fields(db: AsyncSession) -> list[F]:
-    purchases = list((await db.scalars(select(StockyardPurchase).order_by(StockyardPurchase.stockyard_purchase_date.desc(), StockyardPurchase.id.desc()))).unique().all())
+async def entry_fields(db: AsyncSession, village_id: int = 0, grain_id: int = 0) -> list[F]:
+    stmt = select(StockyardPurchase).order_by(StockyardPurchase.stockyard_purchase_date.desc(), StockyardPurchase.id.desc())
+    if village_id:
+        stmt = stmt.where(StockyardPurchase.farmer_id.in_(select(Farmer.id).where(Farmer.village_id == village_id)))
+    if grain_id:
+        stmt = stmt.where(StockyardPurchase.grain_id == grain_id)
+    purchases = list((await db.scalars(stmt)).unique().all())
     groups = list((await db.scalars(select(LabourGroup).order_by(LabourGroup.group_name))).all())
     return [
         F("stockyard_purchase_entry_date", "Date", "તારીખ", kind="date", required=True),
@@ -182,6 +214,9 @@ async def entry_fields(db: AsyncSession) -> list[F]:
         F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)", kind="decimal",
           help=("Leave blank to start at the grain's expected raw weight per bag", "ખાલી રાખો તો અનાજના અપેક્ષિત કાચા વજનથી શરૂ થશે")),
         F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ", kind="textarea"),
+        F("no_of_received_empty_bags", "Empty bags received back", "પાછી મળેલી ખાલી બેગ", kind="int",
+          help=("Leave blank to start at: bags given − filled bags of the purchase − bags already received back. If that is below zero the purchase's given bags are opened for editing",
+                "ખાલી રાખો તો: આપેલી − ખરીદીની ભરેલી − પહેલા પાછી આવેલી. શૂન્યથી ઓછું આવે તો ખરીદીની આપેલી બેગ સુધારવા ખુલશે")),
         F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", options=_opt(groups, lambda g: g.group_name)),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ]
@@ -195,6 +230,7 @@ class EntryIn(BaseModel):
     borrowed_amount: Money | None = None
     expected_raw_weight_per_bag: Annotated[float, Field(ge=0, le=1000)] | None = None
     grain_quality_code: str | None = None
+    no_of_received_empty_bags: Money | None = None
     labour_group_id: int | None = None
     description: str | None = None
 
@@ -202,17 +238,17 @@ class EntryIn(BaseModel):
 def entry_values(e: StockyardPurchaseEntry) -> dict:
     return dict(stockyard_purchase_entry_date=e.stockyard_purchase_entry_date.isoformat(), stockyard_purchase_id=str(e.stockyard_purchase_id),
                 no_of_filled_bags=str(e.no_of_filled_bags), extra_kilos=str(e.extra_kilos), borrowed_amount=str(e.borrowed_amount),
-                expected_raw_weight_per_bag=f"{e.expected_raw_weight_per_bag:g}", grain_quality_code=e.grain_quality_code or "", labour_group_id=str(e.labour_group_id or ""), description=e.description or "")
+                expected_raw_weight_per_bag=f"{e.expected_raw_weight_per_bag:g}", grain_quality_code=e.grain_quality_code or "", no_of_received_empty_bags=str(e.no_of_received_empty_bags), labour_group_id=str(e.labour_group_id or ""), description=e.description or "")
 
 
 def entry_snapshot(e: StockyardPurchaseEntry) -> dict:
     return dict(stockyard_purchase_entry_date=e.stockyard_purchase_entry_date, stockyard_purchase_id=e.stockyard_purchase_id, no_of_filled_bags=e.no_of_filled_bags,
                 extra_kilos=e.extra_kilos, payable_amount=e.payable_amount, borrowed_amount=e.borrowed_amount, due_date=e.due_date,
                 expected_raw_weight_per_bag=e.expected_raw_weight_per_bag,
-                grain_quality_code=e.grain_quality_code, labour_group_id=e.labour_group_id, description=e.description)
+                grain_quality_code=e.grain_quality_code, no_of_received_empty_bags=e.no_of_received_empty_bags, labour_group_id=e.labour_group_id, description=e.description)
 
 
-async def arrangement_fields(db: AsyncSession, keep_entry_id: int | None = None) -> list[F]:
+async def arrangement_fields(db: AsyncSession, keep_entry_id: int | None = None, village_id: int = 0, grain_id: int = 0) -> list[F]:
     """`keep_entry_id`: the entry the record being edited already uses, so it stays in the list. Entries that are already arranged are left out."""
     arranged = select(StockyardArrangementEntry.stockyard_purchase_entry_id).where(StockyardArrangementEntry.stockyard_purchase_entry_id.is_not(None))
     open_entry = StockyardPurchaseEntry.id.not_in(arranged)
@@ -220,6 +256,7 @@ async def arrangement_fields(db: AsyncSession, keep_entry_id: int | None = None)
         open_entry = open_entry | (StockyardPurchaseEntry.id == keep_entry_id)
     stmt = select(StockyardPurchaseEntry).where(open_entry).order_by(StockyardPurchaseEntry.stockyard_purchase_entry_date.desc(), StockyardPurchaseEntry.id.desc())
     entries = list((await db.scalars(stmt)).unique().all())
+    entries = [e for e in entries if e.id == keep_entry_id or ((not village_id or e.purchase.farmer.village_id == village_id) and (not grain_id or e.purchase.grain_id == grain_id))]
     groups = list((await db.scalars(select(LabourGroup).order_by(LabourGroup.group_name))).all())
     return [
         F("stockyard_arrangement_date", "Date", "તારીખ", kind="date", required=True),
@@ -260,11 +297,13 @@ def _source_key(t: FarmerStockyardTransfer) -> str:
     return f"g:{t.purchase_farmer_entry_id}" if t.purchase_farmer_entry_id is not None else f"i:{t.purchase_individual_id}"
 
 
-async def transfer_fields(db: AsyncSession, keep_source: str | None = None, exclude_transfer_id: int | None = None) -> list[F]:
+async def transfer_fields(db: AsyncSession, keep_source: str | None = None, exclude_transfer_id: int | None = None, village_id: int = 0, grain_id: int = 0) -> list[F]:
     """`keep_source`: the farmer entry the transfer being edited already uses, so it stays in the list although it may now have no bags left."""
     yards = list((await db.scalars(select(Stockyard).order_by(Stockyard.name_of_stockyard))).all())
     group = list((await db.scalars(select(PurchaseFarmerEntry).order_by(PurchaseFarmerEntry.purchase_entry_date.desc(), PurchaseFarmerEntry.id.desc()).limit(500))).unique().all())
     direct = list((await db.scalars(select(PurchaseIndividual).order_by(PurchaseIndividual.purchase_individual_date.desc(), PurchaseIndividual.id.desc()).limit(500))).unique().all())
+    group = [e for e in group if keep_source == f"g:{e.id}" or ((not village_id or e.purchase_group.village_id == village_id) and (not grain_id or e.purchase_group.grain_id == grain_id))]
+    direct = [e for e in direct if keep_source == f"i:{e.id}" or ((not village_id or e.village_id == village_id) and (not grain_id or e.grain_id == grain_id))]
     g_stock = await stock_by_entry(db, [e.id for e in group], exclude_transfer_id=exclude_transfer_id) if group else {}
     d_stock = await stock_by_entry(db, [e.id for e in direct], individual=True, exclude_transfer_id=exclude_transfer_id) if direct else {}
     options = []
@@ -281,7 +320,7 @@ async def transfer_fields(db: AsyncSession, keep_source: str | None = None, excl
         F("source", "Farmer entry (village · farmer · grain)", "ખેડૂત નોંધ (ગામ · ખેડૂત · અનાજ)", kind="select", required=True, options=tuple(options),
           help=("From /PurchaseGroup or /PurchaseIndividual; only entries with bags still at the farmer's place are listed", "/PurchaseGroup અથવા /PurchaseIndividual માંથી; ખેડૂત પાસે બેગ બાકી હોય તે જ નોંધ")),
         F("stockyard_id", "To stockyard", "સ્ટોકયાર્ડમાં", kind="select", required=True, options=_opt(yards, lambda y: f"{y.name_of_stockyard} — {y.location}")),
-        F("no_of_bags", "Bags brought", "લાવેલી બેગ", kind="int", required=True,
+        F("no_of_transferred_bags", "Bags brought", "લાવેલી બેગ", kind="int", required=True,
           help=("All or part of the bags left at the farmer's place", "ખેડૂત પાસે બાકી બેગમાંથી બધી અથવા થોડી")),
         F("description", "Description (e.g. wedding, function)", "વર્ણન (દા.ત. લગ્ન, પ્રસંગ)", kind="textarea"),
     ]
@@ -291,66 +330,66 @@ class TransferIn(BaseModel):
     transfer_date: date
     source: str
     stockyard_id: int
-    no_of_bags: Annotated[int, Field(gt=0, le=INT_MAX)]
+    no_of_transferred_bags: Annotated[int, Field(gt=0, le=INT_MAX)]
     description: str | None = None
 
 
 def transfer_values(t: FarmerStockyardTransfer) -> dict:
-    return dict(transfer_date=t.transfer_date.isoformat(), source=_source_key(t), stockyard_id=str(t.stockyard_id), no_of_bags=str(t.no_of_bags), description=t.description or "")
+    return dict(transfer_date=t.transfer_date.isoformat(), source=_source_key(t), stockyard_id=str(t.stockyard_id), no_of_transferred_bags=str(t.no_of_transferred_bags), description=t.description or "")
 
 
 def transfer_snapshot(t: FarmerStockyardTransfer) -> dict:
     return dict(transfer_date=t.transfer_date, purchase_farmer_entry_id=t.purchase_farmer_entry_id, purchase_individual_id=t.purchase_individual_id,
-                stockyard_id=t.stockyard_id, no_of_bags=t.no_of_bags, description=t.description)
+                stockyard_id=t.stockyard_id, no_of_transferred_bags=t.no_of_transferred_bags, description=t.description)
 
 
-# ---- empty bags (received into / given out of a stockyard)
+# ---- empty bags (bought into a stockyard: seller + mover)
 
-async def movement_fields(db: AsyncSession) -> list[F]:
+async def empty_bag_fields(db: AsyncSession, village_id: int = 0, grain_id: int = 0) -> list[F]:
     yards = list((await db.scalars(select(Stockyard).order_by(Stockyard.name_of_stockyard))).all())
     grains = list((await db.scalars(select(Grain).order_by(Grain.grain_name))).all())
-    farmers = list((await db.scalars(select(Farmer).order_by(Farmer.farmer_name))).unique().all())
-    farmers.sort(key=lambda f: (f.village.village_name, f.farmer_name))
+    sellers = list((await db.scalars(select(EmptyBagSeller).order_by(EmptyBagSeller.pet_name))).all())
+    movers = list((await db.scalars(select(EmptyBagMover).order_by(EmptyBagMover.pet_name))).all())
     return [
-        F("movement_date", "Date", "તારીખ", kind="date", required=True),
+        F("empty_bags_entry_date", "Date", "તારીખ", kind="date", required=True),
         F("stockyard_id", "Stockyard", "સ્ટોકયાર્ડ", kind="select", required=True, options=_opt(yards, lambda y: f"{y.name_of_stockyard} — {y.location}")),
         F("grain_id", "Grain", "અનાજ", kind="select", required=True, options=_opt(grains, lambda g: g.grain_name)),
-        F("movement_type", "Movement", "હેરફેર", kind="select", required=True, options=tuple((k, f"{en} / {gu}") for k, en, gu in MOVEMENT_TYPES),
+        F("empty_bag_seller_id", "Empty bag seller", "ખાલી બારદાન વેચનાર", kind="select", options=_opt(sellers, lambda x: f"{x.pet_name} — {x.name}")),
+        F("empty_bag_mover_id", "Empty bag mover", "ખાલી બારદાન મૂવર", kind="select", options=_opt(movers, lambda x: f"{x.pet_name} — {x.name}")),
+        F("no_of_empty_bags", "Empty bags", "ખાલી બેગ", kind="int", required=True,
           help=("Bags used by stockyard purchase entries are taken off automatically", "સ્ટોકયાર્ડ ખરીદી નોંધમાં વપરાયેલી બેગ આપમેળે ઘટે છે")),
-        F("farmer_id", "Farmer (when given to a farmer)", "ખેડૂત (ખેડૂતને આપી હોય ત્યારે)", kind="select", options=_opt(farmers, lambda f: f"{f.village.village_name} — {f.farmer_name}")),
-        F("no_of_bags", "Empty bags", "ખાલી બેગ", kind="int", required=True),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ]
 
 
-class MovementIn(BaseModel):
-    movement_date: date
+class EmptyBagIn(BaseModel):
+    empty_bags_entry_date: date
     stockyard_id: int
     grain_id: int
-    movement_type: str
-    farmer_id: int | None = None
-    no_of_bags: Annotated[int, Field(gt=0, le=INT_MAX)]
+    empty_bag_seller_id: int | None = None
+    empty_bag_mover_id: int | None = None
+    no_of_empty_bags: Annotated[int, Field(gt=0, le=INT_MAX)]
     description: str | None = None
 
 
-def movement_values(m: StockyardEmptyBagMovement) -> dict:
-    return dict(movement_date=m.movement_date.isoformat(), stockyard_id=str(m.stockyard_id), grain_id=str(m.grain_id), movement_type=m.movement_type,
-                farmer_id=str(m.farmer_id or ""), no_of_bags=str(m.no_of_bags), description=m.description or "")
+def empty_bag_values(m: EmptyBag) -> dict:
+    return dict(empty_bags_entry_date=m.empty_bags_entry_date.isoformat(), stockyard_id=str(m.stockyard_id), grain_id=str(m.grain_id),
+                empty_bag_seller_id=str(m.empty_bag_seller_id or ""), empty_bag_mover_id=str(m.empty_bag_mover_id or ""), no_of_empty_bags=str(m.no_of_empty_bags), description=m.description or "")
 
 
-def movement_snapshot(m: StockyardEmptyBagMovement) -> dict:
-    return dict(movement_date=m.movement_date, stockyard_id=m.stockyard_id, grain_id=m.grain_id, movement_type=m.movement_type, farmer_id=m.farmer_id,
-                no_of_bags=m.no_of_bags, description=m.description)
+def empty_bag_snapshot(m: EmptyBag) -> dict:
+    return dict(empty_bags_entry_date=m.empty_bags_entry_date, stockyard_id=m.stockyard_id, grain_id=m.grain_id, empty_bag_seller_id=m.empty_bag_seller_id,
+                empty_bag_mover_id=m.empty_bag_mover_id, no_of_empty_bags=m.no_of_empty_bags, description=m.description)
 
 
-FIELDS = {"purchases": purchase_fields, "entries": entry_fields, "arrangements": arrangement_fields, "transfers": transfer_fields, "empty_bags": movement_fields}
-VALUES = {"purchases": purchase_values, "entries": entry_values, "arrangements": arrangement_values, "transfers": transfer_values, "empty_bags": movement_values}
+FIELDS = {"purchases": purchase_fields, "entries": entry_fields, "arrangements": arrangement_fields, "transfers": transfer_fields, "empty_bags": empty_bag_fields}
+VALUES = {"purchases": purchase_values, "entries": entry_values, "arrangements": arrangement_values, "transfers": transfer_values, "empty_bags": empty_bag_values}
 NEW_VALUES = {
-    "purchases": lambda: dict(stockyard_purchase_date=today().isoformat(), no_of_empty_bags="0"),
+    "purchases": lambda: dict(stockyard_purchase_date=today().isoformat(), no_of_given_empty_bags="0"),
     "entries": lambda: dict(stockyard_purchase_entry_date=today().isoformat(), extra_kilos="0", borrowed_amount="0"),
     "arrangements": lambda: dict(stockyard_arrangement_date=today().isoformat()),
     "transfers": lambda: dict(transfer_date=today().isoformat()),
-    "empty_bags": lambda: dict(movement_date=today().isoformat(), movement_type="received"),
+    "empty_bags": lambda: dict(empty_bags_entry_date=today().isoformat()),
 }
 
 
@@ -374,7 +413,14 @@ def _ctx(kind: str, fields: list[F], values: dict, errors: dict, obj_id: int | N
 async def stockyard_new(request: Request, kind: str, user: User = Depends(current_user), csrf: CsrfProtect = Depends(), db: AsyncSession = Depends(get_db)):
     _tab(kind)
     extra = await _arrangement_extras(db) if kind == "arrangements" else {}
-    ctx = _ctx(kind, await FIELDS[kind](db), NEW_VALUES[kind](), {}, None)
+    village_id, grain_id = toolbar_ids(request)  # narrow the pick lists; the grain also starts the grain field
+    if kind == "arrangements":
+        fields = await arrangement_fields(db, None, village_id, grain_id)
+    elif kind == "transfers":
+        fields = await transfer_fields(db, None, None, village_id, grain_id)
+    else:
+        fields = await FIELDS[kind](db, village_id, grain_id)
+    ctx = _ctx(kind, fields, apply_toolbar(request, NEW_VALUES[kind]()), {}, None)
     return render_with_csrf(request, csrf, _page(kind), user=user, obj_id=None, **extra, **ctx)
 
 
@@ -390,8 +436,11 @@ async def stockyard_edit(request: Request, kind: str, obj_id: int, user: User = 
         fields = await transfer_fields(db, _source_key(obj), obj.id)
     else:
         fields = await FIELDS[kind](db)
-    ctx = _ctx(kind, fields, VALUES[kind](obj), {}, obj_id)
-    return render_with_csrf(request, csrf, _page(kind), user=user, obj_id=obj_id, **extra, **ctx)
+    errors = {}
+    if kind == "purchases" and (need := request.query_params.get("need", "")).isdigit():  # sent here by a purchase entry that needs more empty bags
+        errors["no_of_given_empty_bags"] = (f"The entry needs {need} more empty bags than were given: raise the bags given", f"નોંધ માટે {need} ખાલી બેગ વધુ જોઈએ: આપેલી બેગ વધારો")
+    ctx = _ctx(kind, fields, VALUES[kind](obj), errors, obj_id)
+    return render_with_csrf(request, csrf, _page(kind), user=user, obj_id=obj_id, focus=request.query_params.get("focus", ""), **extra, **ctx)
 
 
 @router.post("/{kind}", response_class=HTMLResponse)
@@ -437,7 +486,7 @@ async def _bag_problem(db: AsyncSession, keys: set[tuple[int, int]], before: dic
             return (f"The stockyard would be short of {-filled_after} filled bags of this grain (they are already loaded on trucks)",
                     f"સ્ટોકયાર્ડમાં આ અનાજની {-filled_after} ભરેલી બેગ ઓછી પડશે (તે ટ્રકમાં ભરાઈ ગઈ છે)")
         if empty_after < 0 and empty_after < empty_before:
-            return (f"Not enough empty bags in the stockyard for this grain: short by {-empty_after}. Add the empty bags received first (Empty bags tab)",
+            return (f"Not enough empty bags in the stockyard for this grain: short by {-empty_after}. Add the empty bags first (Empty bags tab)",
                     f"સ્ટોકયાર્ડમાં આ અનાજની ખાલી બેગ પૂરતી નથી: {-empty_after} ઓછી. પહેલા મળેલી ખાલી બેગ ઉમેરો (ખાલી બેગ ટેબ)")
     return None
 
@@ -459,7 +508,7 @@ async def _save_purchase(request: Request, p: StockyardPurchase | None, user: Us
     clean, errors = run_validation(PurchaseIn, fields, normalize_fields(fields, raw))
     if errors:
         return rerender(errors)
-    clean["no_of_empty_bags"] = clean["no_of_empty_bags"] or 0
+    clean["no_of_given_empty_bags"] = clean["no_of_given_empty_bags"] or 0
     for name, model in (("stockyard_id", Stockyard), ("farmer_id", Farmer), ("grain_id", Grain)):
         if await db.get(model, clean[name]) is None:
             return rerender({name: ("Unknown value", "અજ્ઞાત કિંમત")})
@@ -493,7 +542,7 @@ async def _save_purchase(request: Request, p: StockyardPurchase | None, user: Us
     await db.flush()
     if problem := await _bag_problem(db, keys, balances):
         await db.rollback()
-        return rerender({"no_of_empty_bags": problem})
+        return rerender({"no_of_given_empty_bags": problem})
     audit.log(db, user, "update" if before else "create", "stockyard_purchases", p.id, audit.diff(before, purchase_snapshot(p)))
     return await _commit(db, "purchases", rerender, "grain_rate_per_20kg")
 
@@ -529,6 +578,16 @@ async def _save_entry(request: Request, e: StockyardPurchaseEntry | None, user: 
     keys = {(purchase.stockyard_id, purchase.grain_id)} | ({(e.purchase.stockyard_id, e.purchase.grain_id)} if e else set())
     for sy, gr in keys:
         await advisory_lock(db, "stockyard_bags", sy * 1000 + gr)  # two clerks must not both take the last empty bags
+    if clean["no_of_received_empty_bags"] is None:  # starts at given - filled - already received; editable
+        others = select(func.coalesce(func.sum(StockyardPurchaseEntry.no_of_filled_bags), 0), func.coalesce(func.sum(StockyardPurchaseEntry.no_of_received_empty_bags), 0)).where(
+            StockyardPurchaseEntry.stockyard_purchase_id == purchase.id)
+        if e is not None:
+            others = others.where(StockyardPurchaseEntry.id != e.id)
+        other_filled, other_received = (await db.execute(others)).one()
+        clean["no_of_received_empty_bags"] = default_received(purchase.no_of_given_empty_bags, int(other_filled) + clean["no_of_filled_bags"], int(other_received))
+        if clean["no_of_received_empty_bags"] < 0:  # the farmer needed more empty bags than were given: raise them on the purchase
+            need = -clean["no_of_received_empty_bags"]
+            return Response(status_code=204, headers={"HX-Redirect": f"/StockyardPurchase/purchases/{purchase.id}/Edit?focus=no_of_given_empty_bags&need={need}"})
     balances = await _balances(db, keys)
     before = None
     if e is not None:
@@ -617,8 +676,8 @@ async def _save_transfer(request: Request, t: FarmerStockyardTransfer | None, us
     await advisory_lock(db, "stock_ind" if individual else "stock", entry.id)  # two clerks must not move the same bags twice
     stock = (await stock_by_entry(db, [entry.id], individual=individual, exclude_transfer_id=t_id)).get(entry.id)
     left = stock.available if stock else 0
-    if clean["no_of_bags"] > left:
-        return rerender({"no_of_bags": (f"Only {left} bags are left at this farmer's place", f"આ ખેડૂત પાસે ફક્ત {left} બેગ બાકી છે")})
+    if clean["no_of_transferred_bags"] > left:
+        return rerender({"no_of_transferred_bags": (f"Only {left} bags are left at this farmer's place", f"આ ખેડૂત પાસે ફક્ત {left} બેગ બાકી છે")})
     grain_id, entry_id = entry.grain.id, entry.id
     del clean["source"]
     clean["purchase_farmer_entry_id"], clean["purchase_individual_id"] = (None, entry_id) if individual else (entry_id, None)
@@ -635,56 +694,44 @@ async def _save_transfer(request: Request, t: FarmerStockyardTransfer | None, us
     await db.flush()
     if problem := await _bag_problem(db, keys, balances):
         await db.rollback()
-        return rerender({"no_of_bags": problem})
-    for flag, eid in {(individual, entry_id), (old_source is not None and old_source.startswith("i:"), int(old_source[2:]) if old_source else 0)}:
-        if eid:
-            await renumber_remaining(db, eid, flag)
-    audit.log(db, user, "update" if before else "create", "farmer_stockyard_transfers", t.id, audit.diff(before, transfer_snapshot(t)))
-    return await _commit(db, "transfers", rerender, "no_of_bags")
+        return rerender({"no_of_transferred_bags": problem})
+    audit.log(db, user, "update" if before else "create", "farmer_to_stockyard_transfers", t.id, audit.diff(before, transfer_snapshot(t)))
+    return await _commit(db, "transfers", rerender, "no_of_transferred_bags")
 
 
-async def _save_movement(request: Request, m: StockyardEmptyBagMovement | None, user: User, db: AsyncSession):
+async def _save_empty_bag(request: Request, m: EmptyBag | None, user: User, db: AsyncSession):
     m_id = m.id if m else None
-    fields = await movement_fields(db)
+    fields = await empty_bag_fields(db)
     raw = await read_form(request)
     rerender = lambda errs: render(request, "partials/master_form.html", **_ctx("empty_bags", fields, raw, errs, m_id))  # noqa: E731
-    clean, errors = run_validation(MovementIn, fields, normalize_fields(fields, raw))
+    clean, errors = run_validation(EmptyBagIn, fields, normalize_fields(fields, raw))
     if errors:
         return rerender(errors)
-    if clean["movement_type"] not in {k for k, _, _ in MOVEMENT_TYPES}:
-        return rerender({"movement_type": ("Unknown value", "અજ્ઞાત કિંમત")})
-    for name, model in (("stockyard_id", Stockyard), ("grain_id", Grain)):
-        if await db.get(model, clean[name]) is None:
+    for name, model in (("stockyard_id", Stockyard), ("grain_id", Grain), ("empty_bag_seller_id", EmptyBagSeller), ("empty_bag_mover_id", EmptyBagMover)):
+        if clean[name] is not None and await db.get(model, clean[name]) is None:
             return rerender({name: ("Unknown value", "અજ્ઞાત કિંમત")})
-    if clean["movement_type"] == "given_to_farmer":
-        if clean["farmer_id"] is None:
-            return rerender({"farmer_id": ("Pick the farmer who received the bags", "બેગ મેળવનાર ખેડૂત પસંદ કરો")})
-        if await db.get(Farmer, clean["farmer_id"]) is None:
-            return rerender({"farmer_id": ("Unknown value", "અજ્ઞાત કિંમત")})
-    else:
-        clean["farmer_id"] = None
     try:
-        clean["business_year"] = await _open_year(db, clean["movement_date"], m.movement_date if m else None)
+        clean["business_year"] = await _open_year(db, clean["empty_bags_entry_date"], m.empty_bags_entry_date if m else None)
     except YearLockedError as exc:
-        return rerender({"movement_date": YEAR_LOCKED(exc.label)})
+        return rerender({"empty_bags_entry_date": YEAR_LOCKED(exc.label)})
     keys = {(clean["stockyard_id"], clean["grain_id"])} | ({(m.stockyard_id, m.grain_id)} if m else set())
     for sy, gr in keys:
         await advisory_lock(db, "stockyard_bags", sy * 1000 + gr)
     balances = await _balances(db, keys)
     before = None
     if m is not None:
-        before = movement_snapshot(m)
+        before = empty_bag_snapshot(m)
         for name, value in clean.items():
             setattr(m, name, value)
     else:
-        m = StockyardEmptyBagMovement(created_by=user.id, **clean)
+        m = EmptyBag(created_by=user.id, **clean)
         db.add(m)
     await db.flush()
     if problem := await _bag_problem(db, keys, balances):
         await db.rollback()
-        return rerender({"no_of_bags": problem})
-    audit.log(db, user, "update" if before else "create", "stockyard_empty_bag_movements", m.id, audit.diff(before, movement_snapshot(m)))
-    return await _commit(db, "empty_bags", rerender, "no_of_bags")
+        return rerender({"no_of_empty_bags": problem})
+    audit.log(db, user, "update" if before else "create", "empty_bags", m.id, audit.diff(before, empty_bag_snapshot(m)))
+    return await _commit(db, "empty_bags", rerender, "no_of_empty_bags")
 
 
-SAVERS = {"purchases": _save_purchase, "entries": _save_entry, "arrangements": _save_arrangement, "transfers": _save_transfer, "empty_bags": _save_movement}
+SAVERS = {"purchases": _save_purchase, "entries": _save_entry, "arrangements": _save_arrangement, "transfers": _save_transfer, "empty_bags": _save_empty_bag}

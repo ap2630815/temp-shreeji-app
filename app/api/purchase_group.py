@@ -1,6 +1,6 @@
 """Purchase group (one deal with the few farmers who gathered in a village) and the farmer entries inside it.
 
-A village has many purchase_group over time. The owner lists the farmers taking part (purchase_group_farmers); each listed
+A village has many purchase_group over time. The owner lists the farmers taking part (purchase_group_add_farmers); each listed
 farmer gets his own ledger of entries in that deal."""
 
 from datetime import date, timedelta
@@ -26,7 +26,6 @@ from app.services.ledger import entry_views, paid_for_entry, purchase_group_entr
 from app.services.locations import stored_locations
 from app.services.duplicates import DUPLICATE_MSG, find_duplicate
 from app.services.money import payable_amount, total_available_bags
-from app.services.stock import renumber_remaining
 from app.services.years import YearLockedError, allowed_years, assert_year_open, business_year_of, current_year_label, require_year_visible
 
 router = APIRouter(prefix="/PurchaseGroup")
@@ -358,14 +357,14 @@ async def _save_info(request: Request, purchase_group_id: int | None, user: User
         await roster.remove_farmers(db, user, p.id, removed, gone_entries)
     for fid in added:
         db.add(PurchaseGroupFarmer(purchase_group_id=p.id, farmer_id=fid, created_by=user_id))
-        audit.log(db, user, "create", "purchase_group_farmers", None, dict(purchase_group_id=p.id, farmer_id=fid))
+        audit.log(db, user, "create", "purchase_group_add_farmers", None, dict(purchase_group_id=p.id, farmer_id=fid))
     await db.flush()
     if before is not None:
         problem = await _reprice_entries(db, p)
         if problem:
             await db.rollback()
             return await rerender({"grain_rate_per_20kg": problem})
-    audit.log(db, user, "update" if before else "create", "purchase_group", p.id, audit.diff(before, purchase_group_snapshot(p)))
+    audit.log(db, user, "update" if before else "create", "purchase_groups", p.id, audit.diff(before, purchase_group_snapshot(p)))
     new_id = p.id
     try:
         await db.commit()
@@ -518,7 +517,7 @@ async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry
         return rerender({"borrowed_amount": (f"Cannot exceed the amount payable (₹ {new_payable})", f"ચૂકવવાપાત્ર રકમ (₹ {new_payable}) થી વધુ ન હોઈ શકે")})
 
     if (dup := await find_duplicate(db, clean["farmer_id"], clean["purchase_entry_date"], p.grain_id, p.grain_rate_per_20kg,
-                                    clean["no_of_filled_bags"], clean["extra_kilos"], ("purchase_farmers_entries", e.id) if e else None)):
+                                    clean["no_of_filled_bags"], clean["extra_kilos"], ("purchase_group_farmers_entries", e.id) if e else None)):
         return rerender({"no_of_filled_bags": DUPLICATE_MSG(dup)})
     before = None
     if e is not None:
@@ -526,7 +525,7 @@ async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry
         if new_payable - clean["borrowed_amount"] < paid:
             return rerender({"no_of_filled_bags": (f"₹ {paid} is already paid against this entry; the amount cannot go below that", f"આ એન્ટ્રી સામે ₹ {paid} ચૂકવાઈ ગયા છે; રકમ તેથી ઓછી ન થઈ શકે")})
         loaded = int(await db.scalar(select(func.coalesce(func.sum(FarmersTruckLoadLine.no_of_loaded_bags), 0)).where(FarmersTruckLoadLine.purchase_farmer_entry_id == e.id)))
-        loaded += int(await db.scalar(select(func.coalesce(func.sum(FarmerStockyardTransfer.no_of_bags), 0)).where(FarmerStockyardTransfer.purchase_farmer_entry_id == e.id)))
+        loaded += int(await db.scalar(select(func.coalesce(func.sum(FarmerStockyardTransfer.no_of_transferred_bags), 0)).where(FarmerStockyardTransfer.purchase_farmer_entry_id == e.id)))
         available = total_available_bags(clean["no_of_filled_bags"], clean["no_of_handful_bags"])
         if available < loaded:
             return rerender({"no_of_filled_bags": (f"{loaded} bags of this entry are already loaded on trucks or taken to a stockyard; the total cannot go below that", f"આ એન્ટ્રીની {loaded} બેગ ટ્રકમાં ભરાઈ કે સ્ટોકયાર્ડમાં લઈ જવાઈ ગઈ છે; કુલ તેથી ઓછી ન થઈ શકે")})
@@ -538,9 +537,7 @@ async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry
         db.add(e)
     recalc(e, p)
     await db.flush()
-    if before is not None:
-        await renumber_remaining(db, e.id)
-    audit.log(db, user, "update" if before else "create", "purchase_farmers_entries", e.id, audit.diff(before, entry_snapshot(e)))
+    audit.log(db, user, "update" if before else "create", "purchase_group_farmers_entries", e.id, audit.diff(before, entry_snapshot(e)))
     try:
         await db.commit()
     except IntegrityError:

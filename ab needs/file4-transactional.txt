@@ -161,7 +161,7 @@ farmer_id                   | INTEGER                  | NOT NULL, FOREIGN KEY -
 grain_id                    | INTEGER                  | NOT NULL, FOREIGN KEY -> grains.id
 grain_rate_per_20kg         | INTEGER                  | NOT NULL
 pay_after_no_of_days        | INTEGER                  | NOT NULL
-no_of_empty_bags            | INTEGER                  | NOT NULL, DEFAULT 0
+no_of_given_empty_bags      | INTEGER                  | NOT NULL, DEFAULT 0
 terms                       | TEXT                     | -
 business_year               | VARCHAR(7)               | NOT NULL
 description                 | TEXT                     | -
@@ -172,7 +172,7 @@ Table constraints / indexes:
   CHECK ck_stockyard_purchases_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
   CHECK ck_stockyard_purchases_rate_positive: grain_rate_per_20kg > 0
   CHECK ck_stockyard_purchases_pay_after: pay_after_no_of_days >= 0
-  CHECK ck_stockyard_purchases_no_of_empty_bags: no_of_empty_bags >= 0
+  CHECK ck_stockyard_purchases_no_of_given_empty_bags: no_of_given_empty_bags >= 0
   INDEX ix_stockyard_purchases_business_year (business_year)
   INDEX ix_stockyard_purchases_stockyard_id (stockyard_id)
   INDEX ix_stockyard_purchases_farmer_id (farmer_id)
@@ -192,6 +192,7 @@ no_of_filled_bags             | INTEGER                  | NOT NULL
 extra_kilos                   | INTEGER                  | NOT NULL, DEFAULT 0
 expected_raw_weight_per_bag   | FLOAT                    | NOT NULL (>= 0), starts at the grain's expected_raw_weight_per_bag, editable
 grain_quality_code            | TEXT                     | -
+no_of_received_empty_bags     | INTEGER                  | NOT NULL, DEFAULT stockyard_purchases.no_of_given_empty_bags - filled bags of ALL entries of that purchase - received bags of its OTHER entries (editable)
 payable_amount                | BIGINT                   | NOT NULL
 borrowed_amount               | BIGINT                   | NOT NULL, DEFAULT 0
 due_date                      | DATE                     | NOT NULL
@@ -199,6 +200,8 @@ business_year                 | VARCHAR(7)               | NOT NULL
 description                   | TEXT                     | -
 created_by                    | INTEGER                  | FOREIGN KEY -> users.id
 created_at                    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+IF no_of_received_empty_bags < 0 THEN open edit form for that stockyard_purchases
 
 Calculated by the application on save (grain and rate come from the stockyard_purchases row):
   payable_amount = ceil( (no_of_filled_bags * grain.net_bag_weight + extra_kilos) * grain_rate_per_20kg / 20 )
@@ -254,47 +257,45 @@ Table constraints / indexes:
 
 ==============================================================================
 
-TABLE: farmers_ledgers      (NOT stored: worked out on demand, one row per farmer purchase entry; app/services/stock.py)
+TABLE: farmers_bags_ledgers      (NOT stored: worked out on demand, one row per farmer purchase entry; app/services/stock.py)
 ------------------------------------------------------------------------------------------
-column                        | type                     | source / formula
+column                                | type                     | source / formula
 ------------------------------------------------------------------------------------------
-purchase_farmer_entry_id      | INTEGER                  | purchase_group_farmers_entries.id   (exactly one of the two ids is filled)
-purchase_individual_id        | INTEGER                  | purchase_individuals.id
-farmer_id                     | INTEGER                  | farmers.id
-grain_id                      | INTEGER                  | grain of the purchase group / purchase individual
-business_year                 | VARCHAR(7)               | of the entry
-total_available_bags          | INTEGER                  | bought = no_of_filled_bags + no_of_handful_bags
-loaded_bags                   | INTEGER                  | SUM(farmers_truck_load_lines.no_of_loaded_bags)           (filled on trucks)
-moved_to_stockyard_bags       | INTEGER                  | SUM(farmer_to_stockyard_transfers.no_of_bags)             (taken to a stockyard)
-remaining_bags                | INTEGER                  | total_available_bags - loaded_bags - moved_to_stockyard_bags   (still at the farmer's place)
+purchase_farmer_entry_id              | INTEGER                  | purchase_group_farmers_entries.id   (exactly one of the two ids is filled)
+purchase_individual_id                | INTEGER                  | purchase_individuals.id
+farmer_id                             | INTEGER                  | farmers.id
+grain_id                              | INTEGER                  | grain of the purchase group / purchase individual
+business_year                         | VARCHAR(7)               | of the entry
+total_available_bags                  | INTEGER                  | bought = no_of_filled_bags + no_of_handful_bags
+loaded_bags                           | INTEGER                  | SUM(farmers_truck_load_lines.no_of_loaded_bags)                (filled on trucks)
+moved_from_farmers_to_stockyard_bags  | INTEGER                  | SUM(farmer_to_stockyard_transfers.no_of_transferred_bags)      (taken to a stockyard)
+remaining_bags_at_farmer_house        | INTEGER                  | total_available_bags - loaded_bags - moved_from_farmers_to_stockyard_bags   (still at the farmer's place)
 
-farmers_truck_load_lines.total_remaining_bags = total_available_bags - moved_to_stockyard_bags - running sum of no_of_loaded_bags (lines in id order).
+farmers_truck_load_lines.total_remaining_bags (NOT stored, worked out on demand) = total_available_bags - moved_from_farmers_to_stockyard_bags - running sum of no_of_loaded_bags (lines in id order).
 Money side of the same farmer rows (payable, borrowed, net payable, paid, due, status, overdue) is the farmer payment ledger: see
 leder-entry.txt section A and formula.txt section 1.
-Screen: /StockyardPurchase?view=farmer_bags
+Screen: /PurchaseFarmers?view=bags
 
 ==============================================================================
 
-TABLE: stockyard_ledgers      (NOT stored: worked out on demand, one row per stockyard and grain; app/services/stockyard_stock.py)
+TABLE: stockyard_bags_ledgers         (NOT stored: worked out on demand, one row per stockyard and grain; app/services/stockyard_stock.py)
 ------------------------------------------------------------------------------------------
-column                        | type                     | source / formula
+column                                    | type                     | source / formula
 ------------------------------------------------------------------------------------------
-stockyard_id                  | INTEGER                  | stockyards.id
-grain_id                      | INTEGER                  | grains.id
-filled_bought_bags            | INTEGER                  | SUM(stockyard_purchase_entries.no_of_filled_bags)
-filled_from_farmers_bags      | INTEGER                  | SUM(farmer_to_stockyard_transfers.no_of_bags)
-filled_loaded_bags            | INTEGER                  | SUM(stockyard_truck_load_lines.no_of_loaded_bags)
-filled_in_stock               | INTEGER                  | filled_bought_bags + filled_from_farmers_bags - filled_loaded_bags
-empty_received_bags           | INTEGER                  | SUM(stockyard_empty_bag_movements.no_of_bags) where movement_type = 'received'
-empty_given_to_farmers_bags   | INTEGER                  | SUM(stockyard_empty_bag_movements.no_of_bags) where movement_type = 'given_to_farmer'
-empty_used_bags               | INTEGER                  | SUM over stockyard purchase entries of max(0, no_of_filled_bags - stockyard_purchases.no_of_empty_bags)
-empty_in_stock                | INTEGER                  | empty_received_bags - empty_given_to_farmers_bags - empty_used_bags
+stockyard_id                              | INTEGER                  | stockyards.id
+grain_id                                  | INTEGER                  | grains.id
+filled_bags_buying_at_stockyard_purchase  | INTEGER                  | SUM(stockyard_purchase_entries.no_of_filled_bags)
+filled_bags_from_farmers_to_stockyard     | INTEGER                  | SUM(farmer_to_stockyard_transfers.no_of_transferred_bags)
+filled_bags_loaded_from_stockyard         | INTEGER                  | SUM(stockyard_truck_load_lines.no_of_loaded_bags)
+filled_bags_remaining_in_stock            | INTEGER                  | filled_bags_buying_at_stockyard_purchase + filled_bags_from_farmers_to_stockyard - filled_bags_loaded_from_stockyard
+empty_bags_buying_at_bulk                 | INTEGER                  | SUM(empty_bags.no_of_empty_bags)
+empty_bags_moved_to_farmer_house          | INTEGER                  | SUM(empty_bag_movers_entries.no_of_empty_bags)   (NOT in the app yet: those entries have no stockyard / grain)
+empty_bags_given_to_stockyard_purchases   | INTEGER                  | SUM(stockyard_purchases.no_of_given_empty_bags)
+empty_bags_received_at_stockyard_purchase | INTEGER                  | SUM(stockyard_purchase_entries.no_of_received_empty_bags)
+empty_bags_received_error                 | INTEGER                  | per purchase: no_of_given_empty_bags - SUM(entries.no_of_filled_bags) - SUM(entries.no_of_received_empty_bags), added up over the purchases
+empty_bags_remaining_in_stock             | INTEGER                  | empty_bags_buying_at_bulk - empty_bags_moved_to_farmer_house - empty_bags_given_to_stockyard_purchases + empty_bags_received_at_stockyard_purchase
 
-Each purchase entry is compared on its own; only stockyard purchase entries use the empty-bag pool this way.
 A save that would leave filled or empty bags below zero is refused (unless the balance was already negative and did not get worse).
-stockyard_empty_bag_movements is the one stored table behind the empty side: id, movement_date, stockyard_id, grain_id,
-movement_type ('received' | 'given_to_farmer'), farmer_id (NULL for received, required for given_to_farmer), no_of_bags (> 0),
-business_year, description, created_by, created_at.
 Screen: /StockyardPurchase?view=stock
 
 ==============================================================================
@@ -308,19 +309,45 @@ transfer_date                 | DATE                     | NOT NULL
 purchase_farmer_entry_id      | INTEGER                  | NULL, FOREIGN KEY -> purchase_group_farmers_entries.id
 purchase_individual_id        | INTEGER                  | NULL, FOREIGN KEY -> purchase_individuals.id
 stockyard_id                  | INTEGER                  | NOT NULL, FOREIGN KEY -> stockyards.id
-no_of_bags                    | INTEGER                  | NOT NULL (> 0)
+no_of_transferred_bags        | INTEGER                  | NOT NULL (> 0)
 business_year                 | VARCHAR(7)               | NOT NULL
 description                   | TEXT                     | -
 created_by                    | INTEGER                  | FOREIGN KEY -> users.id
 created_at                    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Exactly one of purchase_farmer_entry_id / purchase_individual_id is filled (the farmer purchase the bags come from).
-no_of_bags <= bags still at the farmer (total_available_bags - loaded on trucks - taken to a stockyard). The grain is the entry's grain.
+no_of_transferred_bags <= bags still at the farmer (total_available_bags - loaded on trucks - taken to a stockyard). The grain is the entry's grain.
 
 Table constraints / indexes:
   CHECK ck_farmer_stockyard_transfers_business_year_format, ck_farmer_stockyard_transfers_no_of_bags (> 0),
         ck_farmer_stockyard_transfers_one_source
   INDEX on business_year, purchase_farmer_entry_id, purchase_individual_id, stockyard_id
+
+==============================================================================
+
+TABLE: empty_bags
+------------------------------------------------------------------------------------------
+column                      | type                     | constraints
+------------------------------------------------------------------------------------------
+id                          | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+empty_bags_entry_date       | DATE                     | NOT NULL
+stockyard_id                | INTEGER                  | NOT NULL, FOREIGN KEY -> stockyards.id
+grain_id                    | INTEGER                  | NOT NULL, FOREIGN KEY -> grains.id
+empty_bag_seller_id         | INTEGER                  | NULL, FOREIGN KEY -> empty_bag_sellers.id
+empty_bag_mover_id          | INTEGER                  | NULL, FOREIGN KEY -> empty_bag_movers.id
+no_of_empty_bags            | INTEGER                  | NOT NULL 
+business_year               | VARCHAR(7)               | NOT NULL
+description                 | TEXT                     | -
+created_by                  | INTEGER                  | FOREIGN KEY -> users.id
+created_at                  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+
+Table constraints / indexes:
+  CHECK ck_empty_bags_no_of_empty_bags: no_of_empty_bags > 0
+  INDEX ix_empty_bags_business_year (business_year)
+  INDEX ix_empty_bags_empty_bag_seller_id (empty_bag_seller_id)
+  INDEX ix_empty_bags_empty_bag_mover_id (empty_bag_mover_id)
+  INDEX ix_empty_bags_stockyard_id (stockyard_id)
+  INDEX ix_empty_bags_grain_id (grain_id)
 
 ==============================================================================
 
@@ -391,11 +418,9 @@ trip_id                  | INTEGER | NOT NULL, FOREIGN KEY -> truck_trips.id
 purchase_farmer_entry_id | INTEGER | NULL, FOREIGN KEY -> purchase_group_farmers_entries.id
 purchase_individual_id   | INTEGER | NULL, FOREIGN KEY -> purchase_individuals.id  (exactly one of the two is filled)
 no_of_loaded_bags        | INTEGER | NOT NULL
-total_remaining_bags     | INTEGER | NOT NULL
 
 Table constraints / indexes:
   CHECK ck_farmers_truck_load_lines_no_of_loaded_bags: no_of_loaded_bags > 0
-  CHECK ck_farmers_truck_load_lines_total_remaining_bags: total_remaining_bags >= 0
   INDEX ix_farmers_truck_load_lines_purchase_farmer_entry_id (purchase_farmer_entry_id)
   UNIQUE uq_farmers_truck_load_lines_trip_entry (trip_id, purchase_farmer_entry_id)
 
@@ -482,7 +507,7 @@ Table constraints / indexes:
 ** empty_bag_supplies
 ==============================================================================
 
-TABLE: empty_bag_sellers (tab:1)
+TABLE: empty_bag_sellers_entries (tab:1)
 -------------------------------------------------------------------------------------
 column               | type                     | constraints
 -------------------------------------------------------------------------------------
@@ -507,7 +532,7 @@ Table constraints / indexes:
 
 ==============================================================================
 
-TABLE: empty_bag_movers (tab:2)
+TABLE: empty_bag_movers_entries (tab:2)
 -------------------------------------------------------------------------------------
 column               | type                     | constraints
 -------------------------------------------------------------------------------------
@@ -531,27 +556,18 @@ Table constraints / indexes:
 
 ==============================================================================
 
-TABLE: empty_bag_storage_by_farmers (tab:3)
+TABLE: empty_bag_storage_by_farmer_ledgers (tab:3)      (NOT stored: worked out on demand, one row per farmer; app/api/costs.py, bag_list)
 -------------------------------------------------------------------------------------
-column                     | type                     | constraints
+column                     | type                     | source / formula
 -------------------------------------------------------------------------------------
-id                         | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-empty_bag_seller_id        | INTEGER                  | NOT NULL, FOREIGN KEY -> empty_bag_sellers.id
-empty_bag_mover_id         | INTEGER                  | NOT NULL, FOREIGN KEY -> empty_bag_movers.id
-farmer_id                  | INTEGER                  | NOT NULL, FOREIGN KEY -> farmers.id
-total_available_empty_bags | INTEGER                  | NOT NULL  (addition of no_of_empty_bags from empty_bag_sellers & empty_bag_movers)
-business_year              | VARCHAR(7)               | NOT NULL
-description                | TEXT                     | -
-created_by                 | INTEGER                  | FOREIGN KEY -> users.id
-created_at                 | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+farmer_id                  | INTEGER                  | farmers.id (every farmer who has a seller or mover row in the year)
+business_year              | VARCHAR(7)               | of the rows added up
+from_sellers_bags          | INTEGER                  | SUM(empty_bag_sellers_entries.no_of_empty_bags)   (bought direct from sellers)
+from_movers_bags           | INTEGER                  | SUM(empty_bag_movers_entries.no_of_empty_bags)    (moved from a stockyard)
+total_available_empty_bags | INTEGER                  | from_sellers_bags + from_movers_bags
+sellers / movers           | TEXT                     | pet names of the sellers and movers behind the totals
 
-Table constraints / indexes:
-  CHECK ck_empty_bag_storage_by_farmers_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
-  INDEX ix_empty_bag_storage_by_farmers_business_year (business_year)
-  CHECK ck_empty_bag_storage_by_farmers_positive: total_available_empty_bags > 0
-  INDEX ix_empty_bag_storage_by_farmers_empty_bag_seller_id (empty_bag_seller_id)
-  INDEX ix_empty_bag_storage_by_farmers_empty_bag_mover_id (empty_bag_mover_id)
-  INDEX ix_empty_bag_storage_by_farmers_farmer_id (farmer_id)
+Screen: /EmptyBags?view=storage (the Sellers and Movers tabs hold the stored rows; this tab only adds them up per farmer).
 
 ==============================================================================
 

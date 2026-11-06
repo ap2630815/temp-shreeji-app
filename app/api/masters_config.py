@@ -146,10 +146,25 @@ _add(Spec(
 ))
 
 _add(Spec(
-    slug="BagSuppliers", model=models.BagSupplier, label=("Bag Supplier", "બારદાન સપ્લાયર"),
+    slug="EmptyBagSellers", model=models.EmptyBagSeller, label=("Empty Bag Seller", "ખાલી બારદાન વેચનાર"),
     fields=(
         *_name_pair("Full name (surname, name, father)", "પૂરું નામ (અટક, નામ, પિતા)", max_length=120),
         F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=30),
+        F("pet_name_gu", "Pet name (Gujarati)", "ટૂંકું નામ (ગુજરાતી)", max_length=30),
+        _mobile("mobile", "Mobile", "મોબાઇલ"),
+        _upi(),
+        F("description", "Description", "વર્ણન", kind="textarea"),
+    ),
+    list_columns=("name", "pet_name", "mobile"),
+    search_columns=("name", "name_gu", "pet_name", "mobile"),
+))
+
+_add(Spec(
+    slug="EmptyBagMovers", model=models.EmptyBagMover, label=("Empty Bag Mover", "ખાલી બારદાન મૂવર"),
+    fields=(
+        *_name_pair("Full name (surname, name, father)", "પૂરું નામ (અટક, નામ, પિતા)", max_length=120),
+        F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=30),
+        F("pet_name_gu", "Pet name (Gujarati)", "ટૂંકું નામ (ગુજરાતી)", max_length=30),
         _mobile("mobile", "Mobile", "મોબાઇલ"),
         _upi(),
         F("description", "Description", "વર્ણન", kind="textarea"),
@@ -163,6 +178,7 @@ _add(Spec(
     fields=(
         F("transporter_name", "Transport name", "ટ્રાન્સપોર્ટનું નામ", required=True, max_length=120),
         F("pet_name", "Pet name", "ટૂંકું નામ", required=True, max_length=30),
+        F("pet_name_gu", "Pet name (Gujarati)", "ટૂંકું નામ (ગુજરાતી)", required=True, max_length=30),
         F("location", "Location", "સ્થળ", required=True, max_length=60),
         F("owner_name", "Owner name (surname, name, father)", "માલિકનું નામ (અટક, નામ, પિતા)", required=True, max_length=120),
         F("owner_name_gu", "Owner name (Gujarati)", "માલિકનું નામ (ગુજરાતી)", max_length=120),
@@ -195,9 +211,9 @@ _add(Spec(
 _add(Spec(
     slug="Industries", model=models.Industry, label=("Industry", "ઉદ્યોગ"),
     fields=(
-        *_name_pair("Industry name", "ઉદ્યોગનું નામ", name="industrialist_name", max_length=120),
-        F("owner_name", "Owner name", "માલિકનું નામ", required=True, max_length=120),
-        _mobile("owner_mobile", "Owner mobile", "માલિકનો મોબાઇલ"),
+        *_name_pair("Industry name", "ઉદ્યોગનું નામ", name="industry_name", max_length=120),
+        F("industry_owner_name", "Owner name", "માલિકનું નામ", required=True, max_length=120),
+        _mobile("industry_owner_mobile", "Owner mobile", "માલિકનો મોબાઇલ"),
         F("supervisor_name", "Supervisor name", "સુપરવાઇઝરનું નામ", required=True, max_length=120),
         _mobile("supervisor_mobile", "Supervisor mobile", "સુપરવાઇઝરનો મોબાઇલ"),
         F("grain", "Grain", "અનાજ", required=True, max_length=60),
@@ -205,9 +221,9 @@ _add(Spec(
         F("quality_expectation", "Quality expectation", "ગુણવત્તાની અપેક્ષા", kind="textarea"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ),
-    list_columns=("industrialist_name", "grain", "location", "supervisor_mobile"),
-    search_columns=("industrialist_name", "industrialist_name_gu", "owner_name", "supervisor_name", "grain", "location"),
-    order_by="industrialist_name",
+    list_columns=("industry_name", "grain", "location", "supervisor_mobile"),
+    search_columns=("industry_name", "industry_name_gu", "industry_owner_name", "supervisor_name", "grain", "location"),
+    order_by="industry_name",
 ))
 
 _add(Spec(
@@ -241,8 +257,8 @@ _add(Spec(
         F("bank_branch", "Branch name", "શાખાનું નામ", max_length=30),
         F("ifsc_code", "IFSC code", "IFSC કોડ", pattern=IFSC, hint=("e.g. SBIN0001234", "દા.ત. SBIN0001234"),
           max_length=11, normalize="upper"),
-        F("public_figure", "Public figure / influence", "જાહેર વ્યક્તિ / પ્રભાવ", kind="textarea"),
-        F("description", "Private note (owner only)", "ખાનગી નોંધ (ફક્ત માલિક)", kind="textarea", owner_only=True),
+        F("private_note_owner_only", "Private note (owner only)", "ખાનગી નોંધ (ફક્ત માલિક)", kind="textarea", owner_only=True),
+        F("description", "Description", "વર્ણન", kind="textarea"),
     ),
     list_columns=("farmer_name", "village.village_name", "mobile", "head_of_family"),
     search_columns=("farmer_name", "farmer_name_gu", "mobile"),
@@ -272,7 +288,7 @@ _add(Spec(
         F("loading_rate", "Loading rate (₹ per bag)", "લોડિંગ દર (₹ બેગ દીઠ)", kind="int", required=True),
         F("pulling_rate", "Pulling rate (₹ per bag)", "ખેંચાઈ દર (₹ બેગ દીઠ)", kind="int", required=True),
         F("mixing_rate", "Mixing rate (₹ per bag)", "મિક્સિંગ દર (₹ બેગ દીઠ)", kind="int", required=True),
-        F("other_expenses", "Other expenses (₹)", "અન્ય ખર્ચ (₹)", kind="int"),
+        F("other_rate", "Other rate (₹)", "અન્ય ભાવ (₹)", kind="int"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ),
     list_columns=("labour_group.group_name", "grain.grain_name", "weighing_rate", "loading_rate", "pulling_rate", "mixing_rate"),

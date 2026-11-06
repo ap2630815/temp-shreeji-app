@@ -8,7 +8,7 @@ percentage deduction, which is rounded half-up.
 Notation: ceil(a / b) = -(-a // b)
 
 
-1. PURCHASE FROM FARMER  (purchase_farmers_entries, purchase_individuals)
+1. PURCHASE FROM FARMER  (purchase_group_farmers_entries, purchase_individuals)
 -------------------------------------------------------------------------
 total_kg              = no_of_filled_bags * grain.net_bag_weight + extra_kilos
 payable_amount        = ceil( total_kg * grain_rate_per_20kg / 20 )
@@ -28,7 +28,7 @@ Rules: borrowed_amount <= payable_amount;  net_payable must stay >= paid.
 2. STOCK / LOADING  (app/services/stock.py)
 -------------------------------------------
 bought (per entry)            = total_available_bags
-loaded (per entry)            = SUM(truck_load_lines.no_of_loaded_bags)
+loaded (per entry)            = SUM(farmers_truck_load_lines.no_of_loaded_bags)
 available                     = bought - loaded
 total_remaining_bags (line)   = total_available_bags - running sum of no_of_loaded_bags
                                 (lines of the entry taken in id order)
@@ -90,9 +90,9 @@ petrol, meal          = business cost; NOT deducted from the labour group
 Rule: borrowing_amount <= payable_amount.
 
 
-8. BAG SUPPLY  (bag_supplies)
+8. EMPTY BAG SELLER ENTRY  (empty_bag_sellers_entries)
 -----------------------------
-payable_amount        = rate_per_bag * no_of_bags
+payable_amount        = rate_per_bag * no_of_empty_bags
 (a business cost, never deducted from the farmer)
 
 
@@ -156,28 +156,32 @@ Stockyard payments are not part of Payables yet: payable_amount / net_payable ar
 
 Stockyard bag ledgers (nothing stored; app/services/stockyard_stock.py), per stockyard and grain:
 filled bags in stock  = SUM(stockyard_purchase_entries.no_of_filled_bags)
-                        + SUM(farmer_stockyard_transfers.no_of_bags)
-                        - SUM(stockyard_load_lines.no_of_loaded_bags)
-empty bags used       = SUM over stockyard purchase entries of max(0, entry.no_of_filled_bags - stockyard_purchases.no_of_empty_bags)
-                        i.e. when an entry's filled bags are more than the empty bags given on its purchase, the extra empty bags
-                        are taken from the stockyard's own empty bags (each entry on its own; only stockyard purchase entries use the pool)
-empty bags in stock   = SUM(movements 'received') - SUM(movements 'given_to_farmer') - empty bags used (above)
+                        + SUM(farmer_to_stockyard_transfers.no_of_transferred_bags)
+                        - SUM(stockyard_truck_load_lines.no_of_loaded_bags)
+empty bags in stock   = SUM(empty_bags.no_of_empty_bags)                        (bought into the stockyard)
+                        - SUM(stockyard_purchases.no_of_given_empty_bags)         (handed to the farmer to fill)
+                        + SUM(stockyard_purchase_entries.no_of_received_empty_bags) (returned by the farmer)
+no_of_received_empty_bags of an entry starts at (given bags of its purchase) - (filled bags of ALL the purchase's entries, this one included)
+                        - (received bags of the purchase's OTHER entries); the farmer can edit it. If the start value is below zero the entry is
+                        not saved: the purchase opens for editing at "Empty bags given".
+received error (information only, not in the stock) = per purchase: given - filled - received, summed per stockyard and grain
+Not in the app's empty-bag stock yet: bags moved to farmer houses by movers (empty_bag_movers_entries has no stockyard / grain to subtract them from).
 A save that would leave filled or empty bags below zero is refused (unless the balance was already negative and did not get worse).
 
-Farmer bags (per farmer entry, either purchase_farmers_entries or purchase_individuals):
+Farmer bags (per farmer entry, either purchase_group_farmers_entries or purchase_individuals):
 bought     = total_available_bags
-loaded     = SUM(truck_load_lines.no_of_loaded_bags)
-moved      = SUM(farmer_stockyard_transfers.no_of_bags)          (taken to a stockyard)
+loaded     = SUM(farmers_truck_load_lines.no_of_loaded_bags)
+moved      = SUM(farmer_to_stockyard_transfers.no_of_transferred_bags)          (taken to a stockyard)
 available  = bought - loaded - moved                              (the bags still at the farmer's place)
-truck_load_lines.total_remaining_bags = total_available_bags - moved - running sum of loaded bags (lines in id order)
+farmers_truck_load_lines.total_remaining_bags (not stored, worked out on demand) = total_available_bags - moved - running sum of loaded bags (lines in id order)
 
 Bag movements:
-filled bags : farmer -> truck (truck_load_lines), farmer -> stockyard (farmer_stockyard_transfers), stockyard -> truck (stockyard_load_lines)
-empty bags  : stockyard -> farmer (movement 'given_to_farmer'), used at the stockyard by stockyard purchase entries (formula above)
-total_bags_in_truck (trip) = SUM(truck_load_lines) + SUM(stockyard_load_lines); expected loaded weight also counts the stockyard lines:
-    stockyard_load_lines.expected_raw_weight_per_bag starts at grains.expected_raw_weight_per_bag (filled in when the trip's
+filled bags : farmer -> truck (farmers_truck_load_lines), farmer -> stockyard (farmer_to_stockyard_transfers), stockyard -> truck (stockyard_truck_load_lines)
+empty bags  : bought into the stockyard (empty_bags), given to the farmer on a stockyard purchase and received back on its entries (formula above)
+total_bags_in_truck (trip) = SUM(farmers_truck_load_lines) + SUM(stockyard_truck_load_lines); expected loaded weight also counts the stockyard lines:
+    stockyard_truck_load_lines.expected_raw_weight_per_bag starts at grains.expected_raw_weight_per_bag (filled in when the trip's
     grain is known) and can be edited while adding the line; required for every stockyard line.
 
-Storage place: purchase_farmers_entries / purchase_individuals.grain_stored_location. The drop-down lists the distinct places used so far;
+Storage place: purchase_group_farmers_entries / purchase_individuals.grain_stored_location. The drop-down lists the distinct places used so far;
 text in brackets is ignored when comparing, e.g. "Godown (behind shop)" and "godown" are one place.
 

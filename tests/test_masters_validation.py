@@ -70,8 +70,9 @@ def test_labour_wage_rates_required():
 
 def test_owner_only_field_ignored_for_accountant():
     spec = SPECS["Farmers"]
-    data = normalize(spec, dict(farmer_name="X Y Z", head_of_family="Self", description="secret"), include_owner_only=False)
-    assert "description" not in data
+    data = normalize(spec, dict(farmer_name="X Y Z", head_of_family="Self", private_note_owner_only="secret", description="open"), include_owner_only=False)
+    assert "private_note_owner_only" not in data  # only the owner sees and saves the private note
+    assert data["description"] == "open"
 
 
 def test_every_list_column_has_a_field():

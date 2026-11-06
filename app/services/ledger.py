@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import PurchaseIndividual, PaymentAllocation, PurchaseFarmerEntry
 
-FARMER = "farmer"  # payments.party_type for farmers; payment_allocations.payable_type for purchase_farmers_entries
+FARMER = "farmer"  # payments.party_type for farmers; payment_allocations.payable_type for purchase_group_farmers_entries
 DIRECT = "purchase_individual"  # payment_allocations.payable_type for purchase_individuals
 
 

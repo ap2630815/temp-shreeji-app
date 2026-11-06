@@ -41,14 +41,14 @@ class BookingIn(BaseModel):
 async def booking_fields(db: AsyncSession, grain_id: int = 0) -> list[F]:
     brokerages = list((await db.scalars(select(Brokerage).where(*([Brokerage.grain_id == grain_id] if grain_id else [])))).unique().all())
     brokerages.sort(key=lambda b: (b.broker.broker_name, b.grain.grain_name))
-    industries = list((await db.scalars(select(Industry).order_by(Industry.industrialist_name))).all())
+    industries = list((await db.scalars(select(Industry).order_by(Industry.industry_name))).all())
     return [
         F("booking_date", "Booking date", "બુકિંગ તારીખ", kind="date", required=True),
         F("brokerage_id", "Broker & grain", "દલાલ અને અનાજ", kind="select", required=True,
           options=tuple((str(b.id), f"{b.broker.broker_name} — {b.grain.grain_name} — ₹{b.brokerage_per_bag}/bag") for b in brokerages),
           help=("Set up in Masters → Brokerage", "માસ્ટર્સ → દલાલીમાં નક્કી કરો")),
         F("industry_id", "Industry", "ઉદ્યોગ", kind="select", required=True,
-          options=tuple((str(i.id), f"{i.industrialist_name} — {i.location}") for i in industries)),
+          options=tuple((str(i.id), f"{i.industry_name} — {i.location}") for i in industries)),
         F("grain_rate_per_booking_weight", "Rate per booking weight (₹)", "બુકિંગ વજન દીઠ ભાવ (₹)", kind="int", required=True,
           help=("Per the grain's booking weight (20 or 100 kg)", "અનાજના બુકિંગ વજન (20 અથવા 100 કિલો) દીઠ")),
         F("truck_size", "Truck size (tons)", "ટ્રકની સાઇઝ (ટન)", kind="choice", required=True, choices=TRUCK_SIZES),

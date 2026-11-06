@@ -12,15 +12,15 @@ from app.models.transactions import BUSINESS_YEAR
 
 class Payment(TimestampMixin, Base):
     """Every rupee paid out, with who received it. party_type picks the table party_id points to:
-    farmer -> farmers (his payments are allocated to purchase_farmers_entries or, as 'purchase_individual', to purchase_individuals), truck -> trucks (paid to the truck owner), labour_group -> labour_groups,
-    bag_supplier -> bag_suppliers, broker -> brokers."""
+    farmer -> farmers (his payments are allocated to purchase_group_farmers_entries or, as 'purchase_individual', to purchase_individuals), truck -> trucks (paid to the truck owner), labour_group -> labour_groups,
+    empty_bag_seller -> empty_bag_sellers, broker -> brokers."""
 
     __tablename__ = "payments"
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_payments_amount_positive"),
         CheckConstraint("method IN ('cash', 'cheque', 'upi', 'bank')", name="ck_payments_method"),
         CheckConstraint("receiver_mobile ~ '^[0-9]{10}$'", name="ck_payments_receiver_mobile"),
-        CheckConstraint("party_type IN ('farmer', 'truck', 'labour_group', 'bag_supplier', 'broker')", name="ck_payments_party_type"),
+        CheckConstraint("party_type IN ('farmer', 'truck', 'labour_group', 'empty_bag_seller', 'broker')", name="ck_payments_party_type"),
         CheckConstraint("status IN ('partial', 'final', 'complete')", name="ck_payments_status"),
         CheckConstraint(f"business_year ~ '{BUSINESS_YEAR}'", name="ck_payments_business_year_format"),
         Index("ix_payments_business_year", "business_year"),
@@ -48,7 +48,7 @@ class PaymentAllocation(Base):
     __tablename__ = "payment_allocations"
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_alloc_amount_positive"),
-        CheckConstraint("payable_type IN ('farmer', 'purchase_individual', 'truck', 'labour_group', 'bag_supplier', 'broker')", name="ck_alloc_payable_type"),
+        CheckConstraint("payable_type IN ('farmer', 'purchase_individual', 'truck', 'labour_group', 'empty_bag_seller', 'broker')", name="ck_alloc_payable_type"),
         Index("ix_alloc_payable", "payable_type", "payable_id"),
     )
 

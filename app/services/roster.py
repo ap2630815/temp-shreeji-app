@@ -1,6 +1,6 @@
 """The farmers listed on a purchase_group (one deal with the few farmers who gathered in a village).
 
-Only ledger entries (purchase_farmers_entries) hang off a listed farmer at this stage, so taking a farmer off the list
+Only ledger entries (purchase_group_farmers_entries) hang off a listed farmer at this stage, so taking a farmer off the list
 simply deletes his entries in that purchase. If an entry has already been used by a later step (loaded on a truck or paid),
 the farmer cannot be removed: that is reported on the form, nothing is deleted."""
 
@@ -59,11 +59,11 @@ async def in_use(db: AsyncSession, entries: list[PurchaseFarmerEntry]) -> list[F
 async def remove_farmers(db: AsyncSession, user: User, purchase_group_id: int, farmer_ids: list[int], entries: list[PurchaseFarmerEntry]) -> None:
     """Delete the farmers' entries in this purchase and take them off the list. Caller commits."""
     for e in entries:
-        audit.log(db, user, "delete", "purchase_farmers_entries", e.id, dict(farmer_id=e.farmer_id, no_of_filled_bags=e.no_of_filled_bags, payable_amount=e.payable_amount,
+        audit.log(db, user, "delete", "purchase_group_farmers_entries", e.id, dict(farmer_id=e.farmer_id, no_of_filled_bags=e.no_of_filled_bags, payable_amount=e.payable_amount,
                                                                               reason="farmer removed from purchase_group"))
         await db.delete(e)
     await db.flush()
     for row in (await db.scalars(select(PurchaseGroupFarmer).where(PurchaseGroupFarmer.purchase_group_id == purchase_group_id, PurchaseGroupFarmer.farmer_id.in_(farmer_ids)))).unique().all():
-        audit.log(db, user, "delete", "purchase_group_farmers", row.id, dict(purchase_group_id=purchase_group_id, farmer_id=row.farmer_id))
+        audit.log(db, user, "delete", "purchase_group_add_farmers", row.id, dict(purchase_group_id=purchase_group_id, farmer_id=row.farmer_id))
         await db.delete(row)
     await db.flush()

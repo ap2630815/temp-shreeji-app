@@ -105,7 +105,7 @@ description           | TEXT                     | -
 created_at            | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_owner_mobile_10_digits: owner_mobile ~ '^[0-9]{10}$'
+  CHECK ck_owner_mobile_10_digits: industry_owner_mobile ~ '^[0-9]{10}$'
   CHECK ck_supervisor_mobile_10_digits: supervisor_mobile ~ '^[0-9]{10}$'
 
 ==============================================================================

@@ -16,7 +16,7 @@ from sqlalchemy import delete, select
 
 from app.core.db import SessionLocal, engine
 from app.models import (
-    AuditLog, BagSupplier, BagSupply, Bilty, Broker, BrokerBooking, Brokerage, PurchaseIndividual, Farmer, Grain, Industry, Labour, LabourGroup, LabourGroupWage,
+    AuditLog, EmptyBagSeller, EmptyBagSellerEntry, Bilty, Broker, BrokerBooking, Brokerage, PurchaseIndividual, Farmer, Grain, Industry, Labour, LabourGroup, LabourGroupWage,
     LabourWork, Payment, PaymentAllocation, PurchaseFarmerEntry, PurchaseGroup, PurchaseGroupFarmer, Receipt, ReceiptAllocation, Transporter, Truck, FarmersTruckLoadLine,
     TruckTrip, User, Village,
 )
@@ -89,11 +89,11 @@ async def seed() -> None:
                           head_of_family=(FARMERS[(i + 3) % N][0] if i % 4 == 0 else None), upi_number=mobile(1, i) if i % 2 == 0 else None,
                           house=f"Near {['school', 'temple', 'panchayat', 'water tank'][i % 4]}", bank_name="State Bank of India" if i % 3 == 0 else None)
                    for i, (n, g) in enumerate(FARMERS)]
-        suppliers = [BagSupplier(name=o, pet_name=p, mobile=mobile(2, i), upi_number=mobile(2, i)) for i, (p, o) in enumerate(BAG_SUPPLIERS)]
-        transporters = [Transporter(transporter_name=n, pet_name=p, location=loc, owner_name=f"{p} Owner", mobile=mobile(4, i)) for i, (n, p, loc) in enumerate(TRANSPORTERS)]
+        suppliers = [EmptyBagSeller(name=o, pet_name=p, mobile=mobile(2, i), upi_number=mobile(2, i)) for i, (p, o) in enumerate(BAG_SUPPLIERS)]
+        transporters = [Transporter(transporter_name=n, pet_name=p, pet_name_gu=p, location=loc, owner_name=f"{p} Owner", mobile=mobile(4, i)) for i, (n, p, loc) in enumerate(TRANSPORTERS)]
         trucks = [Truck(truck_number=tn, truck_owner_name=f"{TRANSPORTERS[i][1]} Owner", truck_owner_mobile=mobile(5, i), driver_name=f"Driver {i + 1} {['Ahir', 'Rabari', 'Kathi', 'Bharwad'][i % 4]}",
                         driver_mobile=mobile(6, i)) for i, tn in enumerate(TRUCKS)]
-        industries = [Industry(industrialist_name=n, industrialist_name_gu=g, owner_name=f"{n.split()[0]} Owner", owner_mobile=mobile(7, i), supervisor_name=f"Supervisor {i + 1}",
+        industries = [Industry(industry_name=n, industry_name_gu=g, industry_owner_name=f"{n.split()[0]} Owner", industry_owner_mobile=mobile(7, i), supervisor_name=f"Supervisor {i + 1}",
                                supervisor_mobile=mobile(8, i), grain=p, location=loc, quality_expectation="FAQ grade, moisture below 12%") for i, (n, g, p, loc) in enumerate(INDUSTRIES)]
         brokers = [Broker(broker_name=n, broker_name_gu=g, mobile=mobile(9, i), upi_number=mobile(9, i)) for i, (n, g) in enumerate(BROKERS)]
         db.add_all(farmers + suppliers + transporters + trucks + industries + brokers)
@@ -101,7 +101,7 @@ async def seed() -> None:
         labours = [Labour(labour_name=ld, labour_group_id=labour[i].id, mobile=mobile(3, i)) for i, (_, _, ld) in enumerate(LABOUR)]
         brokerages = [Brokerage(broker_id=brokers[i].id, grain_id=grains[i].id, brokerage_per_bag=rng.randint(2, 8), description="Demo brokerage") for i in range(N)]
         wages = [LabourGroupWage(labour_group_id=labour[i].id, grain_id=grains[i].id, weighing_rate=rng.randint(1, 3), loading_rate=rng.randint(2, 5),
-                                 pulling_rate=rng.randint(1, 4), mixing_rate=rng.randint(1, 3), other_expenses=rng.choice([None, 0, 200]), description="Demo wages") for i in range(N)]
+                                 pulling_rate=rng.randint(1, 4), mixing_rate=rng.randint(1, 3), other_rate=rng.choice([None, 0, 200]), description="Demo wages") for i in range(N)]
         db.add_all(labours + brokerages + wages)
         await db.flush()
         masters = dict(villages=villages, grains=grains, labour_groups=labour, farmers=farmers, bag_suppliers=suppliers, transporters=transporters, trucks=trucks,
@@ -190,7 +190,7 @@ async def seed() -> None:
         await db.flush()
         for i, t in enumerate(trips):
             bags = int(entries[i].total_available_bags * 0.8)
-            lines.append(FarmersTruckLoadLine(trip_id=t.id, purchase_farmer_entry_id=entries[i].id, no_of_loaded_bags=bags, total_remaining_bags=entries[i].total_available_bags - bags))
+            lines.append(FarmersTruckLoadLine(trip_id=t.id, purchase_farmer_entry_id=entries[i].id, no_of_loaded_bags=bags))
         db.add_all(lines)
         await db.flush()
         ids["truck_trips"], ids["truck_load_lines"] = [t.id for t in trips], [ln.id for ln in lines]
@@ -225,17 +225,17 @@ async def seed() -> None:
             borrow = rng.choice([0, 0, 500, 1000])
             work.append(LabourWork(labour_group_id=labour[i].id, work_date=day(5 - i % 5), business_year=business_year_of(day(5 - i % 5)), payable_amount=w,
                                    borrowing_amount=min(borrow, w), petrol=rng.choice([0, 200, 300, 500]), meal=rng.choice([0, 150, 250]), description="Demo labour work", created_by=user.id))
-        bags = [BagSupply(supplier_id=suppliers[i].id, farmer_id=farmers[i].id, supply_date=day(6), business_year=business_year_of(day(6)), rate_per_bag=rng.randint(12, 25),
-                          no_of_bags=rng.randrange(200, 600, 50), payable_amount=0, description="Demo bag supply", created_by=user.id) for i in range(N)]
+        bags = [EmptyBagSellerEntry(empty_bag_seller_id=suppliers[i].id, farmer_id=farmers[i].id, selling_date=day(6), business_year=business_year_of(day(6)), rate_per_bag=rng.randint(12, 25),
+                          no_of_empty_bags=rng.randrange(200, 600, 50), payable_amount=0, description="Demo bag supply", created_by=user.id) for i in range(N)]
         for b in bags:
-            b.payable_amount = b.rate_per_bag * b.no_of_bags
+            b.payable_amount = b.rate_per_bag * b.no_of_empty_bags
         db.add_all(work + bags)
         await db.flush()
-        ids["labour_work"], ids["bag_supplies"] = [w.id for w in work], [b.id for b in bags]
+        ids["labour_work"], ids["empty_bag_sellers_entries"] = [w.id for w in work], [b.id for b in bags]
         for w in work:
             stamp(db, user, "labour_work", w)
         for b in bags:
-            stamp(db, user, "bag_supplies", b)
+            stamp(db, user, "empty_bag_sellers_entries", b)
         await db.commit()
 
         # ---- receipts (money in): partial, oldest weighed bilty first, spread over the industries
@@ -252,7 +252,7 @@ async def seed() -> None:
             method, tag = methods[k % 3]
             r = await rec_svc.record_receipt(db, user, ind.id, dict(
                 receipt_date=day(rng.randint(0, 2)), amount=amount, method=method, reference_no=None if method == "cash" else f"{tag}{rng.randint(100000, 999999)}",
-                payer_name=ind.owner_name, description="Demo receipt"))
+                payer_name=ind.industry_owner_name, description="Demo receipt"))
             await db.commit()
             receipt_ids.append(r.id)
             k += 1
@@ -260,7 +260,7 @@ async def seed() -> None:
 
         # ---- payments (money out): 4 farmers, 3 truck owners, 1 broker, 1 labour group, 1 bag supplier
         plan = [("farmer", farmers[i].id) for i in range(4)] + [("truck", trucks[i].id) for i in (0, 1, 2)] + \
-               [("broker", brokers[0].id), ("labour_group", labour[0].id), ("bag_supplier", suppliers[0].id)]
+               [("broker", brokers[0].id), ("labour_group", labour[0].id), ("empty_bag_seller", suppliers[0].id)]
         payment_ids = []
         for n, (ptype, pid) in enumerate(plan):
             rows = [p for p in await pay_svc.load_payables(db, ptype, pid) if p.due > 0]
@@ -299,12 +299,12 @@ async def remove() -> None:
         await db.execute(delete(ReceiptAllocation).where(ReceiptAllocation.receipt_id.in_(rec_ids)))
         await db.execute(delete(Receipt).where(Receipt.id.in_(rec_ids)))
         for model, key in ((Bilty, "bilties"), (FarmersTruckLoadLine, "truck_load_lines"), (TruckTrip, "truck_trips"), (BrokerBooking, "broker_bookings"),
-                           (BagSupply, "bag_supplies"), (LabourWork, "labour_work"), (PurchaseIndividual, "purchase_individuals"), (PurchaseFarmerEntry, "purchase_farmers_entries"), (PurchaseGroupFarmer, "purchase_group_farmers"), (PurchaseGroup, "purchase_group"),
-                           (LabourGroupWage, "labour_group_wages"), (Brokerage, "brokerages"), (Labour, "labours"), (Farmer, "farmers"), (BagSupplier, "bag_suppliers"),
+                           (EmptyBagSellerEntry, "empty_bag_sellers_entries"), (LabourWork, "labour_work"), (PurchaseIndividual, "purchase_individuals"), (PurchaseFarmerEntry, "purchase_farmers_entries"), (PurchaseGroupFarmer, "purchase_group_farmers"), (PurchaseGroup, "purchase_group"),
+                           (LabourGroupWage, "labour_group_wages"), (Brokerage, "brokerages"), (Labour, "labours"), (Farmer, "farmers"), (EmptyBagSeller, "empty_bag_sellers"),
                            (LabourGroup, "labour_groups"), (Transporter, "transporters"), (Truck, "trucks"), (Industry, "industries"), (Broker, "brokers"),
                            (Grain, "grains"), (Village, "villages")):
             await db.execute(delete(model).where(model.id.in_(ids.get(key, []))))
-        for table in ("purchase_group", "purchase_farmers_entries", "purchase_farmer_entries", "purchase_individuals", "broker_bookings", "truck_trips", "bilties", "labour_work", "bag_supplies", "payments", "receipts"):
+        for table in ("purchase_group", "purchase_farmers_entries", "purchase_farmer_entries", "purchase_individuals", "broker_bookings", "truck_trips", "bilties", "labour_work", "empty_bag_sellers_entries", "payments", "receipts"):
             await db.execute(delete(AuditLog).where(AuditLog.table_name == table, AuditLog.record_id.in_(ids.get(table, []))))
         await db.commit()
     IDS_FILE.unlink()

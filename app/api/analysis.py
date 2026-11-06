@@ -10,7 +10,7 @@ from app.api.deps import current_user
 from app.api.formkit import today
 from app.core.db import get_db
 from app.core.templating import render_with_csrf
-from app.models import BagSupply, Bilty, PurchaseIndividual, LabourWork, Payment, PurchaseFarmerEntry, Receipt, TruckTrip, User
+from app.models import EmptyBagSellerEntry, Bilty, PurchaseIndividual, LabourWork, Payment, PurchaseFarmerEntry, Receipt, TruckTrip, User
 from app.services import analysis
 from app.services.years import allowed_years, current_year_label
 
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/Analysis")
 
 async def _years(db: AsyncSession, user: User) -> list[str]:
     found: set[str] = set()
-    for model in (PurchaseFarmerEntry, PurchaseIndividual, TruckTrip, LabourWork, BagSupply, Bilty, Payment, Receipt):
+    for model in (PurchaseFarmerEntry, PurchaseIndividual, TruckTrip, LabourWork, EmptyBagSellerEntry, Bilty, Payment, Receipt):
         found |= set((await db.scalars(select(model.business_year).distinct())).all())
     return allowed_years(user, found)
 

@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.labels import method_label
-from app.models import BagSupply, LabourGroupWage, LabourWork, Payment, Receipt, TruckTrip
+from app.models import EmptyBagSellerEntry, LabourGroupWage, LabourWork, Payment, Receipt, TruckTrip
 from app.services import receivables as rec_svc
 from app.services.ledger import all_entry_views
 from app.services.payables import paid_map
@@ -25,7 +25,7 @@ LEDGERS: dict[str, Pair] = {
     "farmer": ("Farmers", "ખેડૂતો"),
     "truck": ("Trucks", "ટ્રક"),
     "labour_group": ("Labour", "મજૂર"),
-    "bag_supplier": ("Bag suppliers", "બારદાન સપ્લાયર"),
+    "empty_bag_seller": ("Empty Bag Suppliers", "બારદાન સપ્લાયર"),
     "broker": ("Brokers", "દલાલ"),
     "industry": ("Industries", "ઉદ્યોગો"),
 }
@@ -255,7 +255,7 @@ async def truck_report(db: AsyncSession, year: str, grain_id: int, village_id: i
 
     grouped(lambda t: f"{t.truck.truck_number} — {t.truck.truck_owner_name}", ("Truck / owner", "ટ્રક / માલિક", "text"), ("By truck", "ટ્રક મુજબ"))
     grouped(lambda t: t.transporter.pet_name, ("Transport", "ટ્રાન્સપોર્ટ", "text"), ("By transport", "ટ્રાન્સપોર્ટ મુજબ"))
-    grouped(lambda t: t.industry.industrialist_name, ("Delivered to", "ક્યાં પહોંચાડ્યું", "text"), ("By industry", "ઉદ્યોગ મુજબ"))
+    grouped(lambda t: t.industry.industry_name, ("Delivered to", "ક્યાં પહોંચાડ્યું", "text"), ("By industry", "ઉદ્યોગ મુજબ"))
     grouped(lambda t: t.grain.grain_name, ("Grain", "અનાજ", "text"), ("By grain", "અનાજ મુજબ"))
     basis = _G()
     for t in trips:
@@ -318,15 +318,15 @@ async def labour_report(db: AsyncSession, year: str, grain_id: int, village_id: 
 # ---------------------------------------------------------------- bag suppliers
 
 async def bag_report(db: AsyncSession, year: str, grain_id: int, village_id: int, today: date) -> Report:
-    rows_ = [b for b in (await db.scalars(select(BagSupply).where(BagSupply.business_year == year))).unique().all()
+    rows_ = [b for b in (await db.scalars(select(EmptyBagSellerEntry).where(EmptyBagSellerEntry.business_year == year))).unique().all()
              if not village_id or b.farmer.village_id == village_id]
-    paid = await paid_map(db, "bag_supplier", [b.id for b in rows_])
-    r = Report("bag_supplier")
+    paid = await paid_map(db, "empty_bag_seller", [b.id for b in rows_])
+    r = Report("empty_bag_seller")
     amount = sum(b.payable_amount for b in rows_)
-    bags = sum(b.no_of_bags for b in rows_)
+    bags = sum(b.no_of_empty_bags for b in rows_)
     paid_total = sum(paid.get(b.id, 0) for b in rows_)
     r.stats = [
-        Stat("Supplies", "સપ્લાય", len(rows_), "int", f"{len({b.supplier_id for b in rows_})} suppliers"),
+        Stat("Supplies", "સપ્લાય", len(rows_), "int", f"{len({b.empty_bag_seller_id for b in rows_})} suppliers"),
         Stat("Bags supplied", "આપેલી બેગ", bags, "int"),
         Stat("Amount", "રકમ", amount, "inr", f"avg ₹ {round(amount / bags, 2) if bags else 0} / bag"),
         Stat("Paid", "ચૂકવ્યું", paid_total, "inr", f"{pct(paid_total, amount) or 0}% of amount"),
@@ -336,7 +336,7 @@ async def bag_report(db: AsyncSession, year: str, grain_id: int, village_id: int
     for b in rows_:
         x = g[b.supplier.pet_name]
         x["n"] += 1
-        x["bags"] += b.no_of_bags
+        x["bags"] += b.no_of_empty_bags
         x["amount"] += b.payable_amount
         x["paid"] += paid.get(b.id, 0)
     rows = sorted(([k, v["n"], v["bags"], round(v["amount"] / v["bags"], 2) if v["bags"] else 0, v["amount"], v["paid"], v["amount"] - v["paid"]] for k, v in g.items()), key=lambda x: -x[4])
@@ -347,14 +347,14 @@ async def bag_report(db: AsyncSession, year: str, grain_id: int, village_id: int
     for b in rows_:
         name = b.farmer.village.village_name
         farmers_in[name].add(b.farmer_id)
-        v[name]["bags"] += b.no_of_bags
+        v[name]["bags"] += b.no_of_empty_bags
         v[name]["amount"] += b.payable_amount
     rows = sorted(([k, len(farmers_in[k]), x["bags"], x["amount"]] for k, x in v.items()), key=lambda x: -x[2])
     r.tables.append(Table(("Bags held by village", "ગામ મુજબ સંગ્રહ"), [("Village", "ગામ", "text"), ("Storing farmers", "સંગ્રહ કરનાર ખેડૂત", "int"), ("Bags", "બેગ", "int"), ("Value", "કિંમત", "inr")],
                           rows, _sum_cols(rows, [1, 2, 3])))
-    r.bars.append(Bars(("Bag cost by month", "મહિના મુજબ બારદાન ખર્ચ"), monthly([(b.supply_date, b.payable_amount) for b in rows_])))
+    r.bars.append(Bars(("Bag cost by month", "મહિના મુજબ બારદાન ખર્ચ"), monthly([(b.selling_date, b.payable_amount) for b in rows_])))
     r.notes.append(("Bags are not tied to a grain, so the grain filter does not apply here.", "બારદાન અનાજ સાથે જોડાયેલા નથી, તેથી અનાજ ફિલ્ટર અહીં લાગુ પડતું નથી."))
-    await _money_blocks(db, r, party_type="bag_supplier", year=year, party_ids={b.supplier_id for b in rows_} if village_id else None)
+    await _money_blocks(db, r, party_type="empty_bag_seller", year=year, party_ids={b.empty_bag_seller_id for b in rows_} if village_id else None)
     return r
 
 
@@ -389,7 +389,7 @@ async def broker_report(db: AsyncSession, year: str, grain_id: int, village_id: 
         r.tables.append(Table(title, [label_head, *head], rows, _sum_cols(rows, [1, 2, 3, 4, 5])))
 
     grouped(lambda b: b.booking.brokerage.broker.broker_name, ("Broker", "દલાલ", "text"), ("By broker", "દલાલ મુજબ"))
-    grouped(lambda b: b.trip.industry.industrialist_name, ("Industry", "ઉદ્યોગ", "text"), ("By industry", "ઉદ્યોગ મુજબ"))
+    grouped(lambda b: b.trip.industry.industry_name, ("Industry", "ઉદ્યોગ", "text"), ("By industry", "ઉદ્યોગ મુજબ"))
     grouped(lambda b: b.trip.grain.grain_name, ("Grain", "અનાજ", "text"), ("By grain", "અનાજ મુજબ"))
     r.bars.append(Bars(("Brokerage by month", "મહિના મુજબ દલાલી"), monthly([(b.bilty_date, b.brokerage_amount) for b in bilties])))
     await _money_blocks(db, r, party_type="broker", year=year, party_ids={b.booking.brokerage.broker_id for b in bilties} if (grain_id or village_id) else None)
@@ -414,7 +414,7 @@ async def industry_report(db: AsyncSession, year: str, grain_id: int, village_id
     g = _G()
     for v in views:
         b = v.bilty
-        x = g[b.trip.industry.industrialist_name]
+        x = g[b.trip.industry.industry_name]
         x["trucks"] += 1
         x["awaiting"] += v.receivable is None
         if v.receivable is not None:
@@ -443,14 +443,14 @@ async def industry_report(db: AsyncSession, year: str, grain_id: int, village_id
     worst = sorted((v for v in weighed if v.bilty.percentage_difference is not None), key=lambda v: -v.bilty.percentage_difference)[:10]
     r.tables.append(Table(("Biggest weight shortages", "સૌથી મોટી વજન ઘટ"), [("Bill", "બિલ", "int"), ("Truck", "ટ્રક", "text"), ("Industry", "ઉદ્યોગ", "text"), ("Our kg", "આપણું કિલો", "kg"),
                                                                           ("Industry kg", "કારખાનું કિલો", "kg"), ("Shortage %", "ઘટ %", "pct")],
-                          [[v.bilty.bill_number, v.bilty.trip.truck.truck_number, v.bilty.trip.industry.industrialist_name, v.bilty.merchant_net_weight, v.bilty.industry_net_weight,
+                          [[v.bilty.bill_number, v.bilty.trip.truck.truck_number, v.bilty.trip.industry.industry_name, v.bilty.merchant_net_weight, v.bilty.industry_net_weight,
                             v.bilty.percentage_difference] for v in worst]))
     r.bars.append(Bars(("Billed by month", "મહિના મુજબ બિલ"), monthly([(v.bilty.bilty_date, v.receivable) for v in weighed])))
     await _money_blocks(db, r, party_type=None, year=year, party_ids={v.bilty.trip.industry.id for v in views} if (grain_id or village_id) else None)
     return r
 
 
-BUILDERS = {"farmer": farmer_report, "truck": truck_report, "labour_group": labour_report, "bag_supplier": bag_report, "broker": broker_report, "industry": industry_report}
+BUILDERS = {"farmer": farmer_report, "truck": truck_report, "labour_group": labour_report, "empty_bag_seller": bag_report, "broker": broker_report, "industry": industry_report}
 
 
 async def build(db: AsyncSession, ledger: str, year: str, grain_id: int, village_id: int, today: date) -> Report:

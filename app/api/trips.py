@@ -26,7 +26,7 @@ from app.services import audit, money
 from app.services.locks import advisory_lock
 from app.services.payables import paid_for
 from app.services.receivables import received_map
-from app.services.stock import renumber_remaining, stock_by_entry
+from app.services.stock import stock_by_entry
 from app.services.stockyard_stock import filled_ledger, Filled
 from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible
 
@@ -74,7 +74,7 @@ async def trip_fields(db: AsyncSession, grain_id: int = 0) -> list[F]:
     return [
         F("trip_date", "Date", "તારીખ", kind="date", required=True),
         F("broker_booking_id", "Booking (broker · grain → industry)", "બુકિંગ (દલાલ · અનાજ → ઉદ્યોગ)", kind="select", required=True,
-          options=tuple((str(b.id), f"{b.booking_date} · {b.brokerage.broker.broker_name} · {b.grain.grain_name} → {b.industry.industrialist_name} · {b.truck_size} T") for b in bookings),
+          options=tuple((str(b.id), f"{b.booking_date} · {b.brokerage.broker.broker_name} · {b.grain.grain_name} → {b.industry.industry_name} · {b.truck_size} T") for b in bookings),
           help=("Fixes the grain, the industry, the rate and the broker for this trip", "આ ટ્રીપ માટે અનાજ, ઉદ્યોગ, ભાવ અને દલાલ નક્કી કરે છે")),
         F("truck_id", "Truck", "ટ્રક", kind="select", required=True, options=tuple((str(t.id), f"{t.truck_number} — {t.driver_name}") for t in trucks)),
         F("transporter_id", "Transport", "ટ્રાન્સપોર્ટ", kind="select", required=True, options=tuple((str(t.id), f"{t.pet_name} — {t.location}") for t in transporters)),
@@ -161,7 +161,7 @@ def bilty_snapshot(b: Bilty) -> dict:
 class LineIn(BaseModel):
     """One form, two parts: farmer load line (above) and stockyard load line (below). Fill either part or both."""
 
-    farmer_source: str | None = None  # 'g:<purchase_farmers_entries.id>' or 'i:<purchase_individuals.id>'
+    farmer_source: str | None = None  # 'g:<purchase_group_farmers_entries.id>' or 'i:<purchase_individuals.id>'
     no_of_loaded_bags: _int(gt=0) | None = None  # blank: load everything still unloaded in the entry
     stockyard_id: int | None = None
     no_of_stockyard_bags: _int(gt=0) | None = None
@@ -378,7 +378,6 @@ async def add_line(request: Request, trip_id: int, user: User = Depends(current_
         return form({"no_of_loaded_bags": YEAR_LOCKED(exc.label)})
     new_lines: list = []
     added_bags = 0
-    renumber: tuple[int, bool] | None = None
     if clean["farmer_source"]:
         kind_, _, raw_id = clean["farmer_source"].partition(":")
         individual = kind_ == "i"
@@ -393,11 +392,10 @@ async def add_line(request: Request, trip_id: int, user: User = Depends(current_
         bags = clean["no_of_loaded_bags"] or available
         if bags <= 0 or bags > available:
             return form({"no_of_loaded_bags": (f"Only {available} bags are left in this entry", f"આ એન્ટ્રીમાં ફક્ત {available} બેગ બાકી છે")})
-        line = FarmersTruckLoadLine(trip_id=trip.id, total_remaining_bags=available - bags, no_of_loaded_bags=bags,
+        line = FarmersTruckLoadLine(trip_id=trip.id, no_of_loaded_bags=bags,
                              **({"purchase_individual_id": entry.id} if individual else {"purchase_farmer_entry_id": entry.id}))
         new_lines.append(line)
         added_bags += bags
-        renumber = (entry.id, individual)
     if clean["stockyard_id"] is not None:
         yard = await db.get(Stockyard, clean["stockyard_id"])
         if yard is None:
@@ -414,8 +412,6 @@ async def add_line(request: Request, trip_id: int, user: User = Depends(current_
     for line in new_lines:
         db.add(line)
     await db.flush()
-    if renumber:
-        await renumber_remaining(db, *renumber)
     if trip.bilty is not None:
         trip.bilty.total_bags_in_truck = before_bags + added_bags
     for line in new_lines:
@@ -451,17 +447,13 @@ async def _delete_load(request: Request, user: User, db: AsyncSession, line, kin
         problem = _below_paid(await paid_for(db, "broker", trip.bilty.id), money.brokerage_amount(new_bags, per_bag), ("brokerage", "દલાલી"))
         if problem:
             return flash(*problem)
-    renumber = None
     if kind == "farmers_truck_load_lines":
         audit.log(db, user, "delete", kind, line.id, dict(trip_id=trip_id, purchase_farmer_entry_id=line.purchase_farmer_entry_id,
                                                           purchase_individual_id=line.purchase_individual_id, no_of_loaded_bags=bags))
-        renumber = (line.purchase_individual_id or line.purchase_farmer_entry_id, line.purchase_individual_id is not None)
     else:
         audit.log(db, user, "delete", kind, line.id, dict(trip_id=trip_id, stockyard_id=line.stockyard_id, no_of_loaded_bags=bags))
     await db.delete(line)
     await db.flush()
-    if renumber:
-        await renumber_remaining(db, *renumber)
     if trip.bilty is not None:
         trip.bilty.total_bags_in_truck = new_bags
     await db.commit()

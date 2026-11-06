@@ -26,14 +26,31 @@ def _upi_check() -> CheckConstraint:
 
 
 # ---------------------------------------------------------------- file1-master1.txt
-class BagSupplier(TimestampMixin, Base):
-    __tablename__ = "bag_suppliers"
+class EmptyBagSeller(TimestampMixin, Base):
+    __tablename__ = "empty_bag_sellers"
     __table_args__ = (_upi_check(), _mobile_check())
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
     name_gu: Mapped[str | None] = mapped_column(String(120))
-    pet_name: Mapped[str] = mapped_column(String(30))
+    pet_name: Mapped[str] = mapped_column(String(30), unique=True)
+    pet_name_gu: Mapped[str | None] = mapped_column(String(30))
+    mobile: Mapped[str] = mapped_column(String(10), unique=True)
+    upi_number: Mapped[str | None] = mapped_column(String(10), unique=True)
+    description: Mapped[str | None] = mapped_column(Text)
+
+
+class EmptyBagMover(TimestampMixin, Base):
+    """Moves empty bags from a stockyard to a particular farmer's house (file1: empty_bag_movers)."""
+
+    __tablename__ = "empty_bag_movers"
+    __table_args__ = (_upi_check(), _mobile_check())
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    name_gu: Mapped[str | None] = mapped_column(String(120))
+    pet_name: Mapped[str] = mapped_column(String(30), unique=True)
+    pet_name_gu: Mapped[str | None] = mapped_column(String(30))
     mobile: Mapped[str] = mapped_column(String(10), unique=True)
     upi_number: Mapped[str | None] = mapped_column(String(10), unique=True)
     description: Mapped[str | None] = mapped_column(Text)
@@ -46,6 +63,7 @@ class Transporter(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     transporter_name: Mapped[str] = mapped_column(String(120), unique=True)
     pet_name: Mapped[str] = mapped_column(String(30), unique=True)
+    pet_name_gu: Mapped[str] = mapped_column(String(30))
     location: Mapped[str] = mapped_column(String(60))
     owner_name: Mapped[str] = mapped_column(String(120))
     owner_name_gu: Mapped[str | None] = mapped_column(String(120))
@@ -76,15 +94,15 @@ class Truck(TimestampMixin, Base):
 class Industry(TimestampMixin, Base):
     __tablename__ = "industries"
     __table_args__ = (
-        _digits_check("owner_mobile"),
+        _digits_check("industry_owner_mobile", "ck_owner_mobile_10_digits"),
         _digits_check("supervisor_mobile"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    industrialist_name: Mapped[str] = mapped_column(String(120), unique=True)
-    industrialist_name_gu: Mapped[str | None] = mapped_column(String(120))
-    owner_name: Mapped[str] = mapped_column(String(120))
-    owner_mobile: Mapped[str] = mapped_column(String(10))
+    industry_name: Mapped[str] = mapped_column(String(120), unique=True)
+    industry_name_gu: Mapped[str | None] = mapped_column(String(120))
+    industry_owner_name: Mapped[str] = mapped_column(String(120))
+    industry_owner_mobile: Mapped[str] = mapped_column(String(10))
     supervisor_name: Mapped[str] = mapped_column(String(120))
     supervisor_mobile: Mapped[str] = mapped_column(String(10))
     grain: Mapped[str] = mapped_column(String(60))
@@ -160,7 +178,7 @@ class Farmer(TimestampMixin, Base):
     bank_name: Mapped[str | None] = mapped_column(String(30))
     bank_branch: Mapped[str | None] = mapped_column(String(30))
     ifsc_code: Mapped[str | None] = mapped_column(String(15))
-    public_figure: Mapped[str | None] = mapped_column(Text)
+    private_note_owner_only: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
 
     village: Mapped[Village] = relationship(lazy="joined")
@@ -201,7 +219,7 @@ class LabourGroupWage(TimestampMixin, Base):
     loading_rate: Mapped[int] = mapped_column(Integer)
     pulling_rate: Mapped[int] = mapped_column(Integer)
     mixing_rate: Mapped[int] = mapped_column(Integer)
-    other_expenses: Mapped[int | None] = mapped_column(Integer)
+    other_rate: Mapped[int | None] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
 
     labour_group: Mapped[LabourGroup] = relationship(lazy="joined")

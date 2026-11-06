@@ -2,7 +2,7 @@
 {% from "partials/bilabel.html" import bi, t %}
 {% macro title(en, gu) %}<span class="flex items-baseline gap-2 w-full justify-between"><span>{{ en }}</span><span class="gu text-xs normal-case">{{ gu }}</span></span>{% endmacro %}
 {% macro item(href, en, gu, match='', cls='') %}
-<li><a href="{{ href }}" class="{{ cls }} {{ 'active' if request.url.path == href.split('?')[0] or (match and request.url.path.startswith(match)) else '' }}"><span>{{ en }}</span><span class="gu text-xs">{{ gu }}</span></a></li>
+<li><a href="{{ href }}" class="{{ cls }} {{ 'active' if request.url.path == href.split('?')[0] or (match and request.url.path.startswith(match)) else '' }}"><span class="whitespace-nowrap">{{ en }}</span><span class="gu text-xs whitespace-nowrap">{{ gu }}</span></a></li>
 {% endmacro %}
 {% block body %}
 <div class="drawer lg:drawer-open">
@@ -43,13 +43,14 @@
         {% set path = request.url.path %}
         {% set pay_type = request.query_params.get('type', 'farmer') %}
         {% set ledger = request.query_params.get('ledger', 'farmer') %}
-        {% set village_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/BagSupplies', '/Masters/Villages', '/Masters/Farmers'))
+        {% set village_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/EmptyBags', '/Masters/Villages', '/Masters/Farmers'))
+                                  or (path.startswith('/StockyardPurchase') and request.query_params.get('view') not in ('stock', 'empty_bags'))
                                   or (path.startswith('/Payables') and pay_type == 'farmer')
                                   or (path.startswith('/Analysis') and ledger != 'labour')) %}
-        {% set grain_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/Masters/Grains', '/Masters/LabourWages', '/Masters/Brokerages'))
+        {% set grain_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/StockyardPurchase', '/Masters/Grains', '/Masters/LabourWages', '/Masters/Brokerages'))
                                 or (path.startswith('/Payables') and pay_type == 'farmer')
                                 or (path.startswith('/Analysis') and ledger != 'bag')) %}
-        {% set date_off = not path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/BagSupplies', '/StockyardPurchase', '/LabourWork', '/Payables')) %}
+        {% set date_off = not path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/EmptyBags', '/StockyardPurchase', '/LabourWork', '/Payables')) %}
         {% set period = request.query_params.get('period', '') %}
         {% set on_date = request.query_params.get('on_date', '') if period == 'date' else '' %}
         {% set sel_p = (PERIODS | selectattr(0, 'equalto', period) | list | first) if period and period != 'date' else none %}
@@ -98,7 +99,7 @@
   </div>
   <div class="drawer-side z-30">
     <label for="app-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
-    <aside class="bg-base-100 border-r border-base-300 w-64 min-h-full p-3 pt-20 lg:pt-3 flex flex-col gap-2 overflow-y-auto">
+    <aside class="bg-base-100 border-r border-base-300 w-80 min-h-full p-3 pt-20 lg:pt-3 flex flex-col gap-2 overflow-y-auto">
       <a href="/" class="flex items-center gap-3 font-bold px-2 py-2">
         <span class="w-20 h-20 text-3xl rounded-full overflow-hidden bg-primary text-primary-content relative grid place-items-center shrink-0"><img src="/static/logo.png" alt="Shreeji Traders" class="absolute inset-0 w-full h-full object-cover bg-base-100" onerror="this.remove()">S</span><span class="flex flex-col leading-tight gap-1"><span class="text-lg">Shreeji Traders</span><span class="gu text-sm font-semibold">શ્રીજી ટ્રેડર્સ</span></span>
       </a>
@@ -107,8 +108,8 @@
         <li class="menu-title">{{ title('Buying', 'ખરીદી') }}</li>
         {% set pp = request.url.path %}
         {{ item('/PurchaseFarmers', 'Purchase Farmers', 'ખરીદી ખેડૂત', ('/PurchaseFarmers', '/PurchaseGroup', '/PurchaseIndividual')) }}
-        {{ item('/StockyardPurchase', 'Stockyard purchase', 'સ્ટોકયાર્ડ ખરીદી', '/StockyardPurchase') }}
-        {{ item('/BagSupplies', 'Bag supplies', 'બારદાન સપ્લાય') }}
+        {{ item('/StockyardPurchase', 'Stockyard Purchase', 'સ્ટોકયાર્ડ ખરીદી', '/StockyardPurchase') }}
+        {{ item('/EmptyBags', 'Empty Bag Suppliers', 'બારદાન સપ્લાયર') }}
         {{ item('/LabourWork', 'Labour work', 'મજૂર કામ') }}
         <li class="menu-title">{{ title('Selling', 'વેચાણ') }}</li>
         {{ item('/Bookings', 'Bookings', 'બુકિંગ', '/Bookings') }}

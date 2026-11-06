@@ -26,7 +26,7 @@
         <td class="whitespace-nowrap">{{ b.booking_date }}</td>
         <td>{{ b.brokerage.broker.broker_name }}<div class="text-xs opacity-60">₹{{ b.brokerage.brokerage_per_bag }}/{{ t('bag', 'બેગ') }}</div></td>
         <td>{{ b.grain.grain_name }}</td>
-        <td>{{ b.industry.industrialist_name }}</td>
+        <td>{{ b.industry.industry_name }}</td>
         <td>{{ b.grain_rate_per_booking_weight | inr }} / {{ b.grain.booking_weight }} kg</td>
         <td>{{ b.truck_size }} T</td>
         <td>{{ ('%.1f %%' % b.percentage_deduction) if b.percentage_deduction is not none else '' }}</td>

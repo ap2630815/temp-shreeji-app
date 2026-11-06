@@ -32,4 +32,4 @@ def test_sum_cols_totals_only_the_given_columns():
 def test_every_ledger_has_a_report_builder():
     from app.services.analysis import BUILDERS
 
-    assert set(LEDGERS) == set(BUILDERS) == {"farmer", "truck", "labour_group", "bag_supplier", "broker", "industry"}
+    assert set(LEDGERS) == set(BUILDERS) == {"farmer", "truck", "labour_group", "empty_bag_seller", "broker", "industry"}

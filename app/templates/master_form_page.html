@@ -10,4 +10,5 @@
 <div class="max-w-2xl">{% include "partials/master_form.html" %}</div>
 {% block post_form %}{% endblock %}
 </div>
+{% if focus %}<script>document.addEventListener('DOMContentLoaded', function () { var f = document.querySelector('[name="{{ focus }}"]'); if (f) { f.focus(); f.select && f.select(); } });</script>{% endif %}
 {% endblock %}

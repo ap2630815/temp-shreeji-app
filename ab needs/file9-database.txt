@@ -3,9 +3,9 @@ Structure only - no data rows.
 ==============================================================================
 
 ALL TABLES AND WHERE THEY ARE DESCRIBED:
-  file1-master1.txt: bag_suppliers, transporters, trucks, industries, brokers, villages, labour_groups, grains, 
+  file1-master1.txt: empty_bag_sellers, empty_bag_movers, transporters, trucks, industries, brokers, villages, labour_groups, grains, stockyards
   file2-master2.txt: farmers, labours, labour_group_wages, brokerages, 
-  file4-transactional.txt: purchase_group, purchase_group_farmers, purchase_farmers_entries, purchase_individuals, broker_bookings, truck_trips, truck_load_lines, bilties, labour_work, bag_supplies, 
+  file4-transactional.txt: purchase_groups, purchase_group_add_farmers, purchase_group_farmers_entries, purchase_individuals, stockyard_purchases, stockyard_purchase_entries, stockyard_arrangement_entries, farmer_to_stockyard_transfers, empty_bags, broker_bookings, truck_trips, farmers_truck_load_lines, stockyard_truck_load_lines, bilties, labour_work, empty_bag_sellers_entries, empty_bag_movers_entries
   file5-payment-ledger.txt: payments, payment_allocations, receipts, receipt_allocations
   file9-database.txt: users, audit_log, alembic_version  (+ the business-year rule below; there is no business_years table)
 
@@ -37,9 +37,9 @@ A business year runs 1 October to 30 September and is labelled by its two
 years, e.g. 2025-26 = 2025-10-01 .. 2026-09-30.
 
 Every dated record stores its year in a business_year VARCHAR(7) column:
-  purchase_group, purchase_farmers_entries, purchase_individuals, broker_bookings, truck_trips, bilties, labour_work, bag_supplies, (file4-transactional.txt)
+  purchase_groups, purchase_group_farmers_entries, purchase_individuals, stockyard_purchases, stockyard_purchase_entries, stockyard_arrangement_entries, farmer_to_stockyard_transfers, empty_bags, broker_bookings, truck_trips, bilties, labour_work, empty_bag_sellers_entries, empty_bag_movers_entries (file4-transactional.txt)
   payments, receipts (file5-payment-ledger.txt)
-  (truck_load_lines, payment_allocations and receipt_allocations have no date of their own;
+  (farmers_truck_load_lines, stockyard_truck_load_lines, payment_allocations and receipt_allocations have no date of their own;
    they belong to the year of their parent truck_trips / payments / receipts row.)
 
 Rules enforced by the application (app/services/years.py):

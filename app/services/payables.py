@@ -12,8 +12,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
-    BagSupplier,
-    BagSupply,
+    EmptyBagSeller,
+    EmptyBagSellerEntry,
     Bilty,
     Broker,
     BrokerBooking,
@@ -35,7 +35,7 @@ from app.services.years import assert_year_open
 
 @dataclass(frozen=True)
 class PartySpec:
-    """party_type doubles as payment_allocations.payable_type (file5): farmer, truck, labour_group, bag_supplier, broker."""
+    """party_type doubles as payment_allocations.payable_type (file5): farmer, truck, labour_group, empty_bag_seller, broker."""
 
     label: tuple[str, str]
     model: type
@@ -52,7 +52,7 @@ PARTIES: dict[str, PartySpec] = {
                        lambda p: (p.truck_owner_name, p.truck_owner_mobile)),  # paid to the truck owner
     "labour_group": PartySpec(("Labour", "મજૂર"), LabourGroup, lambda p: p.group_name, lambda p: p.group_name_gu, lambda p: "",
                               lambda p: (p.group_name, "")),
-    "bag_supplier": PartySpec(("Bag supplier", "બારદાન સપ્લાયર"), BagSupplier, lambda p: p.pet_name, lambda p: p.name_gu, lambda p: p.mobile,
+    "empty_bag_seller": PartySpec(("Bag supplier", "બારદાન સપ્લાયર"), EmptyBagSeller, lambda p: p.pet_name, lambda p: p.name_gu, lambda p: p.mobile,
                               lambda p: (p.name, p.mobile)),
     "broker": PartySpec(("Broker", "દલાલ"), Broker, lambda p: p.broker_name, lambda p: p.broker_name_gu, lambda p: p.mobile,
                         lambda p: (p.broker_name, p.mobile)),
@@ -64,7 +64,7 @@ COLUMNS: dict[str, tuple[tuple[str, str, bool], ...]] = {
     "farmer": (("Details", "વિગત", False),),
     "truck": (("Industry", "ઉદ્યોગ", False), ("Grain", "અનાજ", False), ("Bags", "બેગ", True)),
     "labour_group": (("Work", "કામ", False),),
-    "bag_supplier": (("Farmer", "ખેડૂત", False), ("Village", "ગામ", False), ("Bags", "બેગ", True), ("Rate/bag", "ભાવ/બેગ", True)),
+    "empty_bag_seller": (("Farmer", "ખેડૂત", False), ("Village", "ગામ", False), ("Bags", "બેગ", True), ("Rate/bag", "ભાવ/બેગ", True)),
     "broker": (("Bill no.", "બિલ નં.", False), ("Truck", "ટ્રક", False), ("Industry", "ઉદ્યોગ", False)),
 }
 
@@ -141,8 +141,8 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         paid = await _paid_map(db, pt, [t.id for t in trips])
         for t in trips:
             out.append(Payable(pt, t.id, party_type, t.truck_id, t.truck.truck_number, t.trip_date, None,
-                               f"{t.truck.truck_number} → {t.industry.industrialist_name}, {t.grain.grain_name}, {t.bags} bags", t.total_amount, paid.get(t.id, 0),
-                               (t.industry.industrialist_name, t.grain.grain_name, t.bags)))
+                               f"{t.truck.truck_number} → {t.industry.industry_name}, {t.grain.grain_name}, {t.bags} bags", t.total_amount, paid.get(t.id, 0),
+                               (t.industry.industry_name, t.grain.grain_name, t.bags)))
     elif party_type == "labour_group":
         stmt = select(LabourWork).order_by(LabourWork.work_date, LabourWork.id)
         if party_id:
@@ -153,16 +153,16 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
             out.append(Payable(pt, r.id, party_type, r.labour_group_id, r.labour_group.group_name, r.work_date, None,
                                r.description or "Labour work", r.net_payable, paid.get(r.id, 0),
                                (r.description or "Labour work",)))
-    elif party_type == "bag_supplier":
-        stmt = select(BagSupply).order_by(BagSupply.supply_date, BagSupply.id)
+    elif party_type == "empty_bag_seller":
+        stmt = select(EmptyBagSellerEntry).order_by(EmptyBagSellerEntry.selling_date, EmptyBagSellerEntry.id)
         if party_id:
-            stmt = stmt.where(BagSupply.supplier_id == party_id)
+            stmt = stmt.where(EmptyBagSellerEntry.empty_bag_seller_id == party_id)
         rows = list((await db.scalars(stmt)).unique().all())
         paid = await _paid_map(db, pt, [r.id for r in rows])
         for r in rows:
-            out.append(Payable(pt, r.id, party_type, r.supplier_id, r.supplier.pet_name, r.supply_date, None,
-                               f"{r.no_of_bags} bags @ ₹ {r.rate_per_bag} to {r.farmer.farmer_name} ({r.farmer.village.village_name})", r.payable_amount, paid.get(r.id, 0),
-                               (r.farmer.farmer_name, r.farmer.village.village_name, r.no_of_bags, r.rate_per_bag)))
+            out.append(Payable(pt, r.id, party_type, r.empty_bag_seller_id, r.supplier.pet_name, r.selling_date, None,
+                               f"{r.no_of_empty_bags} bags @ ₹ {r.rate_per_bag} to {r.farmer.farmer_name} ({r.farmer.village.village_name})", r.payable_amount, paid.get(r.id, 0),
+                               (r.farmer.farmer_name, r.farmer.village.village_name, r.no_of_empty_bags, r.rate_per_bag)))
     elif party_type == "broker":
         stmt = (
             select(Bilty)
@@ -178,8 +178,8 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         for r in rows:
             broker = r.booking.brokerage.broker
             out.append(Payable(pt, r.id, party_type, broker.id, broker.broker_name, r.bilty_date, None,
-                               f"Bill #{r.bill_number}, {r.trip.truck.truck_number} → {r.trip.industry.industrialist_name}", r.brokerage_amount, paid.get(r.id, 0),
-                               (f"#{r.bill_number}", r.trip.truck.truck_number, r.trip.industry.industrialist_name)))
+                               f"Bill #{r.bill_number}, {r.trip.truck.truck_number} → {r.trip.industry.industry_name}", r.brokerage_amount, paid.get(r.id, 0),
+                               (f"#{r.bill_number}", r.trip.truck.truck_number, r.trip.industry.industry_name)))
     out.sort(key=lambda p: p.sort_key)
     return out
 
