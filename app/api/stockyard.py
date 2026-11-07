@@ -30,6 +30,7 @@ from app.models import (
     EmptyBag,
     EmptyBagMover,
     EmptyBagSeller,
+    Industry,
     StockyardArrangementEntry,
     StockyardPurchase,
     StockyardPurchaseEntry,
@@ -40,8 +41,9 @@ from app.services.duplicates import DUPLICATE_MSG, find_duplicate
 from app.services.locks import advisory_lock
 from app.services.money import payable_amount
 from app.services.stock import stock_by_entry
+from app.services.payables import paid_for, paid_map
 from app.services.stockyard_stock import Empty, Filled, default_received, empty_ledger, filled_ledger
-from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label
+from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, assert_year_editable, year_is_locked
 
 router = APIRouter(prefix="/StockyardPurchase")
 INT_MAX = 100_000_000
@@ -101,8 +103,9 @@ async def stockyard_list(request: Request, view: str = "purchases", year: str = 
         stmt = stmt.where(date_col.between(*window))
     stmt = _toolbar_filter(stmt, view, village_id, grain_id)
     rows = list((await db.scalars(stmt.order_by(date_col.desc(), model.id.desc()))).unique().all())
+    extra = dict(bag_paid=await paid_map(db, "empty_bag", [r.id for r in rows])) if view == "empty_bags" else {}
     return render_with_csrf(request, csrf, "stockyard_list.html", user=user, view=view, rows=rows, year=year, years=years,
-                            year_locked=year != current_year_label())
+                            year_locked=year_is_locked(user, year), **extra)
 
 
 def _toolbar_filter(stmt, view: str, village_id: int, grain_id: int):
@@ -350,14 +353,19 @@ async def empty_bag_fields(db: AsyncSession, village_id: int = 0, grain_id: int 
     grains = list((await db.scalars(select(Grain).order_by(Grain.grain_name))).all())
     sellers = list((await db.scalars(select(EmptyBagSeller).order_by(EmptyBagSeller.pet_name))).all())
     movers = list((await db.scalars(select(EmptyBagMover).order_by(EmptyBagMover.pet_name))).all())
+    industries = list((await db.scalars(select(Industry).order_by(Industry.industry_name))).all())
     return [
         F("empty_bags_entry_date", "Date", "તારીખ", kind="date", required=True),
         F("stockyard_id", "Stockyard", "સ્ટોકયાર્ડ", kind="select", required=True, options=_opt(yards, lambda y: f"{y.name_of_stockyard} — {y.location}")),
         F("grain_id", "Grain", "અનાજ", kind="select", required=True, options=_opt(grains, lambda g: g.grain_name)),
         F("empty_bag_seller_id", "Empty bag seller", "ખાલી બારદાન વેચનાર", kind="select", options=_opt(sellers, lambda x: f"{x.pet_name} — {x.name}")),
+        F("industry_id", "Industry (when bought from an industry)", "ઉદ્યોગ (ઉદ્યોગ પાસેથી ખરીદી હોય ત્યારે)", kind="select", options=_opt(industries, lambda x: f"{x.industry_name} — {x.location}"),
+          help=("Pick either an empty bag seller or an industry: the one picked is paid for these bags", "ખાલી બારદાન વેચનાર અથવા ઉદ્યોગ પસંદ કરો: જેને પસંદ કર્યો તેને આ બેગના પૈસા ચૂકવાય")),
         F("empty_bag_mover_id", "Empty bag mover", "ખાલી બારદાન મૂવર", kind="select", options=_opt(movers, lambda x: f"{x.pet_name} — {x.name}")),
         F("no_of_empty_bags", "Empty bags", "ખાલી બેગ", kind="int", required=True,
           help=("Bags used by stockyard purchase entries are taken off automatically", "સ્ટોકયાર્ડ ખરીદી નોંધમાં વપરાયેલી બેગ આપમેળે ઘટે છે")),
+        F("rate_per_empty_bag", "Rate per empty bag (₹)", "ખાલી બેગ દીઠ ભાવ (₹)", kind="int",
+          help=("Amount payable = rate × bags; leave 0 when nothing is paid for these bags", "ચૂકવવાપાત્ર = ભાવ × બેગ; પૈસા ન ચૂકવવાના હોય તો 0 રાખો")),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ]
 
@@ -368,18 +376,21 @@ class EmptyBagIn(BaseModel):
     grain_id: int
     empty_bag_seller_id: int | None = None
     empty_bag_mover_id: int | None = None
+    industry_id: int | None = None
     no_of_empty_bags: Annotated[int, Field(gt=0, le=INT_MAX)]
+    rate_per_empty_bag: Annotated[int, Field(ge=0, le=1_000_000)] | None = None
     description: str | None = None
 
 
 def empty_bag_values(m: EmptyBag) -> dict:
     return dict(empty_bags_entry_date=m.empty_bags_entry_date.isoformat(), stockyard_id=str(m.stockyard_id), grain_id=str(m.grain_id),
-                empty_bag_seller_id=str(m.empty_bag_seller_id or ""), empty_bag_mover_id=str(m.empty_bag_mover_id or ""), no_of_empty_bags=str(m.no_of_empty_bags), description=m.description or "")
+                empty_bag_seller_id=str(m.empty_bag_seller_id or ""), empty_bag_mover_id=str(m.empty_bag_mover_id or ""), industry_id=str(m.industry_id or ""), no_of_empty_bags=str(m.no_of_empty_bags), rate_per_empty_bag=str(m.rate_per_empty_bag), description=m.description or "")
 
 
 def empty_bag_snapshot(m: EmptyBag) -> dict:
     return dict(empty_bags_entry_date=m.empty_bags_entry_date, stockyard_id=m.stockyard_id, grain_id=m.grain_id, empty_bag_seller_id=m.empty_bag_seller_id,
-                empty_bag_mover_id=m.empty_bag_mover_id, no_of_empty_bags=m.no_of_empty_bags, description=m.description)
+                empty_bag_mover_id=m.empty_bag_mover_id, industry_id=m.industry_id, no_of_empty_bags=m.no_of_empty_bags, rate_per_empty_bag=m.rate_per_empty_bag,
+                description=m.description)
 
 
 FIELDS = {"purchases": purchase_fields, "entries": entry_fields, "arrangements": arrangement_fields, "transfers": transfer_fields, "empty_bags": empty_bag_fields}
@@ -389,7 +400,7 @@ NEW_VALUES = {
     "entries": lambda: dict(stockyard_purchase_entry_date=today().isoformat(), extra_kilos="0", borrowed_amount="0"),
     "arrangements": lambda: dict(stockyard_arrangement_date=today().isoformat()),
     "transfers": lambda: dict(transfer_date=today().isoformat()),
-    "empty_bags": lambda: dict(empty_bags_entry_date=today().isoformat()),
+    "empty_bags": lambda: dict(empty_bags_entry_date=today().isoformat(), rate_per_empty_bag="0"),
 }
 
 
@@ -465,7 +476,7 @@ async def stockyard_update(request: Request, kind: str, obj_id: int, user: User 
 async def _open_year(db: AsyncSession, new_date: date, old_date: date | None) -> str:
     year = await assert_year_open(db, new_date)
     if old_date is not None:
-        await assert_year_open(db, old_date)
+        await assert_year_editable(db, old_date)
     return year
 
 
@@ -515,7 +526,7 @@ async def _save_purchase(request: Request, p: StockyardPurchase | None, user: Us
     try:
         clean["business_year"] = await _open_year(db, clean["stockyard_purchase_date"], p.stockyard_purchase_date if p else None)
     except YearLockedError as exc:
-        return rerender({"stockyard_purchase_date": YEAR_LOCKED(exc.label)})
+        return rerender({"stockyard_purchase_date": YEAR_LOCKED(exc)})
     keys = {(clean["stockyard_id"], clean["grain_id"])} | ({(p.stockyard_id, p.grain_id)} if p else set())
     balances = await _balances(db, keys)
     before = None
@@ -565,7 +576,7 @@ async def _save_entry(request: Request, e: StockyardPurchaseEntry | None, user: 
     try:
         clean["business_year"] = await _open_year(db, clean["stockyard_purchase_entry_date"], e.stockyard_purchase_entry_date if e else None)
     except YearLockedError as exc:
-        return rerender({"stockyard_purchase_entry_date": YEAR_LOCKED(exc.label)})
+        return rerender({"stockyard_purchase_entry_date": YEAR_LOCKED(exc)})
     if clean["expected_raw_weight_per_bag"] is None:  # starts at the grain's value, editable
         clean["expected_raw_weight_per_bag"] = purchase.grain.expected_raw_weight_per_bag
     clean["payable_amount"] = payable_amount(clean["no_of_filled_bags"], clean["extra_kilos"], purchase.grain.net_bag_weight, purchase.grain_rate_per_20kg)
@@ -639,7 +650,7 @@ async def _save_arrangement(request: Request, a: StockyardArrangementEntry | Non
     try:
         clean["business_year"] = await _open_year(db, clean["stockyard_arrangement_date"], a.stockyard_arrangement_date if a else None)
     except YearLockedError as exc:
-        return rerender({"stockyard_arrangement_date": YEAR_LOCKED(exc.label)})
+        return rerender({"stockyard_arrangement_date": YEAR_LOCKED(exc)})
     before = None
     if a is not None:
         before = arrangement_snapshot(a)
@@ -672,7 +683,7 @@ async def _save_transfer(request: Request, t: FarmerStockyardTransfer | None, us
     try:
         clean["business_year"] = await _open_year(db, clean["transfer_date"], t.transfer_date if t else None)
     except YearLockedError as exc:
-        return rerender({"transfer_date": YEAR_LOCKED(exc.label)})
+        return rerender({"transfer_date": YEAR_LOCKED(exc)})
     await advisory_lock(db, "stock_ind" if individual else "stock", entry.id)  # two clerks must not move the same bags twice
     stock = (await stock_by_entry(db, [entry.id], individual=individual, exclude_transfer_id=t_id)).get(entry.id)
     left = stock.available if stock else 0
@@ -707,13 +718,24 @@ async def _save_empty_bag(request: Request, m: EmptyBag | None, user: User, db: 
     clean, errors = run_validation(EmptyBagIn, fields, normalize_fields(fields, raw))
     if errors:
         return rerender(errors)
-    for name, model in (("stockyard_id", Stockyard), ("grain_id", Grain), ("empty_bag_seller_id", EmptyBagSeller), ("empty_bag_mover_id", EmptyBagMover)):
+    for name, model in (("stockyard_id", Stockyard), ("grain_id", Grain), ("empty_bag_seller_id", EmptyBagSeller), ("empty_bag_mover_id", EmptyBagMover), ("industry_id", Industry)):
         if clean[name] is not None and await db.get(model, clean[name]) is None:
             return rerender({name: ("Unknown value", "અજ્ઞાત કિંમત")})
+    if clean["empty_bag_seller_id"] is not None and clean["industry_id"] is not None:
+        return rerender({"industry_id": ("Pick either a seller or an industry, not both", "વેચનાર અથવા ઉદ્યોગ પસંદ કરો, બંને નહીં")})
+    clean["rate_per_empty_bag"] = clean["rate_per_empty_bag"] or 0
+    if clean["rate_per_empty_bag"] and clean["empty_bag_seller_id"] is None and clean["industry_id"] is None:
+        return rerender({"rate_per_empty_bag": ("Pick the seller or industry who is paid for these bags, or set the rate to 0", "જેને ચુકવણી કરવાની છે તે વેચનાર કે ઉદ્યોગ પસંદ કરો, અથવા ભાવ 0 રાખો")})
+    new_payable = clean["rate_per_empty_bag"] * clean["no_of_empty_bags"]
+    if m is not None:
+        paid = await paid_for(db, "empty_bag", m.id)
+        if paid and (new_payable < paid or (clean["empty_bag_seller_id"], clean["industry_id"]) != (m.empty_bag_seller_id, m.industry_id)):
+            return rerender({"rate_per_empty_bag": (f"₹ {paid} is already paid for these bags: the amount cannot go below that and the seller / industry cannot change",
+                                              f"આ બેગ માટે ₹ {paid} ચૂકવાઈ ગયા છે: રકમ તેથી ઓછી ન થાય અને વેચનાર / ઉદ્યોગ બદલી ન શકાય")})
     try:
         clean["business_year"] = await _open_year(db, clean["empty_bags_entry_date"], m.empty_bags_entry_date if m else None)
     except YearLockedError as exc:
-        return rerender({"empty_bags_entry_date": YEAR_LOCKED(exc.label)})
+        return rerender({"empty_bags_entry_date": YEAR_LOCKED(exc)})
     keys = {(clean["stockyard_id"], clean["grain_id"])} | ({(m.stockyard_id, m.grain_id)} if m else set())
     for sy, gr in keys:
         await advisory_lock(db, "stockyard_bags", sy * 1000 + gr)

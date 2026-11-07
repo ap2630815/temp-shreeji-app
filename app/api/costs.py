@@ -19,7 +19,7 @@ from app.core.templating import render, render_with_csrf
 from app.models import EmptyBagMoverEntry, EmptyBagSeller, EmptyBagSellerEntry, EmptyBagMover, Farmer, LabourGroup, LabourWork, User
 from app.services import audit
 from app.services.payables import load_payables, paid_for
-from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label
+from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, assert_year_editable, year_is_locked
 
 router = APIRouter()
 INT_MAX = 100_000_000
@@ -74,7 +74,7 @@ async def labour_list(request: Request, year: str = "", user: User = Depends(cur
         stmt = stmt.where(LabourWork.work_date.between(*window))
     rows = list((await db.scalars(stmt.order_by(LabourWork.work_date.desc(), LabourWork.id.desc()))).unique().all())
     paid = {p.payable_id: p.paid for p in await load_payables(db, "labour_group")}
-    return render_with_csrf(request, csrf, "labour_list.html", user=user, rows=rows, paid=paid, year=year, years=years, year_locked=year != current_year_label())
+    return render_with_csrf(request, csrf, "labour_list.html", user=user, rows=rows, paid=paid, year=year, years=years, year_locked=year_is_locked(user, year))
 
 
 @router.get("/LabourWork/New", response_class=HTMLResponse)
@@ -128,9 +128,9 @@ async def _save_labour(request: Request, w: LabourWork | None, user: User, db: A
     try:
         clean["business_year"] = await assert_year_open(db, clean["work_date"])
         if w is not None:
-            await assert_year_open(db, w.work_date)
+            await assert_year_editable(db, w.work_date)
     except YearLockedError as exc:
-        return rerender({"work_date": YEAR_LOCKED(exc.label)})
+        return rerender({"work_date": YEAR_LOCKED(exc)})
     before = None
     if w is not None:
         paid = await paid_for(db, "labour_group", w.id)
@@ -234,7 +234,7 @@ async def bag_list(request: Request, year: str = "", view: str = "supplies", vil
         total_units, total_amount = sum(r.no_of_empty_bags for r in rows), sum(r.payable_amount for r in rows)
     return render_with_csrf(request, csrf, "bag_list.html", user=user, rows=rows, movers=movers, paid=paid, year=year, years=years, view=view,
                             storage=sorted(storage.values(), key=lambda s: (s["farmer"].village.village_name, s["farmer"].farmer_name)),
-                            total_units=total_units, total_amount=total_amount, year_locked=year != current_year_label())
+                            total_units=total_units, total_amount=total_amount, year_locked=year_is_locked(user, year))
 
 
 # ---- movers tab: empty bags carried from a stockyard to a farmer's house (a business cost)
@@ -314,9 +314,9 @@ async def _save_mover(request: Request, m: EmptyBagMoverEntry | None, user: User
     try:
         clean["business_year"] = await assert_year_open(db, clean["mover_date"])
         if m is not None:
-            await assert_year_open(db, m.mover_date)
+            await assert_year_editable(db, m.mover_date)
     except YearLockedError as exc:
-        return rerender({"mover_date": YEAR_LOCKED(exc.label)})
+        return rerender({"mover_date": YEAR_LOCKED(exc)})
     before = None
     if m is not None:
         before = mover_values(m)
@@ -383,9 +383,9 @@ async def _save_bag(request: Request, b: EmptyBagSellerEntry | None, user: User,
     try:
         clean["business_year"] = await assert_year_open(db, clean["selling_date"])
         if b is not None:
-            await assert_year_open(db, b.selling_date)
+            await assert_year_editable(db, b.selling_date)
     except YearLockedError as exc:
-        return rerender({"selling_date": YEAR_LOCKED(exc.label)})
+        return rerender({"selling_date": YEAR_LOCKED(exc)})
     clean["payable_amount"] = clean["rate_per_bag"] * clean["no_of_empty_bags"]
     before = None
     if b is not None:

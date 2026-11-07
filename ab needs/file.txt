@@ -48,7 +48,7 @@ tare_weight_difference = (industry_tare_weight - merchant_tare_weight)
 payments.status: status IN ('partial', 'final', 'complete'), partial, last partial is called final, full for payment in signle time 
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-'farmer', 'truck', 'labour_group', 'empty_bag_seller', 'broker' are the party_type in payments table, and their respective id is party_id in payments table.
+'farmer', 'truck', 'labour_group', 'empty_bag_seller', 'industry', 'broker' are the party_type in payments table, and their respective id is party_id in payments table.
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 payable_amount = { ( (no_of_filled_bags * net_bag_weight ) + extra_kilos) / 20 } * grain_rate_per_20kg
 farmer_total_amount = payable_amount - borrowed_amount
@@ -65,7 +65,8 @@ business_expense_labour_day = petrol + meal
 
 payable_amount = no_of_empty_bags * rate_per_bag 
 bag_supply_total_amount = payable_amount
-sum of payments.amount for (party_type = empty_bag_seller, party_id = empty_bag_sellers.id) should not exceed (bag_supply_total_amount)
+sum of payments.amount for (party_type = empty_bag_seller, party_id = empty_bag_sellers.id) should not exceed (bag_supply_total_amount) + (payable_amount of the empty_bags rows bought from that seller)
+sum of payments.amount for (party_type = industry, party_id = industries.id) should not exceed the payable_amount of the empty_bags rows bought from that industry
 
 brokerage_amount = total_bags_in_truck * brokerage_per_bag 
 broker_total_amount = brokerage_amount

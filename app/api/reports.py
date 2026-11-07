@@ -10,7 +10,7 @@ from app.api.deps import current_user
 from app.api.formkit import today
 from app.core.db import get_db
 from app.core.templating import render_with_csrf
-from app.models import EmptyBagSellerEntry, PurchaseIndividual, LabourWork, Payment, PurchaseFarmerEntry, PurchaseGroup, Receipt, TruckTrip, User
+from app.models import EmptyBag, EmptyBagSellerEntry, PurchaseIndividual, LabourWork, Payment, PurchaseFarmerEntry, PurchaseGroup, Receipt, TruckTrip, User
 from app.services import payables as pay_svc
 from app.services import receivables as rec_svc
 from app.services.payables import PARTIES
@@ -46,6 +46,7 @@ async def year_report(request: Request, year: str = "", user: User = Depends(cur
     labour = list((await db.scalars(select(LabourWork).where(LabourWork.business_year == year))).unique().all())
     labour_wages, labour_extras = sum(w.payable_amount for w in labour), sum(w.petrol + w.meal for w in labour)
     bag_cost = int(await db.scalar(select(func.coalesce(func.sum(EmptyBagSellerEntry.payable_amount), 0)).where(EmptyBagSellerEntry.business_year == year)))
+    bag_cost += int(await db.scalar(select(func.coalesce(func.sum(EmptyBag.payable_amount), 0)).where(EmptyBag.business_year == year)))  # empty bags bought into a stockyard
     brokerage_cost = sum(v.bilty.brokerage_amount for v in views)
     costs = [
         (("Farmers (grain purchased)", "ખેડૂતો (ખરીદેલું અનાજ)"), farmer_cost),

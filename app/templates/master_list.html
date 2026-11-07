@@ -14,7 +14,7 @@
   <a href="/Masters/{{ spec.slug }}/New" class="btn btn-primary btn-sm">+ {{ bi('add') }}</a>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-  <table class="table table-zebra">
+  <table class="table table-zebra" data-sticky-left="2">
     <thead>
       <tr>
         {% for col in spec.list_columns %}<th>{{ spec.field(col).en }}<br><span class="gu text-xs">{{ spec.field(col).gu }}</span></th>{% endfor %}

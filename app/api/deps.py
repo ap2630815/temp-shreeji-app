@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from app.core.security import SESSION_COOKIE, read_session_token
 from app.models import User
+from app.services.years import set_actor
 
 
 async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:
@@ -14,6 +15,7 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
         # full page loads go to login; HTMX requests get a client-side redirect
         headers = {"HX-Redirect": "/Login"} if request.headers.get("HX-Request") else {"Location": "/Login"}
         raise HTTPException(status_code=401 if "HX-Redirect" in headers else 303, headers=headers)
+    set_actor(user)
     return user
 
 

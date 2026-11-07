@@ -32,7 +32,7 @@ from app.services.locations import stored_locations
 from app.services.stock import Stock, stock_by_entry
 from app.services.ledger import all_entry_views, direct_entry_views, paid_for_direct, totals
 from app.services.money import payable_amount, total_available_bags
-from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label
+from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, assert_year_editable, year_is_locked
 
 router = APIRouter()
 INT_MAX = 100_000_000
@@ -71,7 +71,7 @@ async def _ledger_page(request, csrf, db, user, *, view, year, grain_id, village
     years = sorted(set(await _years(db, user)) | set(await _group_years(db, user)), reverse=True)
     year = year if year in years else current_year_label()
     now = today()
-    ctx = dict(view=view, today=now, year=year, years=years, year_locked=year != current_year_label(), views=[], totals=None, rows=[])
+    ctx = dict(view=view, today=now, year=year, years=years, year_locked=year_is_locked(user, year), views=[], totals=None, rows=[])
     if view == "groups":
         ctx["rows"] = await group_rows(db, year, grain_id, village_id, toolbar_window(request))
         return render_with_csrf(request, csrf, "farmers_entries.html", user=user, **ctx)
@@ -279,9 +279,9 @@ async def _save_direct(request: Request, e: PurchaseIndividual | None, user: Use
     try:
         clean["business_year"] = await assert_year_open(db, clean["purchase_individual_date"])
         if e is not None:
-            await assert_year_open(db, e.purchase_individual_date)
+            await assert_year_editable(db, e.purchase_individual_date)
     except YearLockedError as exc:
-        return rerender({"purchase_individual_date": YEAR_LOCKED(exc.label)})
+        return rerender({"purchase_individual_date": YEAR_LOCKED(exc)})
 
     clean["terms"] = clean["terms"] or grain.grain_terms
     clean["payable_amount"] = payable_amount(clean["no_of_filled_bags"], clean["extra_kilos"], grain.net_bag_weight, clean["grain_rate_per_20kg"])

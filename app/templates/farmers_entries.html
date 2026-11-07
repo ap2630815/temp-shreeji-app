@@ -27,7 +27,7 @@
 
 {% if view == 'groups' %}
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-  <table class="table table-zebra table-sm">
+  <table class="table table-zebra table-sm" data-sticky-left="2">
     <thead><tr>
       {{ th('Date', 'તારીખ') }}{{ th('Village', 'ગામ') }}{{ th('Grain', 'અનાજ') }}{{ th('Rate/20kg', '20 કિલો ભાવ') }}
       {{ th('Bag kg', 'બેગ કિલો') }}{{ th('Pay after', 'ચુકવણી પછી') }}{{ th('Farmers', 'ખેડૂત') }}{{ th('Bags', 'બેગ') }}
@@ -57,14 +57,14 @@
 </div>
 {% elif view == 'bags' %}
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-  <table class="table table-zebra table-sm">
-    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Source', 'સ્ત્રોત') }}{{ th('Village', 'ગામ') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Grain', 'અનાજ') }}{{ th('Total available', 'કુલ ઉપલબ્ધ') }}{{ th('Loaded on trucks', 'ટ્રકમાં ભરેલી') }}{{ th('Taken to stockyard', 'સ્ટોકયાર્ડમાં') }}{{ th('Remaining', 'બાકી') }}</tr></thead>
+  <table class="table table-zebra table-sm" data-sticky-left="3">
+    <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Village', 'ગામ') }}{{ th('Grain', 'અનાજ') }}{{ th('Source', 'સ્ત્રોત') }}{{ th('Total available', 'કુલ ઉપલબ્ધ') }}{{ th('Loaded on trucks', 'ટ્રકમાં ભરેલી') }}{{ th('Taken to stockyard', 'સ્ટોકયાર્ડમાં') }}{{ th('Remaining', 'બાકી') }}</tr></thead>
     <tbody>
     {% for r in rows %}
       <tr>
         <td class="whitespace-nowrap">{{ r.entry.entry_date }}</td>
+        <td>{{ r.entry.farmer.farmer_name }}</td><td>{{ r.entry.village.village_name }}</td><td>{{ r.entry.grain.grain_name }}</td>
         <td><a class="link" href="{{ r.link }}">{{ t('Group', 'ગ્રુપ') if r.kind == 'PurchaseGroup' else t('Individual', 'વ્યક્તિગત') }}</a></td>
-        <td>{{ r.entry.village.village_name }}</td><td>{{ r.entry.farmer.farmer_name }}</td><td>{{ r.entry.grain.grain_name }}</td>
         <td>{{ r.stock.bought }}</td><td>{{ r.stock.loaded }}</td><td>{{ r.stock.moved }}</td><td class="font-semibold">{{ r.stock.available }}</td>
       </tr>
     {% else %}<tr><td colspan="9" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
@@ -82,7 +82,7 @@
 </div>
 
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-  <table class="table table-zebra table-sm">
+  <table class="table table-zebra table-sm" data-sticky-left="3">
     <thead><tr>
       {{ th('Date', 'તારીખ') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Village', 'ગામ') }}{{ th('Grain', 'અનાજ') }}{% if not direct %}{{ th('Purchase', 'ખરીદી') }}{% endif %}
       {{ th('Bags', 'બેગ') }}{{ th('Kg', 'કિલો') }}{{ th('Rate/20kg', '20 કિલો ભાવ') }}{{ th('Amount', 'રકમ') }}{{ th('Borrowing', 'ઉધાર') }}{{ th('Net', 'ચોખ્ખું') }}
@@ -106,7 +106,7 @@
         <td class="font-semibold">{{ v.due | inr }}</td>
         <td class="whitespace-nowrap {{ 'text-error' if v.is_overdue(today) }}">{{ e.due_date }}</td>
         <td>{{ badge(v.status, v.is_overdue(today)) }}</td>
-        <td class="text-right whitespace-nowrap"><a class="btn btn-primary btn-sm" href="{{ '/PurchaseIndividual/%s/Edit' % e.id if e.is_direct else '/PurchaseGroup/Entries/%s/Edit' % e.id }}">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right whitespace-nowrap">{% if can_edit_year(user, year) %}<a class="btn btn-primary btn-sm" href="{{ '/PurchaseIndividual/%s/Edit' % e.id if e.is_direct else '/PurchaseGroup/Entries/%s/Edit' % e.id }}">{{ t('Edit', 'સુધારો') }}</a>{% endif %}</td>
       </tr>
     {% else %}
       <tr><td colspan="16" class="text-center opacity-60">{{ t('No entries in this year', 'આ વર્ષમાં કોઈ નોંધ નથી') }}</td></tr>

@@ -449,9 +449,12 @@ class EmptyBag(TimestampMixin, Base):
         _year_check("empty_bags"),
         _year_index("empty_bags"),
         CheckConstraint("no_of_empty_bags > 0", name="ck_empty_bags_no_of_empty_bags"),
+        CheckConstraint("rate_per_empty_bag >= 0", name="ck_empty_bags_rate"),
+        CheckConstraint("empty_bag_seller_id IS NULL OR industry_id IS NULL", name="ck_empty_bags_one_seller_or_industry"),
         Index("ix_empty_bags_stockyard_id", "stockyard_id"),
         Index("ix_empty_bags_grain_id", "grain_id"),
         Index("ix_empty_bags_empty_bag_seller_id", "empty_bag_seller_id"),
+        Index("ix_empty_bags_industry_id", "industry_id"),
         Index("ix_empty_bags_empty_bag_mover_id", "empty_bag_mover_id"),
     )
 
@@ -461,7 +464,9 @@ class EmptyBag(TimestampMixin, Base):
     grain_id: Mapped[int] = mapped_column(ForeignKey("grains.id"))
     empty_bag_seller_id: Mapped[int | None] = mapped_column(ForeignKey("empty_bag_sellers.id"))
     empty_bag_mover_id: Mapped[int | None] = mapped_column(ForeignKey("empty_bag_movers.id"))
+    industry_id: Mapped[int | None] = mapped_column(ForeignKey("industries.id"))  # bought from an industry instead of a seller
     no_of_empty_bags: Mapped[int] = mapped_column(Integer)
+    rate_per_empty_bag: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     business_year: Mapped[str] = mapped_column(String(7))
     description: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
@@ -470,7 +475,11 @@ class EmptyBag(TimestampMixin, Base):
     grain: Mapped[Grain] = relationship(lazy="joined")
     seller: Mapped[EmptyBagSeller | None] = relationship(lazy="joined")
     mover: Mapped[EmptyBagMover | None] = relationship(lazy="joined")
+    industry: Mapped[Industry | None] = relationship(lazy="joined")
 
+
+# payable_amount (not stored) = no_of_empty_bags * rate_per_empty_bag: what is paid to the seller / industry the bags were bought from
+EmptyBag.payable_amount = column_property(EmptyBag.no_of_empty_bags * EmptyBag.rate_per_empty_bag)
 
 class Bilty(TimestampMixin, Base):
     """The consignment note for a trip: weights at both ends."""

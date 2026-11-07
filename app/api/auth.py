@@ -32,6 +32,7 @@ async def login(
     if user is None or not user.is_active or not verify_password(user.password_hash, password):
         return render(request, "partials/login_error.html")  # 200: htmx does not swap 4xx
     response = Response(status_code=204, headers={"HX-Redirect": "/"})
+    response.delete_cookie("toolbar_filters")  # a new login starts with no filters
     response.set_cookie(
         SESSION_COOKIE,
         make_session_token(user.id),
@@ -48,4 +49,5 @@ async def logout(request: Request, csrf: CsrfProtect = Depends(), _: User = Depe
     await csrf.validate_csrf(request)
     response = Response(status_code=204, headers={"HX-Redirect": "/Login"})
     response.delete_cookie(SESSION_COOKIE)
+    response.delete_cookie("toolbar_filters")  # the remembered toolbar filters end with the session
     return response

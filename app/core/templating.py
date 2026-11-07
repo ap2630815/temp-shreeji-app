@@ -17,6 +17,9 @@ from app.api.masters_config import SPECS
 
 templates.env.globals["L"] = LABELS
 templates.env.globals["PERIODS"] = PERIODS
+from app.services.years import can_edit_year  # noqa: E402  (owner-only, last 3 business years)
+
+templates.env.globals["can_edit_year"] = can_edit_year
 
 
 def cell(row, path: str):

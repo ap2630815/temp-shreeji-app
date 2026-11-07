@@ -11,6 +11,7 @@ from app.api.masters_config import SPECS
 from app.api.deps import current_user
 from app.core.config import settings
 from app.core.db import SessionLocal
+from app.core import toolbar_state
 from app.core.templating import BASE_DIR, render_with_csrf
 from sqlalchemy import select
 
@@ -37,7 +38,20 @@ async def load_grains(request: Request, call_next):
     """Grain and village names for the toolbar dropdowns (page loads only)."""
     request.state.grains = []
     request.state.villages = []
-    if request.method == "GET" and request.url.query:
+    remember: dict[str, str] | None = None  # toolbar filters to store in the cookie after this response
+    page_load = request.method == "GET" and not request.url.path.startswith("/static") and "hx-request" not in request.headers
+    if page_load and request.url.path not in ("/Login", "/Logout"):
+        # toolbar filters follow you from page to page until you change them (see app/core/toolbar_state.py)
+        cookie = request.cookies.get(toolbar_state.COOKIE)
+        items, state, changed = toolbar_state.resolve(request.query_params.multi_items(), cookie)
+        request.scope["query_string"] = urlencode(items).encode()
+        if hasattr(request, "_url"):
+            del request._url
+        if hasattr(request, "_query_params"):
+            del request._query_params
+        if changed or (cookie is not None and not state):
+            remember = state
+    elif request.method == "GET" and request.url.query:
         # the toolbar's "Village" / "Grain" placeholder submits village_id= / grain_id= (empty): treat blank (or non-numeric id) filters as "not chosen"
         # instead of letting the integer parsing fail
         kept = [(k, v) for k, v in request.query_params.multi_items() if v.strip() and (k not in ("village_id", "grain_id") or v.strip().isdigit())]
@@ -52,7 +66,13 @@ async def load_grains(request: Request, call_next):
         except Exception:
             request.state.grains = []
             request.state.villages = []
-    return await call_next(request)
+    response = await call_next(request)
+    if remember is not None:  # a browser-session cookie: gone when the browser closes or on logout
+        if remember:
+            response.set_cookie(toolbar_state.COOKIE, toolbar_state.dump(remember), httponly=True, samesite="lax", secure=settings.cookie_secure)
+        else:
+            response.delete_cookie(toolbar_state.COOKIE)
+    return response
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.include_router(auth.router)
 app.include_router(account.router)

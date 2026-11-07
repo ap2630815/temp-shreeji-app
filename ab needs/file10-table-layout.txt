@@ -1,0 +1,63 @@
+TABLE LAYOUT RULES (list screens) - sticky columns and alignment
+==============================================================================
+
+Standard rule (script + styles at the end of app/templates/base.html)
+----------------------------------------------------------------------
+1. In the template, put the identifying columns leftmost, in this order when present:
+       date, farmer / name, village / stockyard / industry, grain
+2. Set data-sticky-left="N" on the <table> (N = how many leftmost columns are pinned; default 2).
+3. The table sits directly inside a <div class="overflow-x-auto">.
+4. Alignment (always, scrolling or not): the first N columns are LEFT-aligned, every other column
+   (including the Edit / Open / Pay button column) is RIGHT-aligned.
+5. Pinning (only when the table is wider than its box): the first N columns stay in view, the rest
+   scroll sideways. The button column is NOT pinned. If the pinned columns would take more than 60%
+   of the width (phones) nothing is pinned.
+6. Tables with fewer than 4 columns, or with data-no-sticky, are left alone.
+7. A new column that is a key to the row goes inside the first N; anything else goes after them.
+   Adding a screen = follow steps 1-3, nothing else.
+
+Pinned columns per screen (N)
+----------------------------------------------------------------------
+PURCHASE FARMERS (/PurchaseFarmers)
+  Purchase Groups ........... 2   date, village
+  Farmer Entries ............ 3   date, farmer, village
+  Purchase Individuals ...... 3   date, farmer, village
+  Farmer Bag Ledger ......... 3   date, farmer, village   (then grain, source ...)
+STOCKYARD PURCHASE (/StockyardPurchase)
+  Stockyard Purchase ........ 3   date, farmer, stockyard (then grain ...)
+  Purchase Entries .......... 3   date, purchase, filled bags
+  Arrangement Entries ....... 3   date, purchase entry, labour group
+  Farmer -> Stockyard ....... 3   date, farmer entry, grain
+  Empty Bags ................ 3   date, stockyard, grain
+  Stockyard Bag Ledger ...... 2   stockyard, grain
+EMPTY BAGS (/EmptyBags)
+  Sellers ................... 3   date, seller, delivered at
+  Movers .................... 3   date, mover, delivered at
+  Storage by Farmer ......... 2   village, farmer
+OTHER
+  Labour work ............... 2   date, group
+  Broker bookings ........... 4   date, broker, grain, industry
+  Trips ..................... 3   date, truck, industry
+  Receivables ............... 1   industry
+  Payables - farmer ......... 3   name, village, mobile
+  Payables - truck / labour / bag supplier / industry / broker ... 2   name, mobile
+  Purchase group page: farmers table 2 (farmer, village); entries table 2 (date, farmer)
+MASTERS (/Masters/...)  always 2 = the first two list columns
+  Village (name, name Gujarati), Grain (name, name Gujarati), Labour group (name, name Gujarati),
+  Empty bag seller / mover (full name, pet name), Transport (name, pet name), Truck (number, owner),
+  Industry (name, grain), Broker (name, mobile), Farmer (name, village), Labour (name, group),
+  Labour wages (group, grain), Brokerage (broker, grain), Stockyard (name, location)
+  -> the order of spec.list_columns in app/api/masters_config.py decides this; keep identifying
+     columns first there.
+
+Edit buttons and business years (see file9-database.txt)
+----------------------------------------------------------------------
+The Edit button of a row is shown only if can_edit_year(user, year) is true: owner, and the year is
+one of the last 3 business years. The accountant never sees Edit buttons.
+
+Toolbar filters are remembered (village, grain, date)
+----------------------------------------------------------------------
+The filters chosen in the top bar stay chosen when you move to another page. They are kept in a
+browser-session cookie (toolbar_filters) and change only when you pick another value, choose "All",
+press "Filter on" (clear all), or log out / log in again. A filter greyed out on a page keeps its stored
+value for the next page. Code: app/core/toolbar_state.py, applied in app/main.py (load_grains).

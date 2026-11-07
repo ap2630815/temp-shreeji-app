@@ -14,6 +14,7 @@ Table payments
         truck         -> trucks         (paid to the truck owner)
         labour_group  -> labour_groups
         empty_bag_seller  -> empty_bag_sellers
+        industry      -> industries      (empty bags bought from an industry)
         broker        -> brokers
 
 Table payment_allocations   (which bills a payment settled)
@@ -24,6 +25,7 @@ Table payment_allocations   (which bills a payment settled)
         truck               -> truck_trips
         labour_group        -> labour_work
         empty_bag_seller        -> empty_bag_sellers_entries
+        empty_bag           -> empty_bags       (bags bought into a stockyard; for a seller party and for an industry party)
         broker              -> bilties            (brokerage per bilty)
 
 Payment ledgers (one per party type; amount owed per row):
@@ -32,9 +34,11 @@ Payment ledgers (one per party type; amount owed per row):
     3. Labour ledger        row = labour work day                  amount = net_payable (wages - borrowing)
     4. Empty bag seller ledger  row = empty bag seller entry          amount = rate_per_bag * no_of_empty_bags
     5. Broker ledger        row = bilty                            amount = brokerage_amount
+    6. Industry ledger      row = empty_bags row bought from it    amount = no_of_empty_bags * rate_per_empty_bag
+       (the empty bag seller ledger also lists the empty_bags rows bought from that seller)
     Statement columns after the date:
         farmer: Details | truck: Industry, Grain, Bags | labour: Work |
-        bag supplier: Farmer, Village, Bags, Rate/bag | broker: Bill no., Truck, Industry
+        empty bag seller: Delivered to (farmer or stockyard), Village / grain, Bags, Rate/bag | industry (empty bags): Stockyard, Grain, Bags, Rate/bag | broker: Bill no., Truck, Industry
     Per row: amount, paid (sum of allocations), due = amount - paid, status = paid / partial / pending, overdue (farmers only).
 
 
@@ -55,7 +59,7 @@ Industry ledger:
 
 C. HOW A PAYMENT / RECEIPT IS RECORDED
 --------------------------------------
-1. Reject if the business year is locked.
+1. Reject if the payment/receipt date is outside the years this user may add to (owner: current + 2 previous business years; accountant: current year only).
 2. Lock the party (advisory lock) so two clerks cannot allocate against the same dues.
 3. Load the party's payables, oldest first (payments: due_date or doc date; receipts: bilty date).
 4. Spread the amount over the open dues; reject if it exceeds the outstanding total.
@@ -121,6 +125,7 @@ Tables that write audit rows:
     bilties                    create / update
     labour_work                create / update
     empty_bag_sellers_entries               create / update
+    empty_bags                 create / update
     stockyard_purchases        create / update
     stockyard_purchase_entries create / update  (also when a purchase edit recalculates its entries)
     stockyard_arrangement_entries create / update  (also when an entry's filled bags change)
@@ -154,4 +159,4 @@ Table stockyard_arrangement_entries   (bag arranging work paid per bag to a labo
 Derived views (no table of their own):
     purchase entries     bags, payable, borrowed, net per entry, due date; totals shown in the page header
     arrangement entries  bags and amount per entry; totals shown in the page header
-Only the current business year accepts new or changed rows; every save is written to the audit log (section F).
+Owner: new or changed rows in the current and 2 previous business years. Accountant: new rows only, current year only, never changes. Every save is written to the audit log (section F).

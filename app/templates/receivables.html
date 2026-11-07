@@ -10,7 +10,7 @@
   <span class="badge badge-lg badge-warning h-auto py-1 gap-3">{{ t('Outstanding', 'બાકી') }}<b>{{ totals.due | inr }}</b></span>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-  <table class="table table-zebra table-sm">
+  <table class="table table-zebra table-sm" data-sticky-left="1">
     <thead><tr>{{ th('Industry', 'ઉદ્યોગ') }}{{ th('Trucks', 'ટ્રક') }}{{ th('Weight awaited', 'વજન બાકી') }}{{ th('Shortage kg', 'ઘટ કિલો') }}{{ th('Billed', 'બિલ') }}{{ th('Received', 'મળ્યા') }}{{ th('Outstanding', 'બાકી') }}<th></th></tr></thead>
     <tbody>
     {% for industry, s in rows %}

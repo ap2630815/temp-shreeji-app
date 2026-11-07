@@ -15,7 +15,7 @@
   </form>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-  <table class="table table-zebra table-sm">
+  <table class="table table-zebra table-sm" data-sticky-left="2">
     <thead><tr>{{ th('Date', 'તારીખ') }}{{ th('Group', 'જૂથ') }}{{ th('Wages', 'મજૂરી') }}{{ th('Borrowing', 'ઉધાર') }}{{ th('Net', 'ચોખ્ખું') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Balance', 'બાકી') }}{{ th('Petrol', 'પેટ્રોલ') }}{{ th('Meal', 'જમવાનું') }}<th></th></tr></thead>
     <tbody>
     {% for w in rows %}{% set p = paid.get(w.id, 0) %}
@@ -25,7 +25,7 @@
         <td>{{ w.payable_amount | inr }}</td><td>{{ w.borrowing_amount | inr if w.borrowing_amount else '' }}</td>
         <td class="font-medium">{{ w.net_payable | inr }}</td><td>{{ p | inr }}</td><td class="font-semibold">{{ (w.net_payable - p) | inr }}</td>
         <td>{{ w.petrol | inr if w.petrol else '' }}</td><td>{{ w.meal | inr if w.meal else '' }}</td>
-        <td class="text-right"><a class="btn btn-primary btn-sm" href="/LabourWork/{{ w.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right">{% if can_edit_year(user, year) %}<a class="btn btn-primary btn-sm" href="/LabourWork/{{ w.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a>{% endif %}</td>
       </tr>
     {% else %}<tr><td colspan="10" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
     </tbody>

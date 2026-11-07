@@ -16,14 +16,14 @@
   {% endfor %}
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-  <table class="table table-sm even-tint">
-    <thead><tr>{{ th('Name', 'નામ') }}{% if type == 'farmer' %}{{ th('Village', 'ગામ') }}{% endif %}{{ th('Mobile', 'મોબાઇલ') }}{{ th('Items', 'નંગ') }}{{ th('Oldest', 'સૌથી જૂની') }}{% if type == 'farmer' %}{{ th('Overdue', 'મુદત વીતી') }}{% endif %}{{ th('Total due', 'કુલ બાકી') }}<th></th></tr></thead>
+  <table class="table table-sm even-tint" data-sticky-left="{{ 3 if type == 'farmer' else 2 }}">
+    <thead><tr>{{ th('Name', 'નામ') }}{% if type == 'farmer' %}{{ th('Village', 'ગામ') }}{% endif %}{{ th('Mobile', 'મોબાઇલ') }}{% if type == 'truck' %}{{ th('No. of unpaid trips', 'બાકી ટ્રીપની સંખ્યા') }}{% else %}{{ th('Items', 'નંગ') }}{% endif %}{{ th('Oldest', 'સૌથી જૂની') }}{% if type == 'farmer' %}{{ th('Overdue', 'મુદત વીતી') }}{% endif %}{{ th('Total due', 'કુલ બાકી') }}<th></th></tr></thead>
     <tbody>
     {% for r in rows %}
       <tr>
         <td><a class="link" href="/Statements/{{ type }}/{{ r.party_id }}">{{ r.name }}</a></td>
         {% if type == 'farmer' %}<td>{{ r.village }}</td>{% endif %}
-        <td>{{ r.mobile | mobhtml }}</td><td>{{ r.items }}</td>
+        <td>{{ r.mobile | mobhtml }}</td><td>{{ r.unpaid_count }}</td>
         <td class="{{ 'text-error' if type == 'farmer' and r.earliest < today }}">{{ r.earliest }}</td>
         {% if type == 'farmer' %}<td class="{{ 'text-error font-semibold' if r.overdue }}">{{ r.overdue | inr }}</td>{% endif %}
         <td class="font-semibold">{{ r.due | inr }}</td>

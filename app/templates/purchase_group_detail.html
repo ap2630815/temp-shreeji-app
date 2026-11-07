@@ -13,7 +13,7 @@
     {{ meta('Village', 'ગામ', p.village.village_name ~ (('  ' ~ p.village.village_name_gu) if p.village.village_name_gu else '')) }}
     {{ meta('Grain', 'અનાજ', p.grain.grain_name ~ (('  ' ~ p.grain.grain_name_gu) if p.grain.grain_name_gu else '')) }}
   </div></div></div>
-  <a href="/PurchaseGroup/{{ p.id }}/Edit" class="btn btn-primary btn-sm">{{ t('Edit purchase group', 'ખરીદી જૂથ સુધારો') }}</a>
+  {% if can_edit_year(user, p.business_year) %}<a href="/PurchaseGroup/{{ p.id }}/Edit" class="btn btn-primary btn-sm">{{ t('Edit purchase group', 'ખરીદી જૂથ સુધારો') }}</a>{% endif %}
 </div>
 <div class="card bg-base-100 shadow w-fit max-w-full mb-4"><div class="flex flex-wrap divide-x divide-base-300 py-1">
   {{ meta('Date', 'તારીખ', p.purchase_group_date) }}
@@ -43,7 +43,7 @@
 <div class="card bg-base-100 shadow mb-4"><div class="card-body p-4">
   <h2 class="font-semibold inline-flex flex-col leading-snug"><span>Farmers in this purchase ({{ people | length }})</span><span class="gu text-sm">આ ખરીદીમાં ખેડૂતો ({{ people | length }})</span></h2>
   <p class="text-xs opacity-60 flex flex-col leading-snug"><span>Each farmer has their own ledger in this purchase. The same village can have other purchases with other farmers.</span><span class="gu">દરેક ખેડૂતનું આ ખરીદીમાં પોતાનું ખાતું છે. એ જ ગામની બીજી ખરીદીમાં બીજા ખેડૂતો હોઈ શકે.</span></p>
-  <div class="overflow-x-auto"><table class="table table-sm table-zebra">
+  <div class="overflow-x-auto"><table class="table table-sm table-zebra" data-sticky-left="2">
     <thead><tr>{{ th('Farmer', 'ખેડૂત') }}{{ th('Village', 'ગામ') }}{{ th('Entries', 'નોંધ') }}{{ th('Net payable', 'ચોખ્ખું') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Due', 'બાકી') }}<th></th></tr></thead>
     <tbody>
     {% for x in people %}
@@ -57,7 +57,7 @@
 
 <div class="card bg-base-100 shadow"><div class="card-body p-4">
   <h2 class="font-semibold inline-flex flex-col leading-snug"><span>Entries ({{ views | length }})</span><span class="gu text-sm">એન્ટ્રીઓ ({{ views | length }})</span></h2>
-  <div class="overflow-x-auto"><table class="table table-zebra table-sm">
+  <div class="overflow-x-auto"><table class="table table-zebra table-sm" data-sticky-left="2">
     <thead><tr>
       {{ th('Date', 'તારીખ') }}{{ th('Farmer', 'ખેડૂત') }}{{ th('Labour', 'મજૂર') }}{{ th('Bags', 'બેગ') }}{{ th('Handful', 'હેન્ડફુલ') }}{{ th('Kilos', 'કિલો') }}
       {{ th('Amount', 'રકમ') }}{{ th('Borrowing', 'ઉધાર') }}{{ th('Net', 'ચોખ્ખું') }}{{ th('Paid', 'ચૂકવ્યું') }}{{ th('Balance', 'બાકી') }}{{ th('Due on', 'ચૂકવવાની તારીખ') }}{{ th('Status', 'સ્થિતિ') }}<th></th>
@@ -79,7 +79,7 @@
         <td class="whitespace-nowrap {{ 'text-error' if v.is_overdue(today) }}">{{ e.due_date }}</td>
         <td>{{ badge(v.status, v.is_overdue(today)) }}</td>
         <td class="text-right whitespace-nowrap">
-          <a class="btn btn-primary btn-sm" href="/PurchaseGroup/Entries/{{ e.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a>
+          {% if can_edit_year(user, e.business_year) %}<a class="btn btn-primary btn-sm" href="/PurchaseGroup/Entries/{{ e.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a>{% endif %}
         </td>
       </tr>
     {% else %}

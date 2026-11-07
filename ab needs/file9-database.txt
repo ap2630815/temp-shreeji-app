@@ -43,14 +43,22 @@ Every dated record stores its year in a business_year VARCHAR(7) column:
    they belong to the year of their parent truck_trips / payments / receipts row.)
 
 Rules enforced by the application (app/services/years.py):
-  1. Entering or changing a record, payment or receipt is only allowed when
-     its date falls inside the CURRENT business year. A date in any past or
-     future year is rejected, and a record already stored in a past year can
-     no longer be edited.
-  2. A year closes automatically on 1 October; nobody locks or unlocks it.
-     The old business_years lock table was dropped (migration b7d3f0a91c42).
+  1. Who may write to which year (checked on every record, payment and receipt;
+     assert_year_open = adding, assert_year_editable = changing or deleting):
+       owner       adds AND edits records, payments and receipts dated in the
+                   current business year and the 2 before it (the last 3 years,
+                   OWNER_YEARS in years.py).
+       accountant  only ADDS records, payments and receipts, and only dated in
+                   the CURRENT business year. The accountant can never edit or
+                   delete an existing record (the Edit buttons are hidden).
+     A date outside the allowed years is rejected, and a record stored in a year
+     the user may not edit cannot be changed. Older years are read-only.
+  2. A year drops out of the owner's 3-year window automatically on 1 October;
+     nobody locks or unlocks it. The old business_years lock table was dropped
+     (migration b7d3f0a91c42).
   3. Only the owner can view past business years (lists, detail pages, year
      report, /Years). Accountants only see the current year.
+     The "Closed" badge on a list means the year is closed for the signed-in user.
   4. Each year's data stays in the same tables, told apart by business_year.
   5. business_year is never typed by the user. The application sets it from the
      record's own date (purchase_group_date, purchase_entry_date, booking_date,

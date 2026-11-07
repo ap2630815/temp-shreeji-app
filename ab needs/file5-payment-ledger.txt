@@ -25,7 +25,7 @@ Table constraints / indexes:
   CHECK ck_payments_amount_positive: amount > 0
   CHECK ck_payments_method: method IN ('cash', 'cheque', 'upi', 'bank')
   CHECK ck_payments_receiver_mobile: receiver_mobile ~ '^[0-9]{10}$'
-  CHECK ck_payments_party_type: party_type IN ('farmer', 'truck', 'labour_group', 'empty_bag_seller', 'broker')
+  CHECK ck_payments_party_type: party_type IN ('farmer', 'truck', 'labour_group', 'empty_bag_seller', 'industry', 'broker')
   CHECK ck_payments_status: status IN ('partial', 'final', 'complete')
   CHECK ck_payments_business_year_format: business_year ~ '^[0-9]{4}-[0-9]{2}$'
   INDEX ix_payments_business_year (business_year)
@@ -45,7 +45,7 @@ amount       | BIGINT      | NOT NULL
 
 Table constraints / indexes:
   CHECK ck_alloc_amount_positive: amount > 0
-  CHECK ck_alloc_payable_type: payable_type IN ('farmer', 'purchase_individual', 'truck', 'labour_group', 'empty_bag_seller', 'broker')
+  CHECK ck_alloc_payable_type: payable_type IN ('farmer', 'purchase_individual', 'truck', 'labour_group', 'empty_bag_seller', 'empty_bag', 'broker')
   INDEX ix_alloc_payable (payable_type, payable_id)
 
 ==============================================================================

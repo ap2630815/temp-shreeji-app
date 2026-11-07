@@ -86,7 +86,7 @@
         {% set keep = [] %}{% for k in ('year', 'village_id', 'grain_id') %}{% if request.query_params.get(k) %}{% set _ = keep.append(k ~ '=' ~ request.query_params.get(k)) %}{% endif %}{% endfor %}
         {# next to Analysis: clears the village and grain filters in one click (lit while any filter is applied) #}
         {% set any_filter = sel_v or sel_g or date_on %}
-        <a href="{{ request.url.path }}{{ ('?' ~ request.url.remove_query_params(['village_id', 'grain_id', 'period', 'on_date']).query) if request.url.remove_query_params(['village_id', 'grain_id', 'period', 'on_date']).query }}" role="switch" aria-checked="{{ 'true' if any_filter else 'false' }}" title="Clear all filters"
+        <a href="{{ request.url.path }}?{{ request.url.remove_query_params(['village_id', 'grain_id', 'period', 'on_date', 'filters']).include_query_params(filters='clear').query }}" role="switch" aria-checked="{{ 'true' if any_filter else 'false' }}" title="Clear all filters"
            class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight normal-case font-semibold filter-btn {{ 'on' if any_filter else 'opacity-40 cursor-not-allowed' }}" {% if not any_filter %}tabindex="-1" aria-disabled="true" onclick="return false"{% endif %}>
           <span>{{ 'Filter on' if any_filter else 'Filter off' }}</span><span class="gu text-xs">{{ 'ફિલ્ટર ચાલુ' if any_filter else 'ફિલ્ટર બંધ' }}</span>
         </a>

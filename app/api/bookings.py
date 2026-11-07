@@ -21,7 +21,7 @@ from app.services.filters import trip_conditions
 from app.models import Bilty, BrokerBooking, Brokerage, Industry, TruckTrip, User
 from app.services import audit, money
 from app.services.receivables import received_map
-from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible
+from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible, assert_year_editable, year_is_locked
 
 router = APIRouter(prefix="/Bookings")
 
@@ -106,7 +106,7 @@ async def list_page(
         rows = await db.execute(select(TruckTrip.broker_booking_id, func.count()).where(TruckTrip.broker_booking_id.in_([b.id for b in bookings])).group_by(TruckTrip.broker_booking_id))
         counts = {bid: int(n) for bid, n in rows.all()}
     return render_with_csrf(request, csrf, "booking_list.html", user=user, bookings=bookings, counts=counts, grain_id=grain_id, year=year,
-                            years=years, year_locked=year != current_year_label())
+                            years=years, year_locked=year_is_locked(user, year))
 
 
 # ---------------------------------------------------------------- create / edit
@@ -164,9 +164,9 @@ async def _save(request: Request, b: BrokerBooking | None, user: User, db: Async
     try:
         clean["business_year"] = await assert_year_open(db, clean["booking_date"])
         if b is not None:
-            await assert_year_open(db, b.booking_date)
+            await assert_year_editable(db, b.booking_date)
     except YearLockedError as exc:
-        return rerender({"booking_date": YEAR_LOCKED(exc.label)})
+        return rerender({"booking_date": YEAR_LOCKED(exc)})
 
     before = None
     if b is not None:

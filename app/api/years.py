@@ -11,7 +11,7 @@ from app.api.deps import require_role
 from app.core.db import get_db
 from app.core.templating import render_with_csrf
 from app.models import EmptyBagSellerEntry, BrokerBooking, PurchaseIndividual, LabourWork, Payment, PurchaseFarmerEntry, PurchaseGroup, Receipt, TruckTrip, User
-from app.services.years import allowed_years, current_year_label, year_bounds
+from app.services.years import allowed_years, current_year_label, year_bounds, year_is_locked
 
 router = APIRouter(prefix="/Years")
 
@@ -22,5 +22,5 @@ async def years_page(request: Request, user: User = Depends(require_role("owner"
     for model in (PurchaseGroup, PurchaseFarmerEntry, PurchaseIndividual, BrokerBooking, TruckTrip, LabourWork, EmptyBagSellerEntry, Payment, Receipt):
         found |= set((await db.scalars(select(model.business_year).distinct())).all())
     current = current_year_label()
-    rows = [dict(label=y, current=y == current, bounds=year_bounds(y)) for y in allowed_years(user, found)]
+    rows = [dict(label=y, current=y == current, editable=not year_is_locked(user, y), bounds=year_bounds(y)) for y in allowed_years(user, found)]
     return render_with_csrf(request, csrf, "years.html", user=user, rows=rows)

@@ -9,7 +9,7 @@ from fastapi import Request
 
 from app.api.masters_config import F, national_mobile
 from app.core.periods import date_window as _date_window
-from app.services.years import current_year_label
+from app.services.years import _actor_role, current_year_label
 
 
 def today() -> date:
@@ -55,10 +55,14 @@ def form_context(*, fields: list[F], values: dict, errors: dict, action: str, he
 
 
 GENERIC_ERROR = ("Could not save, please check the values", "સાચવી શકાયું નહીં, કૃપા કરીને કિંમતો તપાસો")
-YEAR_LOCKED = lambda label: (  # noqa: E731
-    f"Date is in business year {label}, which is closed. Use a date in {current_year_label()} (Oct-Sep)",
-    f"તારીખ વ્યવસાય વર્ષ {label} માં છે, જે બંધ છે. {current_year_label()} (ઓક્ટો-સપ્ટે) ની તારીખ વાપરો",
-)
+def YEAR_LOCKED(exc):  # noqa: N802  exc: a YearLockedError
+    if exc.reason == "no_edit":
+        return ("Only the owner can change an existing entry; the accountant can only add new ones",
+                "ફક્ત માલિક જૂની એન્ટ્રી સુધારી શકે છે; એકાઉન્ટન્ટ ફક્ત નવી એન્ટ્રી ઉમેરી શકે છે")
+    return (f"Date is in business year {exc.label}, which is closed for you. Use a date in {current_year_label()} (Oct-Sep)"
+            + (" or one of the 2 years before" if (_actor_role.get() == "owner") else ""),
+            f"તારીખ વ્યવસાય વર્ષ {exc.label} માં છે, જે બંધ છે. {current_year_label()} (ઓક્ટો-સપ્ટે)"
+            + (" અથવા પહેલાના 2 વર્ષની" if (_actor_role.get() == "owner") else "") + " તારીખ વાપરો")
 
 
 def toolbar_ids(request: Request) -> tuple[int, int]:

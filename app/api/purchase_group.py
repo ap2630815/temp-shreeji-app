@@ -26,7 +26,7 @@ from app.services.ledger import entry_views, paid_for_entry, purchase_group_entr
 from app.services.locations import stored_locations
 from app.services.duplicates import DUPLICATE_MSG, find_duplicate
 from app.services.money import payable_amount, total_available_bags
-from app.services.years import YearLockedError, allowed_years, assert_year_open, business_year_of, current_year_label, require_year_visible
+from app.services.years import YearLockedError, allowed_years, assert_year_open, business_year_of, current_year_label, require_year_visible, assert_year_editable
 
 router = APIRouter(prefix="/PurchaseGroup")
 
@@ -322,9 +322,9 @@ async def _save_info(request: Request, purchase_group_id: int | None, user: User
     try:
         clean["business_year"] = await assert_year_open(db, clean["purchase_group_date"])
         if p is not None:  # also the stored year must be open, otherwise a locked year could be edited
-            await assert_year_open(db, p.purchase_group_date)
+            await assert_year_editable(db, p.purchase_group_date)
     except YearLockedError as exc:
-        return await rerender({"purchase_group_date": YEAR_LOCKED(exc.label)})
+        return await rerender({"purchase_group_date": YEAR_LOCKED(exc)})
 
     listed = await roster.listed_farmer_ids(db, p_id) if p_id else []
     added = [f for f in picked if f not in listed]
@@ -507,9 +507,9 @@ async def _save_entry(request: Request, p: PurchaseGroup, e: PurchaseFarmerEntry
     try:
         await assert_year_open(db, clean["purchase_entry_date"])
         if e is not None:
-            await assert_year_open(db, e.purchase_entry_date)
+            await assert_year_editable(db, e.purchase_entry_date)
     except YearLockedError as exc:
-        return rerender({"purchase_entry_date": YEAR_LOCKED(exc.label)})
+        return rerender({"purchase_entry_date": YEAR_LOCKED(exc)})
     clean["business_year"] = await assert_year_open(db, clean["purchase_entry_date"])
 
     new_payable = payable_amount(clean["no_of_filled_bags"], clean["extra_kilos"], net_weight, p.grain_rate_per_20kg)

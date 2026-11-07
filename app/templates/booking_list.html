@@ -15,7 +15,7 @@
   </form>
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-  <table class="table table-zebra table-sm">
+  <table class="table table-zebra table-sm" data-sticky-left="4">
     <thead><tr>
       {{ th('Date', 'તારીખ') }}{{ th('Broker', 'દલાલ') }}{{ th('Grain', 'અનાજ') }}{{ th('Industry', 'ઉદ્યોગ') }}{{ th('Rate', 'ભાવ') }}
       {{ th('Truck size', 'ટ્રક સાઇઝ') }}{{ th('Deduction %', 'કપાત %') }}{{ th('Trips', 'ટ્રીપ') }}<th></th>
@@ -31,7 +31,7 @@
         <td>{{ b.truck_size }} T</td>
         <td>{{ ('%.1f %%' % b.percentage_deduction) if b.percentage_deduction is not none else '' }}</td>
         <td>{{ counts.get(b.id, 0) }}</td>
-        <td class="text-right"><a class="btn btn-primary btn-sm" href="/Bookings/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a></td>
+        <td class="text-right">{% if can_edit_year(user, year) %}<a class="btn btn-primary btn-sm" href="/Bookings/{{ b.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a>{% endif %}</td>
       </tr>
     {% else %}
       <tr><td colspan="9" class="text-center opacity-60">{{ t('No bookings in this year', 'આ વર્ષમાં કોઈ બુકિંગ નથી') }}</td></tr>

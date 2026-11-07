@@ -334,15 +334,25 @@ empty_bags_entry_date       | DATE                     | NOT NULL
 stockyard_id                | INTEGER                  | NOT NULL, FOREIGN KEY -> stockyards.id
 grain_id                    | INTEGER                  | NOT NULL, FOREIGN KEY -> grains.id
 empty_bag_seller_id         | INTEGER                  | NULL, FOREIGN KEY -> empty_bag_sellers.id
+industry_id                 | INTEGER                  | NULL, FOREIGN KEY -> industries.id  (bought from an industry instead of a seller)
 empty_bag_mover_id          | INTEGER                  | NULL, FOREIGN KEY -> empty_bag_movers.id
 no_of_empty_bags            | INTEGER                  | NOT NULL 
+rate_per_empty_bag          | INTEGER                  | NOT NULL, DEFAULT 0 
 business_year               | VARCHAR(7)               | NOT NULL
 description                 | TEXT                     | -
 created_by                  | INTEGER                  | FOREIGN KEY -> users.id
 created_at                  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
+payable_amount (not stored) = no_of_empty_bags * rate_per_empty_bag
+Only one of empty_bag_seller_id / industry_id can be filled; the one filled is the party paid for these bags (payment ledger: party_type
+'empty_bag_seller' or 'industry', payable_type 'empty_bag'). With neither, the rate must be 0 and nothing is payable.
+Once a payment is allocated, payable_amount cannot go below what was paid and the seller / industry cannot change.
+
 Table constraints / indexes:
   CHECK ck_empty_bags_no_of_empty_bags: no_of_empty_bags > 0
+  CHECK ck_empty_bags_rate: rate_per_empty_bag >= 0
+  CHECK ck_empty_bags_one_seller_or_industry: empty_bag_seller_id IS NULL OR industry_id IS NULL
+  INDEX ix_empty_bags_industry_id (industry_id)
   INDEX ix_empty_bags_business_year (business_year)
   INDEX ix_empty_bags_empty_bag_seller_id (empty_bag_seller_id)
   INDEX ix_empty_bags_empty_bag_mover_id (empty_bag_mover_id)

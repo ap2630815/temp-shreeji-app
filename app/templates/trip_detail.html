@@ -1,28 +1,59 @@
 {% extends "layout.html" %}
 {% from "partials/bilabel.html" import t, th %}
-{% macro row(en, gu, value, cls='') %}<tr><td>{{ t(en, gu) }}</td><td class="text-right {{ cls }}">{{ value }}</td></tr>{% endmacro %}
+{% macro row(en, gu, value, cls='') %}<tr><td>{{ t(en, gu) }}</td><td class="text-right tabular-nums {{ cls }}">{{ value }}</td></tr>{% endmacro %}
 {% macro kg(v) %}{{ '{:,}'.format(v) if v is not none else '—' }}{% endmacro %}
+{% macro meta(en, gu, val) %}<div class="flex flex-col leading-snug px-4 py-1"><span class="text-xs inline-flex gap-2"><span>{{ en }}</span><span class="gu">{{ gu }}</span></span><b class="text-sm tabular-nums">{{ val }}</b></div>{% endmacro %}
+{% macro sub(en, gu, val='') %}<div class="flex items-start justify-between gap-6 py-1 w-full"><span class="inline-flex flex-col leading-snug"><span class="text-xs text-base-content">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span>{% if val != '' %}<b class="text-sm text-base-content whitespace-nowrap tabular-nums">{{ val }}</b>{% endif %}</div>{% endmacro %}
+{% macro stat(en, gu, val, cls='') %}<span class="inline-flex flex-col leading-snug"><span class="stat-title">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span><span class="text-2xl font-bold tabular-nums whitespace-nowrap {{ cls }}">{{ val }}</span>{% endmacro %}
+{% macro heading(en, gu) %}<h2 class="font-semibold inline-flex flex-col leading-snug"><span>{{ en }}</span><span class="gu text-sm">{{ gu }}</span></h2>{% endmacro %}
 {% block title %}{{ trip.truck.truck_number }}{% endblock %}
 {% block content %}
+<div class="stackbi">
 {% set booking = trip.broker_booking %}
-<div class="flex flex-wrap items-center gap-3 mb-4">
+{% set farmer_bags = trip.load_lines | sum(attribute='no_of_loaded_bags') %}
+{% set yard_bags = trip.stockyard_lines | sum(attribute='no_of_loaded_bags') %}
+{% set freight_bal = trip.total_amount - freight_paid %}
+{% set recv_total = bilty.receivable_after_deduction if bilty and bilty.receivable_after_deduction is not none else none %}
+
+<div class="flex flex-wrap items-center gap-3 mb-2">
   <a href="/Trips?year={{ trip.business_year }}" class="btn btn-ghost btn-sm">←</a>
-  <h1 class="text-xl font-semibold flex-1">{{ trip.truck.truck_number }} → {{ trip.industry.industry_name }} · {{ trip.grain.grain_name }}</h1>
-  <a href="/Trips/{{ trip.id }}/Edit" class="btn btn-primary btn-sm">{{ t('Edit trip', 'ટ્રીપ સુધારો') }}</a>
+  <h1 class="text-xl font-semibold flex-1 min-w-0">{{ trip.truck.truck_number }} <span class="opacity-50">→</span> {{ trip.industry.industry_name }}
+    <span class="badge badge-ghost align-middle ml-1">{{ trip.grain.grain_name }}</span></h1>
+  {% if can_edit_year(user, trip.business_year) %}<a href="/Trips/{{ trip.id }}/Edit" class="btn btn-primary btn-sm">{{ t('Edit trip', 'ટ્રીપ સુધારો') }}</a>{% endif %}
   <a href="/Trips/{{ trip.id }}/Bilty" class="btn btn-primary btn-sm">{{ t('Edit bilty', 'બિલ્ટી સુધારો') if bilty else t('Add bilty', 'બિલ્ટી ઉમેરો') }}</a>
 </div>
-<p class="text-sm mb-1">{{ trip.trip_date }} · {{ t('Transport', 'ટ્રાન્સપોર્ટ') }}: {{ trip.transporter.pet_name }}
-  · {{ t('Truck owner', 'ટ્રક માલિક') }}: <a class="link" href="/Statements/truck/{{ trip.truck_id }}">{{ trip.truck.truck_owner_name }}</a>
-  · {{ t('Driver', 'ડ્રાઇવર') }}: {{ trip.truck.driver_name }} ({{ trip.truck.driver_mobile | mobhtml }}) · {{ t('Labour', 'મજૂર') }}: {{ trip.labour_group.group_name }}</p>
-<p class="text-sm mb-1">{{ t('Booking', 'બુકિંગ') }}: {{ booking.booking_date }} · {{ t('Broker', 'દલાલ') }}:
-  <a class="link" href="/Statements/broker/{{ booking.brokerage.broker_id }}">{{ booking.brokerage.broker.broker_name }}</a> · {{ booking.truck_size }} T</p>
-{% if trip.description %}<p class="text-sm opacity-80 mb-2">{{ trip.description }}</p>{% endif %}
+
+<div class="card bg-base-100 shadow w-fit max-w-full mb-4"><div class="flex flex-wrap divide-x divide-base-300 py-1">
+  {{ meta('Date', 'તારીખ', trip.trip_date) }}
+  {{ meta('Transport', 'ટ્રાન્સપોર્ટ', trip.transporter.pet_name) }}
+  <div class="flex flex-col leading-snug px-4 py-1"><span class="text-xs inline-flex gap-2"><span>Truck owner</span><span class="gu">ટ્રક માલિક</span></span><a class="link text-sm font-bold" href="/Statements/truck/{{ trip.truck_id }}">{{ trip.truck.truck_owner_name }}</a></div>
+  <div class="flex flex-col leading-snug px-4 py-1"><span class="text-xs inline-flex gap-2"><span>Driver</span><span class="gu">ડ્રાઇવર</span></span><b class="text-sm">{{ trip.truck.driver_name }} <span class="font-normal">({{ trip.truck.driver_mobile | mobhtml }})</span></b></div>
+  {{ meta('Labour', 'મજૂર', trip.labour_group.group_name) }}
+</div></div>
+<div class="card bg-base-100 shadow w-fit max-w-full mb-4"><div class="flex flex-wrap divide-x divide-base-300 py-1">
+  {{ meta('Booking', 'બુકિંગ', booking.booking_date) }}
+  <div class="flex flex-col leading-snug px-4 py-1"><span class="text-xs inline-flex gap-2"><span>Broker</span><span class="gu">દલાલ</span></span><a class="link text-sm font-bold" href="/Statements/broker/{{ booking.brokerage.broker_id }}">{{ booking.brokerage.broker.broker_name }}</a></div>
+  {{ meta('Truck size', 'ટ્રક સાઇઝ', booking.truck_size ~ ' T') }}
+  {{ meta('Business year', 'વ્યવસાય વર્ષ', trip.business_year) }}
+</div></div>
+{% if trip.description %}<div class="card bg-base-100 shadow mb-4"><div class="card-body p-4 text-sm opacity-80">{{ trip.description }}</div></div>{% endif %}
+
+<div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
+  <div class="stat py-2"><div class="flex items-start justify-between gap-6 w-full">{{ stat('Bags loaded', 'ભરેલી બેગ', trip.bags) }}</div>
+    <div class="stat-desc w-full mt-1 border-t border-base-300 pt-1">{{ sub('from farmers', 'ખેડૂતો પાસેથી', farmer_bags) }}{{ sub('from stockyard', 'સ્ટોકયાર્ડમાંથી', yard_bags) }}</div></div>
+  <div class="stat py-2"><div class="flex items-start justify-between gap-6 w-full">{{ stat('Grain weight', 'અનાજનું વજન', (kg(bilty.merchant_net_weight) ~ ' kg') if bilty else '—') }}</div>
+    <div class="stat-desc w-full mt-1 border-t border-base-300 pt-1">{{ sub('industry', 'કારખાનું', (kg(bilty.industry_net_weight) ~ ' kg') if bilty else '—') }}{{ sub('shortage', 'ઘટ', (bilty.percentage_difference ~ '%') if bilty and bilty.percentage_difference is not none else '—') }}</div></div>
+  <div class="stat py-2"><div class="flex items-start justify-between gap-6 w-full">{{ stat('Truck owner due', 'ટ્રક માલિકને બાકી', freight_bal | inr, 'text-error' if freight_bal > 0 else '') }}</div>
+    <div class="stat-desc w-full mt-1 border-t border-base-300 pt-1">{{ sub('payable', 'ચૂકવવાપાત્ર', trip.total_amount | inr) }}{{ sub('paid', 'ચૂકવ્યું', freight_paid | inr) }}</div></div>
+  <div class="stat py-2"><div class="flex items-start justify-between gap-6 w-full">{{ stat('Industry owes', 'કારખાનું આપશે', ((recv_total - received) | inr) if recv_total is not none else '—', 'text-error' if recv_total is not none and recv_total - received > 0 else '') }}</div>
+    <div class="stat-desc w-full mt-1 border-t border-base-300 pt-1">{{ sub('receivable', 'લેણાં', (recv_total | inr) if recv_total is not none else '—') }}{{ sub('received', 'મળ્યા', received | inr) }}</div></div>
+</div>
 <div id="flash" class="mb-3"></div>
 
-<div class="grid lg:grid-cols-2 gap-4">
+<div class="grid lg:grid-cols-2 gap-4 items-start">
   <!-- ------------------------------------------------ load lines -->
   <div class="card bg-base-100 shadow"><div class="card-body p-4">
-    <h2 class="font-semibold">{{ t('Loaded from', 'ક્યાંથી ભર્યું') }} · {{ trip.bags }} {{ t('bags', 'બેગ') }}</h2>
+    <div class="flex items-start justify-between gap-2 pb-2 border-b border-base-300">{{ heading('Loaded from', 'ક્યાંથી ભર્યું') }}<span class="badge badge-ghost badge-lg tabular-nums gap-2">{{ trip.bags }} {{ t('bags', 'બેગ') }}</span></div>
     <table class="table table-sm"><tbody>
       <tr><td colspan="3" class="text-xs uppercase opacity-60">{{ t('From farmers', 'ખેડૂતો પાસેથી') }}</td></tr>
       {% for line in trip.load_lines %}
@@ -53,7 +84,7 @@
 
   <!-- ------------------------------------------------ weights -->
   <div class="card bg-base-100 shadow"><div class="card-body p-4">
-    <h2 class="font-semibold">{{ t('Weights', 'વજન') }} (kg){% if bilty %} · {{ t('Bill', 'બિલ') }} #{{ bilty.bill_number }} · {{ bilty.bilty_date }}{% endif %}</h2>
+    <div class="flex items-start justify-between gap-2 pb-2 border-b border-base-300">{{ heading('Weights (kg)', 'વજન (કિ)') }}{% if bilty %}<span class="flex flex-wrap justify-end gap-1"><span class="badge badge-ghost badge-lg tabular-nums gap-2">{{ t('Bill', 'બિલ') }} <span>#{{ bilty.bill_number }}</span></span><span class="badge badge-ghost badge-lg tabular-nums">{{ bilty.bilty_date }}</span></span>{% endif %}</div>
     {% if bilty %}
     <table class="table table-sm">
       <thead><tr><th></th>{{ th('Ours', 'આપણું') }}{{ th('Industry', 'કારખાનું') }}{{ th('Industry − ours', 'કારખાનું − આપણું') }}</tr></thead>
@@ -85,7 +116,7 @@
 
   <!-- ------------------------------------------------ freight -->
   <div class="card bg-base-100 shadow"><div class="card-body p-4">
-    <h2 class="font-semibold">{{ t('Freight to the truck owner', 'ટ્રક માલિકને ભાડું') }}{% if trip.freight_is_provisional %} <span class="badge badge-warning badge-sm">{{ t('provisional', 'કામચલાઉ') }}</span>{% endif %}</h2>
+    <div class="flex items-start justify-between gap-2 pb-2 border-b border-base-300">{{ heading('Freight to the truck owner', 'ટ્રક માલિકને ભાડું') }}{% if trip.freight_is_provisional %}<span class="badge badge-warning badge-sm">{{ t('provisional', 'કામચલાઉ') }}</span>{% endif %}</div>
     <table class="table table-sm"><tbody>
       {% if trip.rent_per_ton %}
       {{ row('By weight', 'વજન મુજબ', ('%s kg × ₹%s/t = ' % ('{:,}'.format(trip.freight_weight_kg or 0), trip.rent_per_ton)) ~ (trip.freight_by_weight | inr)) }}
@@ -105,7 +136,7 @@
 
   <!-- ------------------------------------------------ sale -->
   <div class="card bg-base-100 shadow"><div class="card-body p-4">
-    <h2 class="font-semibold">{{ t('Sale to industry', 'ઉદ્યોગને વેચાણ') }}</h2>
+    <div class="flex items-start justify-between gap-2 pb-2 border-b border-base-300">{{ heading('Sale to industry', 'ઉદ્યોગને વેચાણ') }}</div>
     {% if bilty %}
     <table class="table table-sm"><tbody>
       {{ row('Rate', 'ભાવ', '₹ %s per %s kg%s' % (booking.grain_rate_per_booking_weight, bilty.booking_weight, (' − ₹ %s' % bilty.any_rate_change) if bilty.any_rate_change else '')) }}
@@ -122,5 +153,6 @@
     <a class="btn btn-sm btn-outline w-fit" href="/Industries/{{ trip.industry.id }}/Account">{{ t('Industry account', 'ઉદ્યોગ ખાતું') }}</a>
     {% else %}<p class="text-sm opacity-60">—</p>{% endif %}
   </div></div>
+</div>
 </div>
 {% endblock %}

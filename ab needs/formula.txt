@@ -95,6 +95,14 @@ Rule: borrowing_amount <= payable_amount.
 payable_amount        = rate_per_bag * no_of_empty_bags
 (a business cost, never deducted from the farmer)
 
+8b. EMPTY BAGS BOUGHT INTO A STOCKYARD  (empty_bags, /StockyardPurchase?view=empty_bags)
+---------------------------------------------------------------------------------
+payable_amount        = no_of_empty_bags * rate_per_empty_bag      (not stored)
+paid to               = the empty bag seller OR the industry on the row (never both); with neither, the rate must be 0 and nothing is payable
+ledger                = party_type 'empty_bag_seller' (listed with the seller's entries to farmers) or 'industry'; payable_type 'empty_bag'
+business cost         = included in the year report's Bags cost
+after a payment       = the amount cannot go below what was paid, and the seller / industry cannot change
+
 
 9. PAYMENT ALLOCATION  (oldest due first)  (app/services/ledger.py: allocate)
 -----------------------------------------------------------------------------

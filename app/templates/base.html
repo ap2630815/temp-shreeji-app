@@ -69,6 +69,8 @@
     @media print { body::before { display: none; } }
     @media (min-width: 1024px) { .sidebar-collapsed .drawer-side { display: none; } }
     .menu li.menu-title { padding: .5rem .75rem .25rem; }
+    /* a faint grey rule above each drawer section (Buying, Selling, ...): the title's own colour at low opacity, so it suits every theme */
+    .drawer-side .menu li.menu-title::before { content: ""; display: block; height: 1px; margin: .25rem 0 .6rem; background: currentColor; opacity: .18; }
     .menu li > a.active { background: oklch(var(--p)) !important; color: #000 !important; font-weight: 600; }
     .menu li > a { justify-content: space-between; }
     .btn { font-weight: 600; }
@@ -152,6 +154,18 @@
     .btn:has(.bi) .bi > span { white-space: nowrap; }
       /* a mobile number on screen: double click selects the whole number (98765 43210); copying it drops the space */
     .mob { user-select: all; cursor: text; white-space: nowrap; }
+    /* every tab label: the first letter of each word in capitals (Gujarati text is unaffected) */
+    .tabs .tab { text-transform: capitalize; }
+    /* wide tables (inside .overflow-x-auto): the first columns stay put while the rest scroll sideways (script at the end of the page) */
+    .sticky-col { position: sticky; z-index: 2; background-color: oklch(var(--b1)); }
+    thead .sticky-col { z-index: 3; }
+    .table-zebra tbody tr:nth-child(even) .sticky-col { background-color: oklch(var(--b2)); }
+    .even-tint tbody tr:nth-child(odd) td.sticky-col { background-color: oklch(var(--b1)); }
+    .even-tint tbody tr:nth-child(even) td.sticky-col { background-color: color-mix(in srgb, oklch(var(--p)) 14%, white); }
+    /* in a table that scrolls sideways: pinned columns read left-aligned, the scrolling columns right-aligned */
+    .table th.col-left, .table td.col-left { text-align: left; }
+    .table th.col-right, .table td.col-right { text-align: right; }
+    .sticky-col.sticky-edge-left { box-shadow: 3px 0 4px -3px rgba(0, 0, 0, .35); }
   </style>
 </head>
 <body class="min-h-screen bg-base-200" hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
@@ -251,6 +265,49 @@
     if (series.length === 1 && m[4]) series = ' ' + series;   // a one-letter series is padded once digits follow: GJ 14  X 6720
     el.value = [m[1], m[2], series, m[4]].filter(Boolean).join(' ');
   });
+</script>
+<script>
+/* Standard rule for wide tables: put the identifying columns (date, farmer/name, village/stockyard/industry, grain ...) leftmost in the template and
+   set data-sticky-left="N" on the <table>. When a table is wider than its box, its first N columns (default 2)
+   stay in view while the other columns scroll sideways; the button column is not pinned.
+   A table that fits is left alone; data-no-sticky on a table switches this off for it. */
+(function () {
+  function clear(t) {
+    t.querySelectorAll('.sticky-col, .col-left, .col-right').forEach(function (c) {
+      c.classList.remove('sticky-col', 'sticky-edge-left', 'col-left', 'col-right');
+      c.style.left = '';
+    });
+  }
+  function apply(t) {
+    var wrap = t.parentElement, head = t.tHead && t.tHead.rows[t.tHead.rows.length - 1];
+    clear(t);
+    if (!head || t.hasAttribute('data-no-sticky')) return;
+    var n = head.cells.length, left = parseInt(t.getAttribute('data-sticky-left') || '2', 10);
+    if (n < 4) return;
+    var rows = Array.prototype.slice.call(t.rows).filter(function (r) { return r.cells.length === n; });  // skips the "nothing recorded" row
+    // alignment always applies: the first N columns read left, the rest right (the button column is an ordinary, unpinned column)
+    rows.forEach(function (r) {
+      for (var i = 0; i < n; i++) r.cells[i].classList.add(i < left ? 'col-left' : 'col-right');
+    });
+    if (wrap.scrollWidth <= wrap.clientWidth + 1) return;  // fits: nothing to pin
+    var offs = [], x = 0;
+    for (var i = 0; i < left; i++) { offs.push(x); x += head.cells[i].getBoundingClientRect().width; }
+    if (x > wrap.clientWidth * 0.6) return;  // pinned columns would leave no room to scroll (phones): leave the table alone
+    rows.forEach(function (r) {
+      for (var i = 0; i < left; i++) {
+        var c = r.cells[i];
+        c.classList.add('sticky-col');
+        c.style.left = offs[i] + 'px';
+        if (i === left - 1) c.classList.add('sticky-edge-left');
+      }
+    });
+  }
+  function all() { document.querySelectorAll('.overflow-x-auto > table').forEach(apply); }
+  document.addEventListener('DOMContentLoaded', all);
+  window.addEventListener('load', all);
+  window.addEventListener('resize', all);
+  document.addEventListener('htmx:afterSettle', all);
+})();
 </script>
 </body>
 </html>

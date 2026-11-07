@@ -127,7 +127,7 @@ async def receive(request: Request, industry_id: int, user: User = Depends(curre
     try:
         receipt = await svc.record_receipt(db, user, industry_id, clean)
     except YearLockedError as exc:
-        return rerender({"receipt_date": YEAR_LOCKED(exc.label)})
+        return rerender({"receipt_date": YEAR_LOCKED(exc)})
     except PaymentError as exc:
         return rerender({exc.field: exc.message})
     receipt_id = receipt.id

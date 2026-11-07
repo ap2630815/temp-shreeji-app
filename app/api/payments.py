@@ -171,7 +171,7 @@ async def pay(
     try:
         payment = await pay_svc.record_payment(db, user, party_type, party_id, clean)
     except YearLockedError as exc:
-        return rerender({"payment_date": YEAR_LOCKED(exc.label)})
+        return rerender({"payment_date": YEAR_LOCKED(exc)})
     except PaymentError as exc:
         return rerender({exc.field: exc.message})
     payment_id = payment.id
@@ -225,9 +225,9 @@ async def payables_page(
     for p in await pay_svc.load_payables(db, type):
         if p.due <= 0 or (window and not window[0] <= p.doc_date <= window[1]) or (on_grain is not None and (p.payable_type, p.payable_id) not in on_grain):
             continue
-        row = per_party.setdefault(p.party_id, dict(party_id=p.party_id, name=p.party_name, due=0, overdue=0, earliest=p.sort_key[0], items=0))
+        row = per_party.setdefault(p.party_id, dict(party_id=p.party_id, name=p.party_name, due=0, overdue=0, earliest=p.sort_key[0], unpaid_count=0))
         row["due"] += p.due
-        row["items"] += 1
+        row["unpaid_count"] += 1
         row["earliest"] = min(row["earliest"], p.sort_key[0])
         if p.is_overdue(now):
             row["overdue"] += p.due

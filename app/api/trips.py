@@ -28,7 +28,7 @@ from app.services.payables import paid_for
 from app.services.receivables import received_map
 from app.services.stock import stock_by_entry
 from app.services.stockyard_stock import filled_ledger, Filled
-from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible
+from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, require_year_visible, assert_year_editable, year_is_locked
 
 router = APIRouter(prefix="/Trips")
 
@@ -245,7 +245,7 @@ async def list_page(
         stmt = stmt.where(TruckTrip.trip_date.between(*window))
     trips = list((await db.scalars(stmt.order_by(TruckTrip.trip_date.desc(), TruckTrip.id.desc()))).unique().all())
     return render_with_csrf(request, csrf, "trip_list.html", user=user, trips=trips, grain_id=grain_id, year=year, years=years,
-                            year_locked=year != current_year_label(), warn_pct=SHORT_WARN_PCT)
+                            year_locked=year_is_locked(user, year), warn_pct=SHORT_WARN_PCT)
 
 
 # ================================================================== trip create / edit
@@ -307,9 +307,9 @@ async def _save_trip(request: Request, trip: TruckTrip | None, user: User, db: A
     try:
         clean["business_year"] = await assert_year_open(db, clean["trip_date"])
         if trip is not None:
-            await assert_year_open(db, trip.trip_date)
+            await assert_year_editable(db, trip.trip_date)
     except YearLockedError as exc:
-        return rerender({"trip_date": YEAR_LOCKED(exc.label)})
+        return rerender({"trip_date": YEAR_LOCKED(exc)})
 
     before = None
     if trip is not None:
@@ -375,7 +375,7 @@ async def add_line(request: Request, trip_id: int, user: User = Depends(current_
     try:
         await assert_year_open(db, trip.trip_date)
     except YearLockedError as exc:
-        return form({"no_of_loaded_bags": YEAR_LOCKED(exc.label)})
+        return form({"no_of_loaded_bags": YEAR_LOCKED(exc)})
     new_lines: list = []
     added_bags = 0
     if clean["farmer_source"]:
@@ -434,9 +434,9 @@ async def _delete_load(request: Request, user: User, db: AsyncSession, line, kin
         return render(request, "partials/flash_text.html", kind="error", en=en, gu=gu)
 
     try:
-        await assert_year_open(db, trip.trip_date)
+        await assert_year_editable(db, trip.trip_date)
     except YearLockedError as exc:
-        return flash(*YEAR_LOCKED(exc.label))
+        return flash(*YEAR_LOCKED(exc))
     new_bags = trip.bags - bags
     total = _total(trip.freight_weight_kg, new_bags, trip.rent_per_ton, trip.rent_per_bag, trip.advance_amount, trip.other_payable, trip.other_deduction)
     problem = _below_paid(await paid_for(db, "truck", trip.id), total, ("freight", "ભાડા"))
@@ -517,10 +517,10 @@ async def save_bilty(request: Request, trip_id: int, user: User = Depends(curren
     try:
         clean["business_year"] = await assert_year_open(db, clean["bilty_date"])
         if bilty is not None:
-            await assert_year_open(db, bilty.bilty_date)
+            await assert_year_editable(db, bilty.bilty_date)
         await assert_year_open(db, trip.trip_date)
     except YearLockedError as exc:
-        return rerender({"bilty_date": YEAR_LOCKED(exc.label)})
+        return rerender({"bilty_date": YEAR_LOCKED(exc)})
 
     clash = await db.scalar(select(Bilty.id).where(Bilty.business_year == clean["business_year"], Bilty.bill_number == clean["bill_number"], Bilty.id != (bilty.id if bilty else 0)))
     if clash:
