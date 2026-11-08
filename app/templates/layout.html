@@ -72,6 +72,23 @@
           </select>
         </div>
         <span class="flex-1"></span>
+        {# general filter: pick any column of the table on this page, then type or pick a value; hides the other rows (script below; nothing is sent to the server) #}
+        <div id="gf" class="relative flex items-center gap-2">
+          <div id="gf-btn" class="btn btn-sm h-auto min-h-0 py-1 gap-0 normal-case font-semibold filter-btn">
+            <div id="gf-col" class="relative px-2 flex flex-col leading-tight cursor-pointer" role="button" tabindex="0" aria-label="Column">
+              <span id="gf-col-en">Column</span><span id="gf-col-gu" class="gu text-xs">કૉલમ</span>
+            </div>
+            <select id="gf-col-sel" class="hidden" aria-hidden="true" tabindex="-1"></select>
+            <span class="opacity-60">|</span>
+            <div id="gf-valbox" class="relative px-2 flex flex-col leading-tight font-normal">
+              <span id="gf-val-en">Type or pick a value</span><span id="gf-val-gu" class="gu text-xs">કિંમત લખો અથવા પસંદ કરો</span>
+              <input id="gf-val" type="text" autocomplete="off" aria-label="Value" class="absolute inset-0 w-full h-full px-2 text-center font-normal bg-transparent outline-none border-0">
+            </div>
+          </div>
+          <div id="gf-col-menu" class="gf-menu" hidden></div>
+          <div id="gf-val-menu" class="gf-menu" hidden></div>
+          <span id="gf-count" class="text-xs opacity-70 tabular-nums whitespace-nowrap"></span>
+        </div>
         {# the date filter: a preset period ending today, or one specific day (picked with the calendar); frozen like the others where the page has no dates #}
         <div class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight relative normal-case font-semibold filter-btn {{ 'opacity-40 cursor-not-allowed' if date_off else ('on' if date_on) }}">
           <span>{{ on_date if date_on and on_date else (sel_p[1] if date_on and sel_p else 'Date') }}</span><span class="gu text-xs">{{ '' if date_on and on_date else (sel_p[2] if date_on and sel_p else 'તારીખ') }}</span>
@@ -86,9 +103,9 @@
         {% set keep = [] %}{% for k in ('year', 'village_id', 'grain_id') %}{% if request.query_params.get(k) %}{% set _ = keep.append(k ~ '=' ~ request.query_params.get(k)) %}{% endif %}{% endfor %}
         {# next to Analysis: clears the village and grain filters in one click (lit while any filter is applied) #}
         {% set any_filter = sel_v or sel_g or date_on %}
-        <a href="{{ request.url.path }}?{{ request.url.remove_query_params(['village_id', 'grain_id', 'period', 'on_date', 'filters']).include_query_params(filters='clear').query }}" role="switch" aria-checked="{{ 'true' if any_filter else 'false' }}" title="Clear all filters"
+        <a href="{{ request.url.path }}?{{ request.url.remove_query_params(['village_id', 'grain_id', 'period', 'on_date', 'filters']).include_query_params(filters='clear').query }}" id="clear-all" data-server-on="{{ '1' if any_filter else '0' }}" role="switch" aria-checked="{{ 'true' if any_filter else 'false' }}" title="Clear all filters"
            class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight normal-case font-semibold filter-btn {{ 'on' if any_filter else 'opacity-40 cursor-not-allowed' }}" {% if not any_filter %}tabindex="-1" aria-disabled="true" onclick="return false"{% endif %}>
-          <span>{{ 'Filter on' if any_filter else 'Filter off' }}</span><span class="gu text-xs">{{ 'ફિલ્ટર ચાલુ' if any_filter else 'ફિલ્ટર બંધ' }}</span>
+          <span id="clear-en">{{ 'Filter on' if any_filter else 'Filter off' }}</span><span id="clear-gu" class="gu text-xs">{{ 'ફિલ્ટર ચાલુ' if any_filter else 'ફિલ્ટર બંધ' }}</span>
         </a>
         <a href="/Analysis{{ '?' ~ keep|join('&') if keep }}" class="btn btn-sm h-auto min-h-0 py-1 gap-0 flex-col leading-tight normal-case font-semibold filter-btn {{ 'on' if request.url.path.startswith('/Analysis') }}"><span>Analysis</span><span class="gu text-xs">વિશ્લેષણ</span></a>
       </form>
@@ -156,6 +173,135 @@
       keep.forEach(function (k) { if (!u.searchParams.has(k)) u.searchParams.set(k, cur.get(k)); });
       a.setAttribute('href', u.pathname + u.search + u.hash);
     });
+  })();
+  // general filter: the columns of the table on this page; pick a column, then type or pick a value, and only the rows holding it stay
+  // (this page only, not remembered). It also lights "Filter on" and is cleared by it.
+  (function () {
+    var $ = function (id) { return document.getElementById(id); };
+    var colSel = $('gf-col-sel'), val = $('gf-val'), count = $('gf-count'), box = $('gf'), gfBtn = $('gf-btn'), colPart = $('gf-col'),
+        colEn = $('gf-col-en'), colGu = $('gf-col-gu'), valEn = $('gf-val-en'), valGu = $('gf-val-gu'), colMenu = $('gf-col-menu'), valMenu = $('gf-val-menu'),
+        clr = $('clear-all'), clrEn = $('clear-en'), clrGu = $('clear-gu'), valBoxEl = $('gf-valbox');
+    if (!colSel) return;
+    var exact = false;  // true when the value was picked from the list: only rows holding exactly that value stay (typing = contains)
+    var table = null, heads = [], NB = '\u00a0\u00a0';
+    function norm(x) { return (x || '').replace(/\s+/g, ' ').trim(); }
+    function active() { return colSel.value !== '' || !!norm(val.value); }
+    function pickTable() {
+      var best = null, bestN = 0;
+      document.querySelectorAll('main table').forEach(function (t) {
+        if (!t.tHead || t.closest('form')) return;
+        var n = t.tHead.rows[t.tHead.rows.length - 1].cells.length, rows = t.tBodies[0] ? t.tBodies[0].rows.length : 0;
+        if (n >= 3 && rows > 0 && n > bestN) { best = t; bestN = n; }
+      });
+      return best;
+    }
+    function dataRows() {
+      var n = table.tHead.rows[table.tHead.rows.length - 1].cells.length;
+      return Array.prototype.filter.call(table.tBodies[0].rows, function (r) { return r.cells.length === n; });
+    }
+    // one look for both drop-downs (.gf-menu in base.html): English, two spaces, Gujarati
+    function item(en, gu, v, sel) {
+      var d = document.createElement('div'); d.setAttribute('data-v', v); if (sel) d.className = 'sel';
+      d.appendChild(document.createTextNode(en));
+      if (gu) { d.appendChild(document.createTextNode(NB)); var g = document.createElement('span'); g.className = 'gu'; g.textContent = gu; d.appendChild(g); }
+      return d;
+    }
+    function closeMenus() { colMenu.hidden = true; valMenu.hidden = true; }
+    function place(menu, part) {  // under its own half of the button
+      var b = box.getBoundingClientRect(), p = part.getBoundingClientRect();
+      menu.style.left = (p.left - b.left) + 'px';
+    }
+    function syncClear() {
+      if (!clr) return;
+      var on = clr.getAttribute('data-server-on') === '1' || active();
+      clr.classList.toggle('on', on); clr.classList.toggle('opacity-40', !on); clr.classList.toggle('cursor-not-allowed', !on);
+      clr.setAttribute('aria-checked', on ? 'true' : 'false');
+      if (on) { clr.removeAttribute('aria-disabled'); clr.removeAttribute('tabindex'); } else { clr.setAttribute('aria-disabled', 'true'); clr.setAttribute('tabindex', '-1'); }
+      clrEn.textContent = on ? 'Filter on' : 'Filter off'; clrGu.textContent = on ? 'ફિલ્ટર ચાલુ' : 'ફિલ્ટર બંધ';
+    }
+    function lit() { gfBtn.classList.toggle('on', active()); syncClear(); }
+    function setLabel() {
+      var h = heads.filter(function (x) { return String(x.i) === colSel.value; })[0];
+      colEn.textContent = h ? h.en : 'Any column'; colGu.textContent = h ? h.gu : 'કોઈપણ કૉલમ';
+      lit();
+    }
+    function buildColMenu() {
+      colMenu.innerHTML = '';
+      colMenu.appendChild(item('Any column', 'કોઈપણ કૉલમ', '', colSel.value === ''));
+      heads.forEach(function (h) { colMenu.appendChild(item(h.en, h.gu, String(h.i), colSel.value === String(h.i))); });
+    }
+    function values() {
+      if (!table || colSel.value === '') return [];
+      var seen = {}, vals = [];
+      dataRows().forEach(function (r) { var v = norm(r.cells[+colSel.value].textContent); if (v && v.length <= 60 && !seen[v]) { seen[v] = 1; vals.push(v); } });
+      return vals.sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); });
+    }
+    function buildValMenu() {
+      var q = norm(val.value).toLowerCase(), all = values(), vals = all.filter(function (v) { return exact || !q || v.toLowerCase().indexOf(q) > -1; }).slice(0, 200);
+      valMenu.innerHTML = '';
+      vals.forEach(function (v) { valMenu.appendChild(item(v, '', v, v.toLowerCase() === q)); });
+      valMenu.hidden = !vals.length;
+    }
+    function run() {
+      if (!table) { count.textContent = ''; return; }
+      var q = norm(val.value).toLowerCase(), c = colSel.value, rows = dataRows(), shown = 0;
+      rows.forEach(function (r) {
+        var text = norm(c === '' ? r.textContent : r.cells[+c].textContent).toLowerCase(), ok = !q || (exact && c !== '' ? text === q : text.indexOf(q) > -1);
+        r.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      count.textContent = q ? shown + ' / ' + rows.length : '';
+      valEn.style.visibility = valGu.style.visibility = val.value ? 'hidden' : '';
+      lit();
+    }
+    function reset() { colSel.value = ''; val.value = ''; exact = false; closeMenus(); setLabel(); run(); }
+    function setup() {
+      var keepHead = heads.filter(function (x) { return String(x.i) === colSel.value; })[0];
+      table = pickTable();
+      colSel.innerHTML = ''; heads = [];
+      box.classList.toggle('opacity-40', !table); box.classList.toggle('cursor-not-allowed', !table);
+      box.title = table ? '' : 'Not used on this page';
+      val.disabled = !table; colPart.style.pointerEvents = table ? '' : 'none';
+      if (!table) { val.value = ''; valEn.style.visibility = valGu.style.visibility = ''; closeMenus(); setLabel(); count.textContent = ''; return; }
+      Array.prototype.forEach.call(table.tHead.rows[table.tHead.rows.length - 1].cells, function (th, i) {
+        var g = th.querySelector('.gu'), gu = g ? norm(g.textContent) : '', clone = th.cloneNode(true);
+        clone.querySelectorAll('.gu').forEach(function (e) { e.remove(); });
+        var en = norm(clone.textContent);
+        if (en) heads.push({ i: i, en: en, gu: gu });
+      });
+      var any = document.createElement('option'); any.value = ''; colSel.appendChild(any);
+      heads.forEach(function (h) { var o = document.createElement('option'); o.value = h.i; colSel.appendChild(o); });
+      var kept = keepHead && heads.filter(function (x) { return x.en === keepHead.en; })[0];
+      colSel.value = kept ? String(kept.i) : '';
+      setLabel(); run();
+    }
+    colPart.addEventListener('click', function (e) {
+      var open = colMenu.hidden; closeMenus();
+      if (open) { buildColMenu(); place(colMenu, colPart); colMenu.hidden = false; }
+    });
+    colPart.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); colPart.click(); } });
+    // an item is chosen the moment the mouse goes down on it (a click could be lost if the list moved or closed between down and up)
+    colMenu.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      var d = e.target.closest('[data-v]'); if (!d) return;
+      colSel.value = d.getAttribute('data-v'); val.value = ''; exact = false; closeMenus(); setLabel(); run();
+    });
+    valMenu.addEventListener('mousedown', function (e) {
+      e.preventDefault();  // the cursor stays in the box
+      var d = e.target.closest('[data-v]'); if (!d) return;
+      val.value = d.getAttribute('data-v'); exact = true; closeMenus(); run();
+    });
+    function openVals() { colMenu.hidden = true; buildValMenu(); place(valMenu, valBoxEl); }
+    val.addEventListener('focus', openVals);
+    val.addEventListener('click', openVals);   // already focused: a click shows the list again
+    val.addEventListener('blur', function () { valMenu.hidden = true; });
+    val.addEventListener('input', function () { exact = false; run(); buildValMenu(); place(valMenu, valBoxEl); });
+    val.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); closeMenus(); } if (e.key === 'Escape') closeMenus(); });  // Enter must not submit the toolbar form
+    document.addEventListener('click', function (e) { if (!e.target.closest('#gf')) closeMenus(); });
+    if (clr) clr.addEventListener('click', function () { if (active()) reset(); });   // "Filter on" also clears this filter
+    document.addEventListener('DOMContentLoaded', setup);
+    window.addEventListener('load', setup);
+    document.addEventListener('htmx:afterSettle', setup);
   })();
   try { if (localStorage.getItem("sidebar-collapsed") === "1") document.body.classList.add("sidebar-collapsed"); } catch (e) {}
 </script>

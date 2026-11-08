@@ -8,6 +8,7 @@
 <div class="flex flex-wrap items-center gap-3 mb-4">
   <h1 class="text-xl font-semibold">{{ t('Purchase Farmers', 'ખરીદી ખેડૂત') }}</h1>
   <span class="flex-1"></span>
+  {% if view != 'bags' %}<a href="/Payables?type=farmer" class="btn btn-sm">{{ t('Pay farmer', 'ખેડૂતને ચુકવણી') }}</a>{% endif %}
   {% if view == 'groups' %}<a href="/PurchaseGroup/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
   {% if direct %}<a href="/PurchaseIndividual/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
   <form method="get" class="flex items-center gap-2">

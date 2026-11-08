@@ -17,6 +17,7 @@
   {% elif view == 'arrangements' %}
     <span class="flex flex-col leading-tight text-sm font-semibold text-center"><span>{{ rows | sum(attribute='no_of_arranged_bags') }} bags</span><span>{{ rows | sum(attribute='amount') | inr }}</span></span>
   {% endif %}
+  {% if view in ('purchases', 'entries') %}<a href="/Payables?type=farmer" class="btn btn-sm">{{ t('Pay farmer', 'ખેડૂતને ચુકવણી') }}</a>{% endif %}
   {% if view != 'stock' %}<a href="/StockyardPurchase/{{ view }}/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
   {% if view != 'stock' %}<form method="get" class="flex items-center gap-2">
     <input type="hidden" name="view" value="{{ view }}">

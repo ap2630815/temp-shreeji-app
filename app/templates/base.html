@@ -75,6 +75,16 @@
     .menu li > a { justify-content: space-between; }
     .btn { font-weight: 600; }
     .toolbar-select { field-sizing: content; }
+    /* general filter drop-downs (column list and value list): same background, font size and English-two spaces-Gujarati text */
+    .gf-menu { position: absolute; top: 100%; left: 0; z-index: 60; width: max-content; min-width: 0; max-width: calc(100vw - 8px); max-height: 18rem; overflow-y: auto; margin-top: .25rem; padding: .25rem 0;
+               background-color: oklch(var(--b1)); color: oklch(var(--bc)); border: 1px solid oklch(var(--b3)); border-radius: var(--rounded-box);
+               box-shadow: 0 6px 16px rgba(0, 0, 0, .15); font-size: .875rem; font-weight: 400; text-align: left; line-height: 1.3; }
+    .gf-menu[hidden] { display: none; }
+    .gf-menu.dd-fixed { position: fixed; z-index: 70; margin-top: 0; min-width: 0; }  /* the same list, opened under any <select> (script at the end of the page) */
+    .gf-menu > div.dd-off { opacity: .45; cursor: not-allowed; }
+    .gf-menu > div { padding: .25rem .75rem; cursor: pointer; white-space: nowrap; }
+    .gf-menu > div:hover, .gf-menu > div.sel { background-color: oklch(var(--b2)); }
+    .gf-menu .gu { margin-left: 0; opacity: .8; }  /* the two spaces are written into the item text */
     /* a toolbar filter button that has a value chosen is coloured like the active tab */
     .filter-btn.on { background-color: oklch(var(--p)); color: oklch(var(--pc)); border-color: oklch(var(--p)); }
     /* (older rule for the plain drop-down version, kept harmless) */
@@ -160,6 +170,9 @@
     .mob { user-select: all; cursor: text; white-space: nowrap; }
     /* every tab label: the first letter of each word in capitals (Gujarati text is unaffected) */
     .tabs .tab { text-transform: capitalize; }
+    /* standard: every button label (also the filter buttons, which carry normal-case) starts each English word with a capital; Gujarati has no case */
+    .btn, .btn.normal-case, button, input[type=submit], input[type=button] { text-transform: capitalize !important; }
+    .btn .bi .gu, .btn .gu { text-transform: none; }
     /* wide tables (inside .overflow-x-auto): the first columns stay put while the rest scroll sideways (script at the end of the page) */
     .sticky-col { position: sticky; z-index: 2; background-color: oklch(var(--b1)); }
     thead .sticky-col { z-index: 3; }
@@ -257,7 +270,7 @@
       var typed = el.value.replace(/^@+/, '').replace(/\s/g, '').toLowerCase();
       el.value = typed;
       if (e.inputType && e.inputType.indexOf('delete') === 0 || !typed) return;
-      var list = document.getElementById(el.getAttribute('list'));
+      var list = document.getElementById(el.getAttribute('data-list') || el.getAttribute('list'));
       var hit = list && Array.prototype.map.call(list.options, function (o) { return o.value; }).filter(function (v) { return v.indexOf(typed) === 0 && v !== typed; })[0];
       if (hit) { el.value = hit; el.setSelectionRange(typed.length, hit.length); }
       return;
@@ -311,6 +324,104 @@
   window.addEventListener('load', all);
   window.addEventListener('resize', all);
   document.addEventListener('htmx:afterSettle', all);
+})();
+</script>
+<script>
+/* Standard drop-down list: every <select> and every type-ahead box (<input list=...>) on a desktop (mouse) opens the same list as the toolbar's
+   Column / Value filter (.gf-menu): page background, small text, English + 2 spaces + Gujarati, the chosen row marked. It applies in every form.
+   A <select> stays in the page (it holds the value, is submitted with its form and fires its normal "change"); only its pop-up is replaced.
+   A type-ahead box keeps its <datalist> as data (list -> data-list so the browser's own pop-up never shows); the list narrows as you type and
+   a pick fills the box and fires "input" and "change". Phones and tablets keep the native pickers.
+   Opt out with data-native, or: multiple, size > 1, disabled. Write options as "English&nbsp;&nbsp;ગુજરાતી". */
+(function () {
+  if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
+  var menu = null, anchor = null, items = [], cur = -1, onPick = null;
+  function close() { if (menu) { menu.remove(); menu = null; } anchor = null; items = []; cur = -1; onPick = null; }
+  function mark(i) {
+    if (cur > -1 && items[cur]) items[cur].el.classList.remove('sel');
+    cur = i; if (i > -1 && items[i]) { items[i].el.classList.add('sel'); items[i].el.scrollIntoView({ block: 'nearest' }); }
+  }
+  function pick(i) { if (items[i] && !items[i].off && onPick) { var f = onPick; f(i); } }
+  // entries: [{text, off}]; one look for every list
+  function show(el, entries, selected, picker) {
+    close(); anchor = el; onPick = picker;
+    if (!entries.length) return;
+    menu = document.createElement('div'); menu.className = 'gf-menu dd-fixed';
+    entries.forEach(function (en, i) {
+      var d = document.createElement('div'), t = en.text, k = t.indexOf('\u00a0\u00a0');
+      if (k > -1) { d.appendChild(document.createTextNode(t.slice(0, k + 2))); var g = document.createElement('span'); g.className = 'gu'; g.textContent = t.slice(k + 2); d.appendChild(g); }
+      else d.textContent = t;
+      if (en.off) d.className = 'dd-off';
+      d.addEventListener('mousedown', function (e) { e.preventDefault(); e.stopPropagation(); pick(i); });
+      menu.appendChild(d); items.push({ el: d, off: en.off });
+    });
+    document.body.appendChild(menu);
+    var r = el.getBoundingClientRect(), h = menu.offsetHeight, below = window.innerHeight - r.bottom, up = r.top > below && below < h + 8;
+    menu.style.left = Math.max(4, Math.min(r.left, window.innerWidth - menu.offsetWidth - 4)) + 'px';
+    /* the list is exactly as wide as its longest line (width: max-content), whatever the box under it measures */
+    menu.style.top = (up ? Math.max(4, r.top - Math.min(h, r.top - 8) - 2) : r.bottom + 2) + 'px';
+    menu.style.maxHeight = up ? Math.max(80, r.top - 12) + 'px' : Math.min(288, Math.max(80, below - 12)) + 'px';
+    mark(selected);
+  }
+  function isSelect(el) { return el && el.tagName === 'SELECT' && !el.disabled && !el.multiple && !(el.size > 1) && !el.hasAttribute('data-native'); }
+  function openSelect(sel) {
+    show(sel, Array.prototype.map.call(sel.options, function (o) { return { text: o.textContent, off: o.disabled }; }), sel.selectedIndex, function (i) {
+      var changed = sel.selectedIndex !== i; sel.selectedIndex = i; close(); sel.focus();
+      if (changed) { sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); }
+    });
+  }
+  // ---- type-ahead boxes
+  function listOf(inp) { var id = inp.getAttribute('data-list'); return id ? document.getElementById(id) : null; }
+  function openType(inp) {
+    var dl = listOf(inp); if (!dl || inp.readOnly || inp.disabled) return;
+    var q = (inp.value || '').trim().toLowerCase(), shown = [];
+    Array.prototype.forEach.call(dl.options, function (o) {
+      var t = o.label && o.label !== o.value ? o.value + '\u00a0\u00a0' + o.label : o.value;
+      if (o.value && (!q || t.toLowerCase().indexOf(q) > -1) && o.value.toLowerCase() !== q) shown.push({ text: t, value: o.value });
+    });
+    shown = shown.slice(0, 100);
+    show(inp, shown, -1, function (i) {
+      inp.value = shown[i].value; close();
+      inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+  function adopt(root) {   // take the datalist away from the browser so only this list shows
+    (root || document).querySelectorAll('input[list]').forEach(function (i) {
+      if (i.hasAttribute('data-native')) return;
+      i.setAttribute('data-list', i.getAttribute('list')); i.removeAttribute('list');
+    });
+  }
+  adopt();
+  document.addEventListener('DOMContentLoaded', function () { adopt(); });
+  document.addEventListener('htmx:afterSettle', function () { adopt(); });
+  document.addEventListener('mousedown', function (e) {
+    var t = e.target, sel = t.closest && t.closest('select');
+    if (menu && !(t.closest && t.closest('.dd-fixed'))) { var again = sel === anchor; close(); if (again) { e.preventDefault(); return; } }
+    if (!isSelect(sel) || e.button !== 0) return;
+    e.preventDefault(); sel.focus(); openSelect(sel);
+  }, true);
+  document.addEventListener('focusin', function (e) { var i = e.target; if (i.tagName === 'INPUT' && i.hasAttribute('data-list')) openType(i); });
+  document.addEventListener('click', function (e) { var i = e.target; if (i.tagName === 'INPUT' && i.hasAttribute('data-list') && !menu) openType(i); });
+  document.addEventListener('input', function (e) { var i = e.target; if (i.tagName === 'INPUT' && i.hasAttribute('data-list') && e.isTrusted) openType(i); });
+  document.addEventListener('focusout', function (e) { if (e.target === anchor && e.target.tagName === 'INPUT') close(); });
+  document.addEventListener('keydown', function (e) {
+    var el = document.activeElement;
+    if (menu) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); var step = e.key === 'ArrowDown' ? 1 : -1, i = cur;
+        do { i += step; } while (items[i] && items[i].off);
+        if (items[i]) mark(i);
+      }
+      else if ((e.key === 'Enter' || (e.key === ' ' && anchor && anchor.tagName === 'SELECT')) && cur > -1) { e.preventDefault(); pick(cur); }
+      else if (e.key === 'Tab') close();
+      return;
+    }
+    if (isSelect(el) && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openSelect(el); }
+    else if (el && el.tagName === 'INPUT' && el.hasAttribute('data-list') && e.key === 'ArrowDown') { e.preventDefault(); openType(el); }
+  }, true);
+  window.addEventListener('scroll', function (e) { if (menu && !(e.target.closest && e.target.closest('.dd-fixed'))) close(); }, true);
+  window.addEventListener('resize', close);
 })();
 </script>
 </body>

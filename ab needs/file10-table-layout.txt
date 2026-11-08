@@ -61,3 +61,25 @@ The filters chosen in the top bar stay chosen when you move to another page. The
 browser-session cookie (toolbar_filters) and change only when you pick another value, choose "All",
 press "Filter on" (clear all), or log out / log in again. A filter greyed out on a page keeps its stored
 value for the next page. Code: app/core/toolbar_state.py, applied in app/main.py (load_grains).
+
+Drop-down lists (every <select> in the project)
+----------------------------------------------------------------------
+One look for every drop-down list, the same as the toolbar's Column / Value filter lists (.gf-menu in base.html):
+page background colour, small text (.875rem, normal weight), the chosen row highlighted, English + 2 spaces + Gujarati.
+Size: the list is exactly as wide as its longest line (width: max-content), never as wide as the box it opens from; it grows taller up to
+18rem and then scrolls, and flips above the box when there is no room below.
+- Script at the end of base.html: on a desktop (mouse) any <select> opens this list instead of the browser's own. The <select> stays in the page,
+  holds the value, is submitted with its form and fires its normal "change" (onchange / htmx work unchanged). Keyboard: Enter / Space opens,
+  Up / Down move, Enter picks, Esc closes. Phones and tablets keep the native picker.
+- Opt out with data-native on a <select> (also: multiple, size > 1, disabled keep the browser's list).
+- Write option text as "English&nbsp;&nbsp;ગુજરાતી"; the Gujarati part is shown dimmer. Plain-text options (years, names) are shown as they are.
+- Type-ahead boxes (<input list=...> with a <datalist>: farmer name parts, e-mail domains, suggested places) use the same list in every form: the
+  script moves list -> data-list so the browser's pop-up never shows; the list narrows as you type, a pick fills the box and fires input / change.
+- The toolbar Value filter and any other search-as-you-type list use the same .gf-menu class; never style a list separately.
+- Applies to every form (New / Edit pages, pay forms, modals loaded by htmx): nothing to add per form.
+
+Button text
+----------------------------------------------------------------------
+Every button label (.btn, <button>, submit / button inputs, the toolbar filter buttons, tabs) shows each English word with a capital first
+letter: "Pay Farmer", "Add Bilty", "Filter On". One rule in base.html (text-transform: capitalize); write labels in any case in the template.
+Gujarati text has no case and is unchanged. Opt out is not provided - a button label is a title, not a sentence.
