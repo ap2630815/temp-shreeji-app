@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th %}
+{% from "partials/bilabel.html" import t, th, stack %}
 {% block title %}Labour work{% endblock %}
 {% block content %}
 <div class="stackbi">
@@ -9,7 +9,7 @@
   <a href="/Payables?type=labour_group" class="btn btn-sm">{{ t('Pay labour', 'મજૂરને ચુકવણી') }}</a>
   <a href="/LabourWork/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>
   <form method="get" class="flex items-center gap-2">
-    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
+    {{ stack('Business year', 'વ્યવસાય વર્ષ', 'leading-tight text-sm text-center', '') }}
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
     {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>

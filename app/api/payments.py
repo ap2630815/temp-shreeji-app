@@ -1,4 +1,4 @@
-"""Payments to any party (farmer, transporter, labour, bag supplier, broker), statements, receipts and payables."""
+"""Payments to any party (farmer, transporter, labour, empty bag supplier, broker), statements, receipts and payables."""
 
 from datetime import date
 from typing import Annotated, Literal

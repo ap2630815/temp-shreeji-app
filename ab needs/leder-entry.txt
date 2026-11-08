@@ -70,7 +70,7 @@ payments.status = partial (still owing) / complete (clears everything, only paym
 
 D. REPORT LEDGERS  (analysis page, per business year; filter by grain / village)
 -------------------------------------------------------------------------------
-farmer, truck, labour, bag supplier, broker, industry.
+farmer, truck, labour, empty bag supplier, broker, industry.
 Each shows stats (amounts, paid, due, overdue), grouped tables, monthly bars, and payments/receipts by method.
 
 

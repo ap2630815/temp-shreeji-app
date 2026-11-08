@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th %}
+{% from "partials/bilabel.html" import t, th, stack %}
 {% macro fmt(value, kind) -%}
 {%- if value is none or value == '' -%}—
 {%- elif kind == 'inr' -%}{{ value | inr }}
@@ -31,18 +31,18 @@
 <div class="stackall">
 <div class="flex flex-wrap items-center gap-3 mb-4">
   <h1 class="text-xl font-semibold flex-1 flex items-center gap-6 leading-tight">
-    <span class="flex flex-col"><span>Analysis</span><span class="gu text-base font-normal">વિશ્લેષણ</span></span>
-    <span class="flex flex-col"><span>{{ ledgers[ledger][0] }}</span><span class="gu text-base font-normal">{{ ledgers[ledger][1] }}</span></span>
+    {{ stack('Analysis', 'વિશ્લેષણ', '', 'text-base font-normal') }}
+    {{ stack(ledgers[ledger][0], ledgers[ledger][1], '', 'text-base font-normal') }}
   </h1>
   <span class="badge badge-lg h-auto py-1 gap-3">{{ t('Business year', 'વ્યવસાય વર્ષ') }}<b>{{ year }}</b></span>
   {% if filtered %}<span class="badge badge-lg badge-info h-auto py-1 gap-3">{{ t('Filtered by the toolbar', 'ટૂલબાર ફિલ્ટર લાગુ') }}</span>{% endif %}
 </div>
 <div class="tabs tabs-boxed bg-base-100 mb-3 w-fit flex-wrap">
   {% for key, label in ledgers.items() %}
-  <a href="/Analysis?ledger={{ key }}{{ '&' ~ keep if keep }}" class="tab h-auto py-1 {{ 'tab-active' if key == ledger }}"><span class="flex flex-col leading-tight text-center"><span>{{ label[0] }}</span><span class="gu text-xs">{{ label[1] }}</span></span></a>
+  <a href="/Analysis?ledger={{ key }}{{ '&' ~ keep if keep }}" class="tab h-auto py-1 {{ 'tab-active' if key == ledger }}">{{ stack(label[0], label[1], 'leading-tight text-center', 'text-xs') }}</a>
   {% endfor %}
 </div>
-{% for n in report.notes %}<p class="text-xs opacity-70 mb-2">{{ n[0] }} <span class="gu">{{ n[1] }}</span></p>{% endfor %}
+{% for n in report.notes %}<p class="text-xs opacity-70 mb-2">{{ n[0] }} <span class="gu gu-side">{{ n[1] }}</span></p>{% endfor %}
 
 <div class="an-tiles mb-4">
   {% for s in report.stats %}
@@ -54,7 +54,7 @@
 
 {% macro table_card(tb, wide=false) %}
 <div class="card bg-base-100 shadow {{ 'xl:col-span-2' if wide }}"><div class="card-body p-4">
-  <h2 class="font-semibold">{{ tb.title[0] }} <span class="gu">{{ tb.title[1] }}</span></h2>
+  <h2 class="font-semibold">{{ tb.title[0] }} <span class="gu gu-side">{{ tb.title[1] }}</span></h2>
   <table class="table table-sm even-tint an-table">
     <thead><tr>{% for en, gu, kind in tb.headers %}<th class="{{ 'text-right' if kind != 'text' }}">{{ en }}<br><span class="gu text-xs font-normal">{{ gu }}</span></th>{% endfor %}</tr></thead>
     <tbody>
@@ -72,7 +72,7 @@
 {% for b in report.bars %}
 {% set top = (b.items | map(attribute=1) | max) if b.items else 0 %}
 <div class="card bg-base-100 shadow h-full"><div class="card-body p-4">
-  <h2 class="font-semibold">{{ b.title[0] }} <span class="gu">{{ b.title[1] }}</span></h2>
+  <h2 class="font-semibold">{{ b.title[0] }} <span class="gu gu-side">{{ b.title[1] }}</span></h2>
   {% for label, value in b.items %}
   <div class="flex items-center gap-2 text-sm">
     <span class="w-28 shrink-0 break-words">{{ label }}</span>

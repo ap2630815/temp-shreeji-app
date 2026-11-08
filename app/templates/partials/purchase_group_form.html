@@ -1,4 +1,4 @@
-{% from "partials/bilabel.html" import t %}
+{% from "partials/bilabel.html" import t, bi %}
 <form id="purchase-form" hx-post="{{ action }}" hx-target="#purchase-form" hx-swap="outerHTML" class="grid lg:grid-cols-2 gap-4 items-start">
   {# ---------------- left: the purchase_group itself #}
   <div class="card bg-base-100 shadow">
@@ -21,7 +21,7 @@
         {% endfor %}
       </ul>
       <p id="picked-empty" class="bi-stack text-xs opacity-70 {{ 'hidden' if selected }}">{{ t('No farmer listed yet. Find farmers below and add them.', 'હજી કોઈ ખેડૂત નથી. નીચે શોધીને ઉમેરો.') }}</p>
-      {% if 'farmer_ids' in errors %}<span class="text-error text-sm">{{ errors['farmer_ids'][0] }} <span class="gu">{{ errors['farmer_ids'][1] }}</span></span>{% endif %}
+      {% if 'farmer_ids' in errors %}<span class="text-error text-sm">{{ errors['farmer_ids'][0] }} <span class="gu gu-side">{{ errors['farmer_ids'][1] }}</span></span>{% endif %}
 
       <div class="divider my-0"></div>
       {# the filters (pv / pq / pfree / pinfo / pg = the selected grain) only drive the search below; the save ignores them #}
@@ -48,8 +48,8 @@
   {# ---------------- below: actions (left) and farmers listed (right) #}
   <div class="card bg-base-100 shadow lg:col-span-2">
     <div class="card-body p-4 flex-row flex-wrap items-center gap-3">
-      <button class="btn btn-primary"><span class="bi"><span>{{ L['save'][0] }}</span> <span class="gu">{{ L['save'][1] }}</span></span></button>
-      <a class="btn btn-ghost" href="{{ back_url }}"><span class="bi"><span>{{ L['back'][0] }}</span> <span class="gu">{{ L['back'][1] }}</span></span></a>
+      <button class="btn btn-primary">{{ bi('save') }}</button>
+      <a class="btn btn-ghost" href="{{ back_url }}">{{ bi('back') }}</a>
       <div class="ml-auto text-sm text-right">
         <span class="font-semibold">{{ t('Farmers listed', 'યાદીમાં ખેડૂતો') }}: <span id="picked-count">{{ selected | length }}</span></span>
         <div class="text-xs opacity-60">{{ t('Review the details and farmers, then save.', 'વિગત અને ખેડૂતો તપાસીને સાચવો.') }}</div>

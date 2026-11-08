@@ -1,14 +1,11 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th %}
+{% from "partials/bilabel.html" import t, th, stack, heading, stat, sub %}
 {% macro row(en, gu, value, cls='') %}<tr><td>{{ t(en, gu) }}</td><td class="text-right tabular-nums {{ cls }}">{{ value }}</td></tr>{% endmacro %}
 {% macro kg(v) %}{{ '{:,}'.format(v) if v is not none else '—' }}{% endmacro %}
 {% macro meta(en, gu, val) %}<div class="flex flex-col leading-snug px-4 py-1"><span class="text-xs inline-flex gap-2"><span>{{ en }}</span><span class="gu">{{ gu }}</span></span><b class="text-sm tabular-nums">{{ val }}</b></div>{% endmacro %}
-{% macro sub(en, gu, val='') %}<div class="flex items-start justify-between gap-6 py-1 w-full"><span class="inline-flex flex-col leading-snug"><span class="text-xs text-base-content">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span>{% if val != '' %}<b class="text-sm text-base-content whitespace-nowrap tabular-nums">{{ val }}</b>{% endif %}</div>{% endmacro %}
-{% macro stat(en, gu, val, cls='') %}<span class="inline-flex flex-col leading-snug"><span class="stat-title">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span><span class="text-2xl font-bold tabular-nums whitespace-nowrap {{ cls }}">{{ val }}</span>{% endmacro %}
-{% macro heading(en, gu) %}<h2 class="font-semibold inline-flex flex-col leading-snug"><span>{{ en }}</span><span class="gu text-sm">{{ gu }}</span></h2>{% endmacro %}
 {% block title %}{{ trip.truck.truck_number }}{% endblock %}
 {% block content %}
-<div class="stackbi">
+<div class="stackbi trip-page">
 {% set booking = trip.broker_booking %}
 {% set farmer_bags = trip.load_lines | sum(attribute='no_of_loaded_bags') %}
 {% set yard_bags = trip.stockyard_lines | sum(attribute='no_of_loaded_bags') %}

@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th %}
+{% from "partials/bilabel.html" import t, th, stack %}
 {% block title %}Trips{% endblock %}
 {% block content %}
 <div class="stackbi">
@@ -7,7 +7,7 @@
   <h1 class="text-xl font-semibold flex-1">{{ t('Truck trips', 'ટ્રક ટ્રીપ') }}</h1>
   <a href="/Trips/New" class="btn btn-primary btn-sm">+ {{ t('New Trip', 'નવી ટ્રીપ') }}</a>
   <form method="get" class="flex items-center gap-2">
-    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
+    {{ stack('Business year', 'વ્યવસાય વર્ષ', 'leading-tight text-sm text-center', '') }}
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
       {% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
     </select>

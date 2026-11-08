@@ -258,7 +258,7 @@ async def seed() -> None:
             k += 1
         ids["receipts"] = receipt_ids
 
-        # ---- payments (money out): 4 farmers, 3 truck owners, 1 broker, 1 labour group, 1 bag supplier
+        # ---- payments (money out): 4 farmers, 3 truck owners, 1 broker, 1 labour group, 1 empty bag supplier
         plan = [("farmer", farmers[i].id) for i in range(4)] + [("truck", trucks[i].id) for i in (0, 1, 2)] + \
                [("broker", brokers[0].id), ("labour_group", labour[0].id), ("empty_bag_seller", suppliers[0].id)]
         payment_ids = []

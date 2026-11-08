@@ -117,7 +117,11 @@
     @font-face { font-family: "Noto Sans Gujarati"; src: url("/static/NotoSansGujarati-Regular.ttf"); font-weight: 400; }
     @font-face { font-family: "Noto Sans Gujarati"; src: url("/static/NotoSansGujarati-Bold.ttf"); font-weight: 700; }
     body { font-family: system-ui, "Noto Sans Gujarati", sans-serif; }
-    .gu { font-family: "Noto Sans Gujarati", sans-serif; opacity: .75; }
+    .gu { font-family: "Noto Sans Gujarati", sans-serif; opacity: .8; }
+    /* Bilingual standard (macros in partials/bilabel.html): English and Gujarati side by side have 2 spaces between them.
+       The source holds one space; the Gujarati span adds the second. .bi = t()/bi(), .gu-side = hand-written text.
+       Stacked pairs (buttons, badges, notices, bi-stack, page titles) are left alone. */
+    .bi:not(.btn .bi):not(.badge .bi):not(.notice .bi):not(.bi-stack > .bi):not(.stackbi h1 .bi) > .gu, .gu-side { margin-left: .3em; }
     /* sidebar: an entry with a sub-list opens it on keyboard focus (and stays open on its own pages); pointing at it does nothing */
     .hover-sub > ul { display: none; }
     .hover-sub:focus-within > ul, .hover-sub.open > ul { display: block; }

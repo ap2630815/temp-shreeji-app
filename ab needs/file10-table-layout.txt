@@ -40,7 +40,7 @@ OTHER
   Trips ..................... 3   date, truck, industry
   Receivables ............... 1   industry
   Payables - farmer ......... 3   name, village, mobile
-  Payables - truck / labour / bag supplier / industry / broker ... 2   name, mobile
+  Payables - truck / labour / empty bag supplier / industry / broker ... 2   name, mobile
   Purchase group page: farmers table 2 (farmer, village); entries table 2 (date, farmer)
 MASTERS (/Masters/...)  always 2 = the first two list columns
   Village (name, name Gujarati), Grain (name, name Gujarati), Labour group (name, name Gujarati),

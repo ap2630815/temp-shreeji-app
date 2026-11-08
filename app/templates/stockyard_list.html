@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th %}
+{% from "partials/bilabel.html" import t, th, stack %}
 {% block title %}Stockyard Purchase{% endblock %}
 {% block content %}
 {% set tabs = [('purchases', 'Stockyard purchases', 'સ્ટોકયાર્ડ ખરીદી'), ('entries', 'Purchase entries', 'ખરીદી નોંધ'), ('arrangements', 'Arrangement entries', 'ગોઠવણી નોંધ'),
@@ -20,7 +20,7 @@
   {% if view != 'stock' %}<a href="/StockyardPurchase/{{ view }}/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
   {% if view != 'stock' %}<form method="get" class="flex items-center gap-2">
     <input type="hidden" name="view" value="{{ view }}">
-    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
+    {{ stack('Business year', 'વ્યવસાય વર્ષ', 'leading-tight text-sm text-center', '') }}
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
     {% if year_locked %}<span class="badge badge-warning">🔒 {{ t('Closed', 'બંધ') }}</span>{% endif %}
   </form>{% endif %}
@@ -29,7 +29,7 @@
   {% for group in (tabs[:3], tabs[3:]) %}
   <div class="tabs tabs-boxed bg-base-100 w-fit">
     {% for key, en, gu in group %}
-    <a class="tab h-auto py-1 {{ 'tab-active' if view == key }}" href="/StockyardPurchase?view={{ key }}&year={{ year }}"><span class="flex flex-col leading-tight text-center"><span>{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span></a>
+    <a class="tab h-auto py-1 {{ 'tab-active' if view == key }}" href="/StockyardPurchase?view={{ key }}&year={{ year }}">{{ stack(en, gu, 'leading-tight text-center', 'text-xs') }}</a>
     {% endfor %}
   </div>
   {% endfor %}

@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th %}
+{% from "partials/bilabel.html" import t, th, stack %}
 {% macro line(label, value, cls='') %}<tr><td><span class="block">{{ label[0] }}</span><span class="gu block text-xs">{{ label[1] }}</span></td><td class="text-right {{ cls }}">{{ value | inr }}</td></tr>{% endmacro %}
 {# a sub-field: English above Gujarati on the left, its value on the right #}
 {% macro sub(en, gu, val='') %}<div class="sub-row flex items-start justify-between gap-6 py-1 w-full"><span class="inline-flex flex-col leading-snug"><span class="text-xs text-base-content">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span>{% if val != '' %}<b class="text-sm text-base-content whitespace-nowrap tabular-nums">{{ val }}</b>{% endif %}</div>{% endmacro %}
@@ -9,7 +9,7 @@
 <div class="flex flex-wrap items-center gap-3 mb-4">
   <h1 class="text-xl font-semibold flex-1">{{ t('Year report', 'વર્ષનો અહેવાલ') }}</h1>
   <form method="get" class="flex items-center gap-2">
-    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
+    {{ stack('Business year', 'વ્યવસાય વર્ષ', 'leading-tight text-sm text-center', '') }}
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
   </form>
 </div>

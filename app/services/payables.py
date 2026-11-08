@@ -55,7 +55,7 @@ PARTIES: dict[str, PartySpec] = {
                        lambda p: (p.truck_owner_name, p.truck_owner_mobile)),  # paid to the truck owner
     "labour_group": PartySpec(("Labour", "મજૂર"), LabourGroup, lambda p: p.group_name, lambda p: p.group_name_gu, lambda p: "",
                               lambda p: (p.group_name, "")),
-    "empty_bag_seller": PartySpec(("Bag supplier", "બારદાન સપ્લાયર"), EmptyBagSeller, lambda p: p.pet_name, lambda p: p.name_gu, lambda p: p.mobile,
+    "empty_bag_seller": PartySpec(("Empty bag supplier", "બારદાન સપ્લાયર"), EmptyBagSeller, lambda p: p.pet_name, lambda p: p.name_gu, lambda p: p.mobile,
                               lambda p: (p.name, p.mobile)),
     "industry": PartySpec(("Industry", "ઉદ્યોગ"), Industry, lambda p: p.industry_name, lambda p: p.industry_name_gu, lambda p: p.industry_owner_mobile,
                           lambda p: (p.industry_owner_name, p.industry_owner_mobile)),  # empty bags bought from an industry

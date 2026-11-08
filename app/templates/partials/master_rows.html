@@ -1,11 +1,12 @@
+{% from "partials/bilabel.html" import bi %}
 {% for row in rows %}
 <tr>
   {% for col in spec.list_columns %}<td>{{ cell(row, col) | mobhtml if spec.field(col).is_mobile else cell(row, col) }}</td>{% endfor %}
   <td class="text-right whitespace-nowrap">
-    {% if spec.slug == 'Farmers' %}<a class="btn btn-ghost btn-xs" href="/Farmers/{{ row.id }}/Statement"><span class="bi"><span>{{ L['statement'][0] }}</span> <span class="gu">{{ L['statement'][1] }}</span></span></a>{% endif %}
-    <a class="btn btn-primary btn-sm" href="/Masters/{{ spec.slug }}/{{ row.id }}/Edit"><span class="bi"><span>{{ L['edit'][0] }}</span> <span class="gu">{{ L['edit'][1] }}</span></span></a>
+    {% if spec.slug == 'Farmers' %}<a class="btn btn-ghost btn-xs" href="/Farmers/{{ row.id }}/Statement">{{ bi('statement') }}</a>{% endif %}
+    <a class="btn btn-primary btn-sm" href="/Masters/{{ spec.slug }}/{{ row.id }}/Edit">{{ bi('edit') }}</a>
   </td>
 </tr>
 {% else %}
-<tr><td colspan="{{ spec.list_columns | length + 1 }}" class="text-center opacity-60"><span class="bi"><span>{{ L['no_records'][0] }}</span> <span class="gu">{{ L['no_records'][1] }}</span></span></td></tr>
+<tr><td colspan="{{ spec.list_columns | length + 1 }}" class="text-center opacity-60">{{ bi('no_records') }}</td></tr>
 {% endfor %}

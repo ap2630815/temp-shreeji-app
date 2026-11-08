@@ -172,7 +172,7 @@ async def bag_fields(db: AsyncSession, village_id: int = 0) -> list[F]:
     farmers = list((await db.scalars(stmt)).unique().all())
     farmers.sort(key=lambda f: (f.village.village_name, f.farmer_name))
     return [
-        F("empty_bag_seller_id", "Bag supplier", "બારદાન સપ્લાયર", kind="select", required=True, options=tuple((str(s.id), f"{s.pet_name} — {s.name}") for s in suppliers)),
+        F("empty_bag_seller_id", "Empty bag supplier", "બારદાન સપ્લાયર", kind="select", required=True, options=tuple((str(s.id), f"{s.pet_name} — {s.name}") for s in suppliers)),
         F("farmer_id", "Delivered at farmer's place", "ખેડૂતને ત્યાં ઉતાર્યું", kind="select", required=True, options=tuple((str(f.id), f"{f.village.village_name} — {f.farmer_name}") for f in farmers),
           help=("The farmer who stores the bags for the village", "જે ખેડૂત ગામ માટે બારદાન સાચવે છે")),
         F("selling_date", "Date", "તારીખ", kind="date", required=True),

@@ -8,6 +8,33 @@
 <span class="bi"><span>{{ en }}</span> <span class="gu">{{ gu }}</span></span>
 {%- endmacro %}
 
+{# ---- bilingual standard -------------------------------------------------------------------------------------------
+   side by side  -> t(en, gu) / bi(key)   (English, 2 spaces, Gujarati; the 2nd space comes from .bi > .gu in base.html)
+   side by side, hand-written text -> put class "gu gu-side" on the Gujarati span (same 2-space gap)
+   stacked       -> stack(en, gu) for a label / tab / title, th(en, gu) for a table header, heading(en, gu) for a card heading,
+                    stat(...) + sub(...) for summary tiles; the Gujarati line is smaller and sits under the English
+   Never write <span class="gu ..."> by hand when one of these fits. #}
+
+{# stacked pair for labels, tabs and titles: English above, Gujarati below #}
+{% macro stack(en, gu, cls='leading-tight', gcls='text-xs') -%}
+<span class="flex flex-col {{ cls }}"><span>{{ en }}</span><span class="gu {{ gcls }}">{{ gu }}</span></span>
+{%- endmacro %}
+
+{# card heading: English above, Gujarati below #}
+{% macro heading(en, gu) -%}
+<h2 class="font-semibold inline-flex flex-col leading-snug"><span>{{ en }}</span><span class="gu text-sm">{{ gu }}</span></h2>
+{%- endmacro %}
+
+{# summary tile: title pair on the left, big value on the right #}
+{% macro stat(en, gu, val, cls='') -%}
+<span class="inline-flex flex-col leading-snug"><span class="stat-title">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span><span class="text-2xl font-bold tabular-nums whitespace-nowrap {{ cls }}">{{ val }}</span>
+{%- endmacro %}
+
+{# a line under a summary tile: label pair on the left, value on the right #}
+{% macro sub(en, gu, val='') -%}
+<div class="flex items-start justify-between gap-6 py-1 w-full"><span class="inline-flex flex-col leading-snug"><span class="text-xs text-base-content">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span>{% if val != '' %}<b class="text-sm text-base-content whitespace-nowrap tabular-nums">{{ val }}</b>{% endif %}</div>
+{%- endmacro %}
+
 {# stacked pair, for table headers #}
 {% macro th(en, gu) -%}
 <th class="whitespace-nowrap">{{ en }}<br><span class="gu text-xs font-normal">{{ gu }}</span></th>

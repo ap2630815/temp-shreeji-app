@@ -159,7 +159,7 @@ async def seed(label: str, chains: int) -> None:
                 await db.commit()
                 ids["receipts"].append(r.id)
 
-            # payments (money out): a farmer, a truck owner, a broker, the labour group and the bag supplier of this month
+            # payments (money out): a farmer, a truck owner, a broker, the labour group and the empty bag supplier of this month
             grp, entry, booking, trip, *_ = booked[0]
             pd2 = day(28)
             plan = [("farmer", entry.farmer_id), ("truck", trip.truck_id), ("broker", broker_of[booking.brokerage_id]), ("labour_group", lw.labour_group_id), ("empty_bag_seller", bs.empty_bag_seller_id)]

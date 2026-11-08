@@ -28,7 +28,7 @@ LABELS: dict[str, tuple[str, str]] = {
     "no_records": ("No records", "કોઈ નોંધ નથી"),
     # masters
     "farmer": ("Farmer", "ખેડૂત"),
-    "empty_bag_seller": ("Bag Supplier", "બારદાન સપ્લાયર"),
+    "empty_bag_seller": ("Empty Bag Supplier", "બારદાન સપ્લાયર"),
     "labour": ("Labour", "મજૂર"),
     "transport": ("Transport", "ટ્રાન્સપોર્ટ"),
     "truck": ("Truck", "ટ્રક"),

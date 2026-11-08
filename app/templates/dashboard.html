@@ -4,9 +4,9 @@
 {% block content %}
 <h1 class="text-xl font-semibold mb-4">{{ bi('dashboard') }}</h1>
 
-{% macro card(href, en, gu) %}<a href="{{ href }}" class="card bg-base-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary transition"><div class="card-body p-4"><span>{{ en }}</span> <span class="gu text-sm">{{ gu }}</span></div></a>{% endmacro %}
+{% macro card(href, en, gu) %}<a href="{{ href }}" class="card bg-base-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary transition"><div class="card-body p-4"><span>{{ en }}</span> <span class="gu gu-side text-sm">{{ gu }}</span></div></a>{% endmacro %}
 <h2 class="font-semibold mb-2">{{ t('Buying (villages)', 'ખરીદી (ગામ)') }}</h2>
-<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+<div class="dash-grid mb-6">
   {{ card('/PurchaseFarmers', 'Purchase Farmers', 'ખરીદી ખેડૂત') }}
   {{ card('/PurchaseIndividual', 'Purchase Individual', 'ખરીદી વ્યક્તિગત') }}
   {{ card('/PurchaseGroup', 'Purchase Group', 'ખરીદી જૂથ') }}
@@ -16,7 +16,7 @@
   {{ card('/LabourWork', 'Labour work', 'મજૂર કામ') }}
 </div>
 <h2 class="font-semibold mb-2">{{ t('Selling (trucks)', 'વેચાણ (ટ્રક)') }}</h2>
-<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+<div class="dash-grid mb-6">
   {{ card('/Bookings', 'Broker bookings', 'દલાલ બુકિંગ') }}
   {{ card('/Trips', 'Truck trips & bilty', 'ટ્રક ટ્રીપ અને બિલ્ટી') }}
   {{ card('/Receivables', 'Receivables', 'ઉદ્યોગો પાસેથી લેણાં') }}
@@ -24,18 +24,37 @@
   {{ card('/Payables?type=broker', 'Broker payables', 'દલાલને ચૂકવવાના') }}
 </div>
 <h2 class="font-semibold mb-2">{{ t('Accounts', 'હિસાબ') }}</h2>
-<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+<div class="dash-grid mb-6">
   {{ card('/Payables', 'All payables', 'બધી ચૂકવણીઓ') }}
   {{ card('/Reports/Year', 'Year report', 'વર્ષનો અહેવાલ') }}
   {% if user.role == 'owner' %}{{ card('/Years', 'Business years', 'વ્યવસાય વર્ષ') }}{% endif %}
 </div>
 
 <h2 class="font-semibold mb-2">{{ t('Masters', 'માસ્ટર્સ') }}</h2>
-<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+<div class="dash-grid">
   {% for slug, spec in masters.items() %}
   <a href="/Masters/{{ slug }}" class="card bg-base-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary transition">
-    <div class="card-body p-4"><span>{{ spec.label[0] }}</span> <span class="gu text-sm">{{ spec.label[1] }}</span></div>
+    <div class="card-body p-4"><span>{{ spec.label[0] }}</span> <span class="gu gu-side text-sm">{{ spec.label[1] }}</span></div>
   </a>
   {% endfor %}
 </div>
+<style>
+  /* every dashboard card is as wide as the widest card's content plus two spaces (width measured by the script below) */
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, min(var(--dash-w, 16rem), 100%)); gap: .75rem; justify-content: start; }
+  .dash-grid > a .card-body { height: 100%; }
+</style>
+<script>
+  (function () {
+    function size() {
+      var cards = document.querySelectorAll('.dash-grid > a');
+      if (!cards.length) return;
+      var widest = 0;
+      cards.forEach(function (a) { a.style.width = 'max-content'; widest = Math.max(widest, a.getBoundingClientRect().width); a.style.width = ''; });
+      var space = parseFloat(getComputedStyle(cards[0]).fontSize) * 0.28 * 2;   // two spaces
+      document.querySelector('.dash-grid').parentElement.style.setProperty('--dash-w', Math.ceil(widest + space) + 'px');
+    }
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(size);
+    window.addEventListener('load', size);
+  })();
+</script>
 {% endblock %}

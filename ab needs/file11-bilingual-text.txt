@@ -1,0 +1,65 @@
+BILINGUAL TEXT RULES (English + Gujarati) - standard for every screen
+==============================================================================
+Code: macros and the rules at the top of app/templates/partials/bilabel.html; styles in app/templates/base.html.
+
+1. Order and coverage
+----------------------------------------------------------------------
+- English always comes first, Gujarati second.
+- Every visible text has both. Exceptions: numbers, dates, names, codes.
+
+2. Placement by element type
+----------------------------------------------------------------------
+STACKED (English above, Gujarati below, left-aligned):
+  buttons, tabs, table headers, badges, summary-tile titles, card headings, labels, page titles (h1; Gujarati slightly smaller)
+SIDE BY SIDE:
+  sentences, table row labels, notes, field help, errors, flash messages, dashboard cards
+A Gujarati value under an English name in a table (e.g. a farmer's Gujarati name): stacked, as a small sub-line.
+
+3. Side by side = English, 2 spaces, Gujarati
+----------------------------------------------------------------------
+- Use t(en, gu) or bi(key). The source holds one space; the rule  .bi > .gu { margin-left: .3em }  in base.html adds the second.
+  Stacked pairs inside buttons, badges, notices, .bi-stack and the h1 of .stackbi pages are not affected.
+- Hand-written side-by-side text: class "gu gu-side" on the Gujarati span (same 2-space gap).
+  Applied in: dashboard cards and master cards, form field help and errors, analysis notes and titles, flash messages,
+  the purchase-group form error.
+- Decided exceptions, left exactly as they are:
+    "All  બધા" dropdown options in layout.html (2 &nbsp;)
+    "All villages  બધા ગામ" in partials/purchase_group_form.html
+    "Date:  <date>" in partials/statement_body.html and partials/industry_body.html
+    the "- " before the Gujarati in form labels (.lf-grid in base.html)
+    the form-page rules (.gu-same in base.html)
+
+4. Stacked
+----------------------------------------------------------------------
+- stack(en, gu)         labels, tabs, titles (Business year label, tabs, Payables / Analysis titles)
+- th(en, gu)            table headers
+- heading(en, gu)       card headings
+- stat(...) + sub(...)  summary tiles and the lines under them
+- Buttons and badges stack automatically (.btn .bi, .badge .bi).
+- The Gujarati line is smaller than the English: about .8em in buttons and badges, text-xs / text-sm elsewhere.
+
+5. Gujarati colour
+----------------------------------------------------------------------
+- Gujarati text has 80% opacity (.gu in base.html).
+- Pages inside .gu-same (New / Edit forms) keep their own rule: same size and colour as the English; table cells and buttons
+  on those pages keep the small, dull Gujarati.
+
+6. How to write them
+----------------------------------------------------------------------
+- Never write <span class="gu ..."> by hand when one of the helpers above fits.
+- A label used in more than 2 places goes into app/core/labels.py and is used as L[key] / bi(key).
+- Adding a screen: pick the helper from section 3 or 4. No new CSS.
+- Already on the helpers: Business year label (all list pages), tab labels, Payables / Analysis titles,
+  Save / Back / Edit / Statement / No-records buttons (bi(key)), PDF buttons, summary tiles on /Trips/<id> and /PurchaseGroup/<id>.
+
+7. Dashboard cards
+----------------------------------------------------------------------
+- Every card is as wide as the widest card's content plus two spaces (measured by a script in dashboard.html); cards wrap into rows
+  starting from the left.
+
+8. Known gaps (hand-written pairs, about 84, left to keep their look)
+----------------------------------------------------------------------
+- sidebar items and top bar (layout.html)
+- printed statements and receipts (partials/*_body.html)
+- farmer-name sub-lines in tables
+- the form pages

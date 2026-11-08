@@ -81,9 +81,9 @@
         {% if f.is_mobile %}</div>{% endif %}
         {% if f.options and f.kind == 'text' %}<datalist id="{{ f.name }}-suggest">{% for val, label in f.options %}<option value="{{ val }}">{% endfor %}</datalist>{% endif %}
       {% endif %}
-      {% if f.help %}<span class="field-help text-xs opacity-60 mt-1">{{ f.help[0] }} <span class="gu">{{ f.help[1] }}</span></span>{% endif %}
+      {% if f.help %}<span class="field-help text-xs opacity-60 mt-1">{{ f.help[0] }} <span class="gu gu-side">{{ f.help[1] }}</span></span>{% endif %}
       {% if f.name in errors %}
-        <span class="text-error text-sm mt-1">{{ errors[f.name][0] }} <span class="gu">{{ errors[f.name][1] }}</span></span>
+        <span class="text-error text-sm mt-1">{{ errors[f.name][0] }} <span class="gu gu-side">{{ errors[f.name][1] }}</span></span>
       {% endif %}
     </label>
     {% endfor %}

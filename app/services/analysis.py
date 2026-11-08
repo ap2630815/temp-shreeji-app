@@ -1,4 +1,4 @@
-"""Ledger analysis: one report per ledger (farmers, trucks, labour, bag suppliers, brokers, industries).
+"""Ledger analysis: one report per ledger (farmers, trucks, labour, empty bag suppliers, brokers, industries).
 
 Each report is plain data (stat cards, tables, bar series) that one template renders. Everything is derived from the
 ledger rows for one business year, optionally narrowed by the toolbar's grain / village filters.
@@ -315,7 +315,7 @@ async def labour_report(db: AsyncSession, year: str, grain_id: int, village_id: 
     return r
 
 
-# ---------------------------------------------------------------- bag suppliers
+# ---------------------------------------------------------------- empty bag suppliers
 
 async def bag_report(db: AsyncSession, year: str, grain_id: int, village_id: int, today: date) -> Report:
     rows_ = [b for b in (await db.scalars(select(EmptyBagSellerEntry).where(EmptyBagSellerEntry.business_year == year))).unique().all()

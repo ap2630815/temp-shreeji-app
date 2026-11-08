@@ -1,18 +1,18 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th %}
+{% from "partials/bilabel.html" import t, th, stack %}
 {% block title %}Payables{% endblock %}
 {% block content %}
 <div class="flex flex-wrap items-center gap-3 mb-4">
   <h1 class="text-xl font-semibold flex-1 flex items-center gap-6 leading-tight">
-    <span class="flex flex-col"><span>Payables</span><span class="gu text-base font-normal">ચૂકવવાપાત્ર</span></span>
-    <span class="flex flex-col"><span>{{ parties[type].label[0] }}</span><span class="gu text-base font-normal">{{ parties[type].label[1] }}</span></span>
+    {{ stack('Payables', 'ચૂકવવાપાત્ર', '', 'text-base font-normal') }}
+    {{ stack(parties[type].label[0], parties[type].label[1], '', 'text-base font-normal') }}
   </h1>
   <span class="badge badge-lg h-auto py-1 gap-3">{{ t('Total due', 'કુલ બાકી') }}<b>{{ summary.due | inr }}</b></span>
   {% if type == 'farmer' %}<span class="badge badge-lg badge-error h-auto py-1 gap-3">{{ t('Overdue', 'મુદત વીતી') }}<b>{{ summary.overdue | inr }}</b></span>{% endif %}
 </div>
 <div class="tabs tabs-boxed bg-base-100 mb-3 w-fit flex-wrap">
   {% for key, spec in parties.items() %}
-  <a href="/Payables?type={{ key }}" class="tab h-auto py-1 {{ 'tab-active' if key == type }}"><span class="flex flex-col leading-tight text-center"><span>{{ spec.label[0] }}</span><span class="gu text-xs">{{ spec.label[1] }}</span></span></a>
+  <a href="/Payables?type={{ key }}" class="tab h-auto py-1 {{ 'tab-active' if key == type }}">{{ stack(spec.label[0], spec.label[1], 'leading-tight text-center', 'text-xs') }}</a>
   {% endfor %}
 </div>
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">

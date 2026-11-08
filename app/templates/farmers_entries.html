@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th, badge %}
+{% from "partials/bilabel.html" import t, th, badge, stack %}
 {% block title %}Purchase Farmers{% endblock %}
 {% block content %}
 {% set tabs = [('entries', 'Farmer entries', 'ખેડૂત નોંધ'), ('groups', 'Purchase groups', 'ખરીદી જૂથ'), ('individuals', 'Purchase individuals', 'ખરીદી વ્યક્તિગત'), ('bags', 'Farmer bag ledger', 'ખેડૂત બેગ ખાતું')] %}
@@ -12,7 +12,7 @@
   {% if direct %}<a href="/PurchaseIndividual/New" class="btn btn-primary btn-sm">+ {{ t('Add', 'ઉમેરો') }}</a>{% endif %}
   <form method="get" class="flex items-center gap-2">
     <input type="hidden" name="view" value="{{ view }}">
-    <span class="text-sm flex flex-col leading-tight text-center"><span>Business year</span><span class="gu">વ્યવસાય વર્ષ</span></span>
+    {{ stack('Business year', 'વ્યવસાય વર્ષ', 'leading-tight text-sm text-center', '') }}
     <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
       {% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
     </select>
@@ -21,7 +21,7 @@
 </div>
 <div class="tabs tabs-boxed bg-base-100 mb-3 w-fit">
   {% for key, en, gu in tabs %}
-  <a class="tab h-auto py-1 {{ 'tab-active' if view == key }}" href="/PurchaseFarmers?view={{ key }}&year={{ year }}"><span class="flex flex-col leading-tight text-center"><span>{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span></a>
+  <a class="tab h-auto py-1 {{ 'tab-active' if view == key }}" href="/PurchaseFarmers?view={{ key }}&year={{ year }}">{{ stack(en, gu, 'leading-tight text-center', 'text-xs') }}</a>
   {% endfor %}
 </div>
 

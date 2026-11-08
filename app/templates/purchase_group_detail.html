@@ -1,9 +1,8 @@
 {% extends "layout.html" %}
-{% from "partials/bilabel.html" import t, th, badge %}
+{% from "partials/bilabel.html" import t, th, badge, sub %}
 {% block title %}{{ p.village.village_name }}{% endblock %}
 {% block content %}
 <div class="stackbi">
-{% macro sub(en, gu, val='') %}<div class="flex items-start justify-between gap-6 py-1 w-full"><span class="inline-flex flex-col leading-snug"><span class="text-xs text-base-content">{{ en }}</span><span class="gu text-xs">{{ gu }}</span></span>{% if val != '' %}<b class="text-sm text-base-content whitespace-nowrap tabular-nums">{{ val }}</b>{% endif %}</div>{% endmacro %}
 {% macro meta(en, gu, val) %}<div class="flex flex-col leading-snug px-4 py-1"><span class="text-xs inline-flex gap-2"><span>{{ en }}</span><span class="gu">{{ gu }}</span></span><b class="text-sm tabular-nums whitespace-nowrap">{{ val }}</b></div>{% endmacro %}
 {% set pct = (totals.paid * 100 / totals.net_payable) | round | int if totals.net_payable else 0 %}
 
