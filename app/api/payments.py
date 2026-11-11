@@ -129,7 +129,7 @@ def _pay_ctx(party_type: str, party, fields, values, errors, summary, items):
         heading=(f"Pay {label[0].lower()}: {name}", f"ચુકવણી ({label[1]}): {name}"),
         back_url=f"/Statements/{party_type}/{party.id}", party=party, party_type=party_type, summary=summary, items=items,
         party_name=PARTIES[party_type].name(party), party_name_gu=PARTIES[party_type].name_gu(party), party_mobile=PARTIES[party_type].mobile(party),
-        party_label=label, today=today(),
+        party_upi=PARTIES[party_type].upi(party), party_label=label, today=today(),
     )
 
 

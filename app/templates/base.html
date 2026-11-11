@@ -82,6 +82,7 @@
     .gf-menu[hidden] { display: none; }
     .gf-menu.dd-fixed { position: fixed; z-index: 70; margin-top: 0; min-width: 0; }  /* the same list, opened under any <select> (script at the end of the page) */
     .gf-menu > div.dd-off { opacity: .45; cursor: not-allowed; }
+    .gf-menu .dd-code { display: inline-block; }  /* code column of a code + name list: as wide as the widest code */
     .gf-menu > div { padding: .25rem .75rem; cursor: pointer; white-space: nowrap; }
     .gf-menu > div:hover, .gf-menu > div.sel { background-color: oklch(var(--b2)); }
     .gf-menu .gu { margin-left: 0; opacity: .8; }  /* the two spaces are written into the item text */
@@ -349,13 +350,20 @@
     menu = document.createElement('div'); menu.className = 'gf-menu dd-fixed';
     entries.forEach(function (en, i) {
       var d = document.createElement('div'), t = en.text, k = t.indexOf('\u00a0\u00a0');
-      if (k > -1) { d.appendChild(document.createTextNode(t.slice(0, k + 2))); var g = document.createElement('span'); g.className = 'gu'; g.textContent = t.slice(k + 2); d.appendChild(g); }
+      if (en.code !== undefined) {   // code + name: the names start in one column (widest code + 2 spaces)
+        var c = document.createElement('span'); c.className = 'dd-code'; c.textContent = en.code; d.appendChild(c);
+        d.appendChild(document.createTextNode('\u00a0\u00a0'));
+        var nm = document.createElement('span'); nm.className = 'gu'; nm.textContent = en.name; d.appendChild(nm);
+      } else if (k > -1) { d.appendChild(document.createTextNode(t.slice(0, k + 2))); var g = document.createElement('span'); g.className = 'gu'; g.textContent = t.slice(k + 2); d.appendChild(g); }
       else d.textContent = t;
       if (en.off) d.className = 'dd-off';
       d.addEventListener('mousedown', function (e) { e.preventDefault(); e.stopPropagation(); pick(i); });
       menu.appendChild(d); items.push({ el: d, off: en.off });
     });
     document.body.appendChild(menu);
+    var codes = menu.querySelectorAll('.dd-code'), wide = 0;
+    codes.forEach(function (c) { wide = Math.max(wide, c.getBoundingClientRect().width); });
+    codes.forEach(function (c) { c.style.minWidth = Math.ceil(wide) + 'px'; });
     var r = el.getBoundingClientRect(), h = menu.offsetHeight, below = window.innerHeight - r.bottom, up = r.top > below && below < h + 8;
     menu.style.left = Math.max(4, Math.min(r.left, window.innerWidth - menu.offsetWidth - 4)) + 'px';
     /* the list is exactly as wide as its longest line (width: max-content), whatever the box under it measures */
@@ -377,7 +385,7 @@
     var q = (inp.value || '').trim().toLowerCase(), shown = [];
     Array.prototype.forEach.call(dl.options, function (o) {
       var t = o.label && o.label !== o.value ? o.value + '\u00a0\u00a0' + o.label : o.value;
-      if (o.value && (!q || t.toLowerCase().indexOf(q) > -1) && o.value.toLowerCase() !== q) shown.push({ text: t, value: o.value });
+      if (o.value && (!q || t.toLowerCase().indexOf(q) > -1) && o.value.toLowerCase() !== q) shown.push(o.label && o.label !== o.value ? { text: t, value: o.value, code: o.value, name: o.label } : { text: t, value: o.value });
     });
     shown = shown.slice(0, 100);
     show(inp, shown, -1, function (i) {
@@ -424,5 +432,6 @@
   window.addEventListener('resize', close);
 })();
 </script>
+<script src="/static/translit.js"></script>  {# English -> Gujarati: fills the _gu twin of a name while the English is typed (forms with both) #}
 </body>
 </html>

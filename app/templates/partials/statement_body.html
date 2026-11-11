@@ -18,7 +18,7 @@
   <div style="text-align:right">{{ t('Date', 'તારીખ') }}:&nbsp;&nbsp;{{ today }}</div>
 </div>
 <div class="meta">
-  <div class="f"><span>Farmer<br><span class="gu">ખેડૂત</span></span><span class="v"><b>{{ farmer.farmer_name }}</b>{% if farmer.farmer_name_gu %}<span class="gu">{{ farmer.farmer_name_gu }}</span>{% endif %}</span></div>
+  <div class="f"><span>Farmer<br><span class="gu">ખેડૂત</span></span><span class="v"><b>{{ farmer.farmer_name }}</b>{% if farmer.farmer_name_gu | gu_only %}<span class="gu">{{ farmer.farmer_name_gu }}</span>{% endif %}</span></div>
   <div class="f"><span>Village<br><span class="gu">ગામ</span></span><span class="v"><b>{{ farmer.village.village_name }}</b>{% if farmer.village.village_name_gu %}<span class="gu">{{ farmer.village.village_name_gu }}</span>{% endif %}</span></div>
   <div class="f"><span>Mobile<br><span class="gu">મોબાઇલ</span></span><span class="v">{{ farmer.mobile | mobhtml }}</span></div>
   {% if farmer.head_of_family %}<div class="f"><span>Head of family<br><span class="gu">કુટુંબના વડા</span></span><span class="v">{{ farmer.head_of_family }}</span></div>{% endif %}

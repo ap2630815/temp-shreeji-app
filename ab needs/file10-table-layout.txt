@@ -75,6 +75,8 @@ Size: the list is exactly as wide as its longest line (width: max-content), neve
 - Write option text as "English&nbsp;&nbsp;ગુજરાતી"; the Gujarati part is shown dimmer. Plain-text options (years, names) are shown as they are.
 - Type-ahead boxes (<input list=...> with a <datalist>: farmer name parts, e-mail domains, suggested places) use the same list in every form: the
   script moves list -> data-list so the browser's pop-up never shows; the list narrows as you type, a pick fills the box and fires input / change.
+- A code + name list (e.g. Grain quality code: <option value="T." label="Top">) shows the codes in one column as wide as the widest code, then
+  2 spaces, then the names, so all names start at the same place.
 - The toolbar Value filter and any other search-as-you-type list use the same .gf-menu class; never style a list separately.
 - Applies to every form (New / Edit pages, pay forms, modals loaded by htmx): nothing to add per form.
 

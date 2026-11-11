@@ -43,7 +43,7 @@
         {% set path = request.url.path %}
         {% set pay_type = request.query_params.get('type', 'farmer') %}
         {% set ledger = request.query_params.get('ledger', 'farmer') %}
-        {% set village_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/EmptyBags', '/Masters/Villages', '/Masters/Farmers'))
+        {% set village_off = not (path.startswith(('/PurchaseGroup', '/PurchaseFarmers', '/PurchaseIndividual', '/Bookings', '/Trips', '/Receivables', '/EmptyBags', '/Masters/Villages', '/Masters/Farmers', '/Masters/LabourGroups'))
                                   or (path.startswith('/StockyardPurchase') and request.query_params.get('view') not in ('stock', 'empty_bags'))
                                   or (path.startswith('/Payables') and pay_type == 'farmer')
                                   or (path.startswith('/Analysis') and ledger != 'labour')) %}

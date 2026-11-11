@@ -13,7 +13,7 @@ name_gu     | VARCHAR(120)             | -
 pet_name    | VARCHAR(30)              | NOT NULL, UNIQUE
 pet_name_gu | VARCHAR(30)              | -
 mobile      | VARCHAR(10)              | NOT NULL, UNIQUE
-upi_number  | VARCHAR(10)              | UNIQUE
+upi_number  | VARCHAR(10)              | UNIQUE  (if different from mobile)
 description | TEXT                     | -
 created_at  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
@@ -33,7 +33,7 @@ name_gu     | VARCHAR(120)             | -
 pet_name    | VARCHAR(30)              | NOT NULL, UNIQUE
 pet_name_gu | VARCHAR(30)              | -
 mobile      | VARCHAR(10)              | NOT NULL, UNIQUE
-upi_number  | VARCHAR(10)              | UNIQUE
+upi_number  | VARCHAR(10)              | UNIQUE  (if different from mobile)
 description | TEXT                     | -
 created_at  | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
@@ -55,7 +55,7 @@ location         | VARCHAR(60)              | NOT NULL
 owner_name       | VARCHAR(120)             | NOT NULL
 owner_name_gu    | VARCHAR(120)             | -
 mobile           | VARCHAR(10)              | NOT NULL, UNIQUE
-upi_number       | VARCHAR(10)              | UNIQUE
+upi_number       | VARCHAR(10)              | UNIQUE  (if different from mobile)
 description      | TEXT                     | -
 created_at       | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
@@ -67,20 +67,22 @@ Table constraints / indexes:
 
 TABLE: trucks
 ----------------------------------------------------------------------
-column             | type                     | constraints
+column                 | type                     | constraints
 ----------------------------------------------------------------------
-id                 | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-truck_number       | VARCHAR(13)              | NOT NULL, UNIQUE
-truck_owner_name   | VARCHAR(120)             | NOT NULL
-truck_owner_mobile | VARCHAR(10)              | NOT NULL
-driver_name        | VARCHAR(120)             | NOT NULL
-driver_mobile      | VARCHAR(10)              | NOT NULL
-upi_number         | VARCHAR(10)              | -
-description        | TEXT                     | -
-created_at         | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id                     | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+truck_number           | VARCHAR(13)              | NOT NULL, UNIQUE
+truck_owner_name       | VARCHAR(120)             | NOT NULL
+truck_owner_mobile     | VARCHAR(10)              | NOT NULL
+driver_name            | VARCHAR(120)             | NOT NULL
+driver_mobile          | VARCHAR(10)              | NOT NULL
+truck_owner_upi_number | VARCHAR(10)              | -  (if different from mobile)
+driver_upi_number      | VARCHAR(10)              | -  (if different from mobile)
+description            | TEXT                     | -
+created_at             | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
-  CHECK ck_upi_number_10_digits: upi_number IS NULL OR upi_number ~ '^[0-9]{10}$'
+  CHECK ck_truck_owner_upi_number_10_digits: truck_owner_upi_number IS NULL OR truck_owner_upi_number ~ '^[0-9]{10}$'
+  CHECK ck_driver_upi_number_10_digits: driver_upi_number IS NULL OR driver_upi_number ~ '^[0-9]{10}$'
   CHECK ck_trucks_number_format: truck_number ~ '^[A-Z]{2} [0-9]{2} (?: [A-Z]|[A-Z]{2}) [0-9]{4}$'  -- GJ 01 DG 3345, GJ 14  X 6720 (a one-letter series is padded)
   CHECK ck_truck_owner_mobile_10_digits: truck_owner_mobile ~ '^[0-9]{10}$'
   CHECK ck_driver_mobile_10_digits: driver_mobile ~ '^[0-9]{10}$'
@@ -118,7 +120,7 @@ id                  | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
 broker_name         | VARCHAR(120)             | NOT NULL, UNIQUE
 broker_name_gu      | VARCHAR(120)             | -
 mobile              | VARCHAR(10)              | NOT NULL, UNIQUE
-upi_number          | VARCHAR(10)              | UNIQUE
+upi_number          | VARCHAR(10)              | UNIQUE  (if different from mobile)
 description         | TEXT                     | -
 created_at          | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
@@ -144,15 +146,22 @@ Table constraints / indexes:
 
 TABLE: labour_groups
 ----------------------------------------------------------------------
-column        | type                     | constraints
+column                    | type                     | constraints
 ----------------------------------------------------------------------
-id            | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
-group_name    | VARCHAR(30)              | NOT NULL, UNIQUE
-group_name_gu | VARCHAR(30)              | -
-description   | TEXT                     | -
-created_at    | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
+id                        | INTEGER                  | PRIMARY KEY, AUTO INCREMENT
+group_name                | VARCHAR(30)              | NOT NULL
+group_name_gu             | VARCHAR(30)              | -
+village_id                | INTEGER                  | FOREIGN KEY villages(id)   (the group is shown everywhere as "group name - village name")
+description               | TEXT                     | -
+created_at                | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 
 Table constraints / indexes:
+  UNIQUE uq_labour_groups_name_village (group_name, village_id)   -- the same group name may exist in different villages
+  UNIQUE INDEX uq_labour_groups_name_no_village (group_name) WHERE village_id IS NULL   -- groups saved before villages were added
+  INDEX ix_labour_groups_village_id (village_id)
+Display name (app): "group name - village name"; Gujarati "group name (Gujarati) - village name (Gujarati)". Every list, drop-down, statement and
+analysis uses it (LabourGroup.display_name / display_name_gu). The Add / Edit form needs the village; old groups without one show the plain name
+until their village is picked.
 
 ==============================================================================
 
@@ -185,7 +194,7 @@ name_of_stockyard      | TEXT                     | NOT NULL
 location               | TEXT                     | NOT NULL
 stockyard_owner_name   | VARCHAR(120)             | NOT NULL, DEFAULT 'Self'
 stockyard_owner_mobile | VARCHAR(10)              | NOT NULL
-stockyard_upi_number   | VARCHAR(10)              | -
+stockyard_upi_number   | VARCHAR(10)              | -  (if different from mobile)
 storage_capacity       | BIGINT                   | NOT NULL
 rent_of_stockyard      | INTEGER                  | NOT NULL, DEFAULT 0
 description            | TEXT                     | -
@@ -197,3 +206,13 @@ Table constraints / indexes:
   CHECK ck_stockyards_upi_number_10_digits: stockyard_upi_number IS NULL OR stockyard_upi_number ~ '^[0-9]{10}$'
 
 ==============================================================================
+
+==============================================================================
+UPI NUMBER RULE (every master with a UPI column: farmers, labours, brokers, empty bag sellers / movers, transporters,
+trucks (owner and driver), stockyards (owner))
+----------------------------------------------------------------------
+- The UPI number is stored only when it is DIFFERENT from the mobile number. Blank = "the UPI is the mobile number".
+- Add and Edit forms: the label reads "UPI number (if different from mobile)". If the value typed equals the mobile it is saved blank
+  (app/services/upi.py drop_upi_same_as_mobile, applied in app/api/masters.py).
+- Wherever the UPI is needed (the Pay page shows "UPI: number" or "UPI (same as mobile)") the application uses effective_upi():
+  the stored UPI, otherwise the mobile number. Labour groups and industries have no UPI column, so no UPI line shows for them.

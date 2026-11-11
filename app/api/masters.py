@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.upi import drop_upi_same_as_mobile
 from app.api.deps import current_user
 from app.api.formkit import apply_toolbar
 from dataclasses import replace
@@ -23,7 +24,7 @@ LIST_LIMIT = 300
 # kind="fk" fields: source key -> (model, order-by column, label)
 FK_SOURCES = {
     "village": (Village, Village.village_name, lambda r: r.village_name),
-    "labour_group": (LabourGroup, LabourGroup.group_name, lambda r: r.group_name),
+    "labour_group": (LabourGroup, LabourGroup.group_name, lambda r: r.display_name),
     "grain": (Grain, Grain.grain_name, lambda r: r.grain_name),
     "broker": (Broker, Broker.broker_name, lambda r: r.broker_name),
 }
@@ -171,6 +172,7 @@ async def _save(request: Request, slug: str, obj_id: int | None, user: User, csr
     is_owner = user.role == "owner"
     raw = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
     clean, errors = validate(spec, normalize(spec, raw, include_owner_only=is_owner))
+    drop_upi_same_as_mobile(clean)  # a UPI equal to the mobile is not stored: blank means "same as mobile"
 
     obj = None
     if obj_id is not None:

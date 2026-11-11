@@ -1,0 +1,492 @@
+DECISION MAKING 1 - TABLES AND THEIR COLUMNS
+==============================================================================
+Every database table with only its column names, in database order (read from the live schema).
+37 tables.
+
+TABLE: audit_log
+----------------------------------------------------------------------
+  id
+  at
+  user_id
+  username
+  action
+  table_name
+  record_id
+  changes
+
+TABLE: bilties
+----------------------------------------------------------------------
+  id
+  bilty_date
+  bill_number
+  truck_trip_id
+  total_bags_in_truck
+  any_rate_change
+  merchant_total_weight
+  merchant_tare_weight
+  industry_total_weight
+  industry_tare_weight
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: broker_bookings
+----------------------------------------------------------------------
+  id
+  booking_date
+  brokerage_id
+  industry_id
+  grain_rate_per_booking_weight
+  truck_size
+  percentage_deduction
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: brokerages
+----------------------------------------------------------------------
+  id
+  broker_id
+  grain_id
+  brokerage_per_bag
+  description
+  created_at
+
+TABLE: brokers
+----------------------------------------------------------------------
+  id
+  broker_name
+  broker_name_gu
+  mobile
+  upi_number
+  description
+  created_at
+
+TABLE: empty_bag_movers
+----------------------------------------------------------------------
+  id
+  name
+  name_gu
+  pet_name
+  mobile
+  upi_number
+  description
+  created_at
+  pet_name_gu
+
+TABLE: empty_bag_movers_entries
+----------------------------------------------------------------------
+  id
+  empty_bag_mover_id
+  farmer_id
+  mover_date
+  cost_per_mover
+  no_of_empty_bags
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: empty_bag_sellers
+----------------------------------------------------------------------
+  id
+  name
+  name_gu
+  pet_name
+  mobile
+  upi_number
+  description
+  created_at
+  pet_name_gu
+
+TABLE: empty_bag_sellers_entries
+----------------------------------------------------------------------
+  id
+  empty_bag_seller_id
+  farmer_id
+  selling_date
+  payable_amount
+  rate_per_bag
+  no_of_empty_bags
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: empty_bags
+----------------------------------------------------------------------
+  id
+  empty_bags_entry_date
+  stockyard_id
+  grain_id
+  empty_bag_seller_id
+  empty_bag_mover_id
+  no_of_empty_bags
+  business_year
+  description
+  created_by
+  created_at
+  industry_id
+  rate_per_empty_bag
+
+TABLE: farmer_to_stockyard_transfers
+----------------------------------------------------------------------
+  id
+  transfer_date
+  purchase_farmer_entry_id
+  purchase_individual_id
+  stockyard_id
+  no_of_transferred_bags
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: farmers
+----------------------------------------------------------------------
+  id
+  farmer_name
+  farmer_name_gu
+  head_of_family
+  mobile
+  email
+  village_id
+  house
+  upi_number
+  bank_account_number
+  bank_name
+  bank_branch
+  ifsc_code
+  description
+  created_at
+  private_note_owner_only
+
+TABLE: farmers_truck_load_lines
+----------------------------------------------------------------------
+  id
+  trip_id
+  purchase_farmer_entry_id
+  no_of_loaded_bags
+  purchase_individual_id
+
+TABLE: grains
+----------------------------------------------------------------------
+  id
+  grain_name
+  grain_name_gu
+  net_bag_weight
+  booking_weight
+  grain_terms
+  description
+  created_at
+  expected_raw_weight_per_bag
+
+TABLE: industries
+----------------------------------------------------------------------
+  id
+  industry_name
+  industry_name_gu
+  industry_owner_name
+  industry_owner_mobile
+  supervisor_name
+  supervisor_mobile
+  grain
+  location
+  quality_expectation
+  description
+  created_at
+
+TABLE: labour_group_wages
+----------------------------------------------------------------------
+  id
+  labour_group_id
+  grain_id
+  weighing_rate
+  loading_rate
+  pulling_rate
+  mixing_rate
+  other_rate
+  description
+  created_at
+
+TABLE: labour_groups
+----------------------------------------------------------------------
+  id
+  group_name
+  group_name_gu
+  description
+  created_at
+  village_id
+
+TABLE: labour_work
+----------------------------------------------------------------------
+  id
+  work_date
+  labour_group_id
+  payable_amount
+  borrowing_amount
+  petrol
+  meal
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: labours
+----------------------------------------------------------------------
+  id
+  labour_name
+  labour_name_gu
+  labour_group_id
+  mobile
+  upi_number
+  description
+  created_at
+
+TABLE: payment_allocations
+----------------------------------------------------------------------
+  id
+  payment_id
+  payable_type
+  payable_id
+  amount
+
+TABLE: payments
+----------------------------------------------------------------------
+  id
+  party_type
+  party_id
+  amount
+  payment_date
+  business_year
+  method
+  receiver_name
+  receiver_mobile
+  reference_no
+  status
+  description
+  created_by
+  created_at
+
+TABLE: purchase_group_add_farmers
+----------------------------------------------------------------------
+  id
+  purchase_group_id
+  farmer_id
+  created_by
+  created_at
+
+TABLE: purchase_group_farmers_entries
+----------------------------------------------------------------------
+  id
+  purchase_entry_date
+  purchase_group_id
+  farmer_id
+  labour_group_id
+  no_of_filled_bags
+  extra_kilos
+  payable_amount
+  borrowed_amount
+  due_date
+  expected_raw_weight_per_bag
+  grain_quality_code
+  grain_stored_location
+  no_of_handful_bags
+  total_available_bags
+  business_year
+  created_by
+  created_at
+  description
+
+TABLE: purchase_groups
+----------------------------------------------------------------------
+  id
+  purchase_group_date
+  village_id
+  grain_id
+  grain_rate_per_20kg
+  pay_after_no_of_days
+  purchase_group_terms
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: purchase_individuals
+----------------------------------------------------------------------
+  id
+  purchase_individual_date
+  village_id
+  grain_id
+  grain_rate_per_20kg
+  pay_after_no_of_days
+  terms
+  farmer_id
+  labour_group_id
+  no_of_filled_bags
+  extra_kilos
+  no_of_handful_bags
+  total_available_bags
+  payable_amount
+  borrowed_amount
+  due_date
+  expected_raw_weight_per_bag
+  grain_quality_code
+  grain_stored_location
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: receipt_allocations
+----------------------------------------------------------------------
+  id
+  receipt_id
+  bilty_id
+  amount
+
+TABLE: receipts
+----------------------------------------------------------------------
+  id
+  industry_id
+  amount
+  receipt_date
+  business_year
+  method
+  reference_no
+  payer_name
+  description
+  created_by
+  created_at
+
+TABLE: stockyard_arrangement_entries
+----------------------------------------------------------------------
+  id
+  stockyard_arrangement_date
+  stockyard_purchase_entry_id
+  labour_group_id
+  no_of_arranged_bags
+  rate_per_arranged_bag
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: stockyard_purchase_entries
+----------------------------------------------------------------------
+  id
+  stockyard_purchase_entry_date
+  stockyard_purchase_id
+  no_of_filled_bags
+  extra_kilos
+  payable_amount
+  borrowed_amount
+  due_date
+  grain_quality_code
+  labour_group_id
+  business_year
+  description
+  created_by
+  created_at
+  expected_raw_weight_per_bag
+  no_of_received_empty_bags
+
+TABLE: stockyard_purchases
+----------------------------------------------------------------------
+  id
+  stockyard_purchase_date
+  stockyard_id
+  farmer_id
+  grain_id
+  grain_rate_per_20kg
+  pay_after_no_of_days
+  no_of_given_empty_bags
+  terms
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: stockyard_truck_load_lines
+----------------------------------------------------------------------
+  id
+  trip_id
+  stockyard_id
+  no_of_loaded_bags
+
+TABLE: stockyards
+----------------------------------------------------------------------
+  id
+  name_of_stockyard
+  location
+  stockyard_owner_name
+  stockyard_owner_mobile
+  stockyard_upi_number
+  storage_capacity
+  rent_of_stockyard
+  description
+  created_at
+
+TABLE: transporters
+----------------------------------------------------------------------
+  id
+  transporter_name
+  pet_name
+  location
+  owner_name
+  owner_name_gu
+  mobile
+  upi_number
+  description
+  created_at
+  pet_name_gu
+
+TABLE: truck_trips
+----------------------------------------------------------------------
+  id
+  trip_date
+  broker_booking_id
+  truck_id
+  transporter_id
+  labour_group_id
+  rent_per_ton
+  rent_per_bag
+  advance_amount
+  other_payable
+  other_deduction
+  business_year
+  description
+  created_by
+  created_at
+
+TABLE: trucks
+----------------------------------------------------------------------
+  id
+  truck_number
+  truck_owner_name
+  truck_owner_mobile
+  driver_name
+  driver_mobile
+  truck_owner_upi_number
+  description
+  created_at
+  driver_upi_number
+
+TABLE: users
+----------------------------------------------------------------------
+  id
+  username
+  password_hash
+  role
+  is_active
+  created_at
+
+TABLE: villages
+----------------------------------------------------------------------
+  id
+  village_name
+  village_name_gu
+  description
+  created_at

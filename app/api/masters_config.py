@@ -138,9 +138,10 @@ _add(Spec(
     fields=(
         F("group_name", "Group name", "જૂથનું નામ", required=True, max_length=30),
         F("group_name_gu", "Group name (Gujarati)", "જૂથનું નામ (ગુજરાતી)", max_length=30),
+        _fk("village_id", "Village", "ગામ", "village"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ),
-    list_columns=("group_name", "group_name_gu"),
+    list_columns=("group_name", "village.village_name", "group_name_gu"),
     search_columns=("group_name", "group_name_gu"),
     order_by="group_name",
 ))
@@ -200,7 +201,8 @@ _add(Spec(
         _mobile("truck_owner_mobile", "Owner mobile (payments go to the owner)", "માલિકનો મોબાઇલ (ચુકવણી માલિકને)"),
         F("driver_name", "Driver name (surname, name, father)", "ડ્રાઇવરનું નામ (અટક, નામ, પિતા)", required=True, max_length=120),
         _mobile("driver_mobile", "Driver mobile", "ડ્રાઇવરનો મોબાઇલ"),
-        _upi(),
+        _mobile("truck_owner_upi_number", "Owner UPI number (if different from mobile)", "માલિકનો UPI નંબર (મોબાઇલથી અલગ હોય તો)", required=False),
+        _mobile("driver_upi_number", "Driver UPI number (if different from mobile)", "ડ્રાઇવરનો UPI નંબર (મોબાઇલથી અલગ હોય તો)", required=False),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ),
     list_columns=("truck_number", "truck_owner_name", "driver_name", "driver_mobile"),
@@ -274,7 +276,7 @@ _add(Spec(
         _upi(),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ),
-    list_columns=("labour_name", "labour_group.group_name", "mobile"),
+    list_columns=("labour_name", "labour_group.display_name", "mobile"),
     search_columns=("labour_name", "labour_name_gu", "mobile"),
     order_by="labour_name",
 ))
@@ -291,7 +293,7 @@ _add(Spec(
         F("other_rate", "Other rate (₹)", "અન્ય ભાવ (₹)", kind="int"),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ),
-    list_columns=("labour_group.group_name", "grain.grain_name", "weighing_rate", "loading_rate", "pulling_rate", "mixing_rate"),
+    list_columns=("labour_group.display_name", "grain.grain_name", "weighing_rate", "loading_rate", "pulling_rate", "mixing_rate"),
     search_columns=("description",),
     order_by="id",
 ))

@@ -1,0 +1,626 @@
+DECISION MAKING 3 - SCREEN COLUMNS: LEFT (PINNED) AND RIGHT (SCROLLING), PER TABLE
+==============================================================================
+Rule (see file10-table-layout.txt): on a table screen the first N columns are LEFT-aligned and stay pinned while the page scrolls sideways;
+every other column is RIGHT-aligned and scrolls horizontally; the button column (Edit / Open / Pay) is right-aligned and is NOT pinned.
+Printed documents and cards do not scroll: text is LEFT, amounts and weights are RIGHT.
+Format: column heading  [table column it shows]. Worked-out columns are marked "worked out".
+
+TABLE: audit_log
+----------------------------------------------------------------------
+  (no output screen of its own: not shown on any screen (kept for the record, written by every save))
+
+TABLE: bilties
+----------------------------------------------------------------------
+  SCREEN: Trip page - weights and sale cards (bilty)   /Trips/<id>
+    document / cards: not scrolling
+    LEFT : Bill date  [bilty_date]; Bill number  [bill_number]; Description  [description]
+    RIGHT: Our loaded truck weight  [merchant_total_weight]; Our empty truck weight  [merchant_tare_weight]; Industry loaded truck weight  [industry_total_weight]; Industry empty truck weight  [industry_tare_weight]; Rate change  [any_rate_change]; Bags in truck  [total_bags_in_truck]
+
+TABLE: broker_bookings
+----------------------------------------------------------------------
+  SCREEN: Broker bookings list   /Bookings
+    pinned columns N = 4   (data-sticky-left="4")
+    LEFT, pinned, left-aligned:
+      Date  [booking_date]
+      Broker  [brokerage_id (shows broker_name + brokerage_per_bag)]
+      Grain  [brokerages.grain_id]
+      Industry  [industry_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Rate  [grain_rate_per_booking_weight (/ grains.booking_weight)]
+      Truck size  [truck_size]
+      Deduction %  [percentage_deduction]
+      Trips  [worked out]
+      Edit button  [button]
+
+TABLE: brokerages
+----------------------------------------------------------------------
+  SCREEN: Brokerage master list   /Masters/Brokerages
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Broker  [broker_id (shows broker_name)]
+      Grain  [grain_id (shows grain_name)]
+    RIGHT, scrolling horizontally, right-aligned:
+      Brokerage per bag (₹)  [brokerage_per_bag]
+      Edit button  [button]
+
+TABLE: brokers
+----------------------------------------------------------------------
+  SCREEN: Broker master list   /Masters/Brokers
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Broker name  [broker_name]
+      Mobile  [mobile]
+    RIGHT, scrolling horizontally, right-aligned:
+      Edit button  [button]
+
+  SCREEN: Broker statement - header block   /Statements/broker/<id>
+    document / cards: not scrolling
+    LEFT : Broker  [broker_name]; Broker (Gujarati)  [broker_name_gu]; Mobile  [mobile]
+    RIGHT: 
+
+TABLE: empty_bag_movers
+----------------------------------------------------------------------
+  SCREEN: Empty Bag Mover master list   /Masters/EmptyBagMovers
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Full name (surname, name, father)  [name]
+      Pet name  [pet_name]
+    RIGHT, scrolling horizontally, right-aligned:
+      Mobile  [mobile]
+      Edit button  [button]
+
+TABLE: empty_bag_movers_entries
+----------------------------------------------------------------------
+  SCREEN: Empty Bag Suppliers - Movers tab   /EmptyBags?view=movers
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [mover_date]
+      Mover  [empty_bag_mover_id]
+      Delivered at  [farmer_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Empty bags  [no_of_empty_bags]
+      Cost  [cost_per_mover]
+      Edit button  [button]
+
+TABLE: empty_bag_sellers
+----------------------------------------------------------------------
+  SCREEN: Empty Bag Seller master list   /Masters/EmptyBagSellers
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Full name (surname, name, father)  [name]
+      Pet name  [pet_name]
+    RIGHT, scrolling horizontally, right-aligned:
+      Mobile  [mobile]
+      Edit button  [button]
+
+  SCREEN: Empty bag supplier statement - header block   /Statements/empty_bag_seller/<id>
+    document / cards: not scrolling
+    LEFT : Supplier  [pet_name]; Supplier (Gujarati)  [name_gu]; Mobile  [mobile]
+    RIGHT: 
+
+TABLE: empty_bag_sellers_entries
+----------------------------------------------------------------------
+  SCREEN: Empty Bag Suppliers - Sellers tab   /EmptyBags
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [selling_date]
+      Seller  [empty_bag_seller_id]
+      Delivered at  [farmer_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Bags  [no_of_empty_bags]
+      Rate  [rate_per_bag]
+      Amount  [payable_amount]
+      Paid  [worked out]
+      Balance  [worked out]
+      Edit button  [button]
+
+  SCREEN: Empty Bag Suppliers - Storage by farmer tab (sellers + movers)   /EmptyBags?view=storage
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Village  [farmers.village_id]
+      Farmer (storage)  [farmer_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      From sellers  [no_of_empty_bags]
+      From movers  [empty_bag_movers_entries.no_of_empty_bags]
+      Total empty bags  [worked out]
+      Sellers / movers  [worked out]
+
+TABLE: empty_bags
+----------------------------------------------------------------------
+  SCREEN: Stockyard Purchase - Empty bags tab   /StockyardPurchase?view=empty_bags
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [empty_bags_entry_date]
+      Stockyard  [stockyard_id]
+      Grain  [grain_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Bought from  [empty_bag_seller_id | industry_id]
+      Mover  [empty_bag_mover_id]
+      Empty bags  [no_of_empty_bags]
+      Rate  [rate_per_empty_bag]
+      Payable  [worked out]
+      Paid  [worked out]
+      Balance  [worked out]
+      Edit button  [button]
+
+TABLE: farmer_to_stockyard_transfers
+----------------------------------------------------------------------
+  SCREEN: Stockyard Purchase - Farmer to stockyard tab   /StockyardPurchase?view=transfers
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [transfer_date]
+      Farmer entry  [purchase_farmer_entry_id | purchase_individual_id]
+      Grain  [worked out]
+    RIGHT, scrolling horizontally, right-aligned:
+      To stockyard  [stockyard_id]
+      Bags  [no_of_transferred_bags]
+      Edit button  [button]
+
+TABLE: farmers
+----------------------------------------------------------------------
+  SCREEN: Farmer master list   /Masters/Farmers
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Full name (surname, name, father, grandfather)  [farmer_name]
+      Village  [village_id (shows village_name)]
+    RIGHT, scrolling horizontally, right-aligned:
+      Mobile  [mobile]
+      Head of family (ask him before any payment)  [head_of_family]
+      Edit / Statement button  [button]
+
+  SCREEN: Farmer statement - header block   /Farmers/<id>/Statement
+    document / cards: not scrolling
+    LEFT : Farmer  [farmer_name]; Farmer (Gujarati)  [farmer_name_gu]; Village  [village_id (shows village_name)]; Mobile  [mobile]; Head of family  [head_of_family]
+    RIGHT: 
+
+TABLE: farmers_truck_load_lines
+----------------------------------------------------------------------
+  SCREEN: Trip page - Loaded from farmers   /Trips/<id>
+    document / cards: not scrolling
+    LEFT : Village / farmer / entry  [purchase_farmer_entry_id | purchase_individual_id]
+    RIGHT: Loaded bags  [no_of_loaded_bags]; Left  [worked out]
+
+TABLE: grains
+----------------------------------------------------------------------
+  SCREEN: Grain master list   /Masters/Grains
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Grain name  [grain_name]
+      Grain name (Gujarati)  [grain_name_gu]
+    RIGHT, scrolling horizontally, right-aligned:
+      Net bag weight (kg)  [net_bag_weight]
+      Expected raw weight per bag (kg)  [expected_raw_weight_per_bag]
+      Booking weight (kg)  [booking_weight]
+      Edit button  [button]
+
+TABLE: industries
+----------------------------------------------------------------------
+  SCREEN: Industry master list   /Masters/Industries
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Industry name  [industry_name]
+      Grain  [grain]
+    RIGHT, scrolling horizontally, right-aligned:
+      Location  [location]
+      Supervisor mobile  [supervisor_mobile]
+      Edit button  [button]
+
+  SCREEN: Industry account - header block   /Industries/<id>/Account
+    document / cards: not scrolling
+    LEFT : Industry  [industry_name]; Industry (Gujarati)  [industry_name_gu]; Location  [location]; Owner  [industry_owner_name]; Owner mobile  [industry_owner_mobile]; Supervisor  [supervisor_name]; Supervisor mobile  [supervisor_mobile]
+    RIGHT: 
+
+TABLE: labour_group_wages
+----------------------------------------------------------------------
+  SCREEN: Labour Wages master list   /Masters/LabourWages
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Labour group  [labour_group_id (shows display_name)]
+      Grain  [grain_id (shows grain_name)]
+    RIGHT, scrolling horizontally, right-aligned:
+      Weighing rate (₹ per bag)  [weighing_rate]
+      Loading rate (₹ per bag)  [loading_rate]
+      Pulling rate (₹ per bag)  [pulling_rate]
+      Mixing rate (₹ per bag)  [mixing_rate]
+      Edit button  [button]
+
+TABLE: labour_groups
+----------------------------------------------------------------------
+  SCREEN: Labour Group master list   /Masters/LabourGroups
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Group name  [group_name]
+      Village  [village_id (shows village_name)]
+    RIGHT, scrolling horizontally, right-aligned:
+      Group name (Gujarati)  [group_name_gu]
+      Edit button  [button]
+
+  SCREEN: Labour group statement - header block   /Statements/labour_group/<id>
+    document / cards: not scrolling
+    LEFT : Labour  [group_name]; Labour (Gujarati)  [group_name_gu]
+    RIGHT: 
+
+TABLE: labour_work
+----------------------------------------------------------------------
+  SCREEN: Labour work list   /LabourWork
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Date  [work_date]
+      Group  [labour_group_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Wages  [payable_amount]
+      Borrowing  [borrowing_amount]
+      Net  [worked out]
+      Paid  [worked out]
+      Balance  [worked out]
+      Petrol  [petrol]
+      Meal  [meal]
+      (note under group)  [description]
+      Edit button  [button]
+
+TABLE: labours
+----------------------------------------------------------------------
+  SCREEN: Labour master list   /Masters/Labours
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Labour name  [labour_name]
+      Labour group  [labour_group_id (shows display_name)]
+    RIGHT, scrolling horizontally, right-aligned:
+      Mobile  [mobile]
+      Edit button  [button]
+
+TABLE: payment_allocations
+----------------------------------------------------------------------
+  SCREEN: Payment receipt - Settled against   /Receipt/<id>
+    document / cards: not scrolling
+    LEFT : Date  [worked out]; Details  [payable_type / payable_id (shows the bill)]
+    RIGHT: Item total  [worked out]; This payment  [amount]; Still due  [worked out]
+
+TABLE: payments
+----------------------------------------------------------------------
+  SCREEN: Payments (ledger) - rows on statement pages   /Farmers/<id>/Statement, /Statements/<type>/<id>
+    document / cards: not scrolling
+    LEFT : Receipt (#)  [id]; Date  [payment_date]; Method  [method]; Received by  [receiver_name]; Received by (mobile)  [receiver_mobile]; Reference  [reference_no]
+    RIGHT: Amount  [amount]
+
+  SCREEN: Payment receipt (printed)   /Receipt/<id>
+    document / cards: not scrolling
+    LEFT : Receipt (#)  [id]; Date  [payment_date]; Received by  [receiver_name]; Receiver mobile  [receiver_mobile]; Method  [method]; Reference  [reference_no]; Note  [description]
+    RIGHT: Amount paid  [amount]
+
+TABLE: purchase_group_add_farmers
+----------------------------------------------------------------------
+  SCREEN: Purchase group page - Farmers in this purchase   /PurchaseGroup/<id>
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Farmer  [farmer_id]
+      Village  [farmers.village_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Entries  [worked out]
+      Net payable  [worked out]
+      Paid  [worked out]
+      Due  [worked out]
+      + Entry button  [button]
+
+TABLE: purchase_group_farmers_entries
+----------------------------------------------------------------------
+  SCREEN: Purchase Farmers - Farmer entries tab (group and individual rows together)   /PurchaseFarmers?view=entries
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [purchase_group_farmers_entries.purchase_entry_date | purchase_individuals.purchase_individual_date]
+      Farmer  [purchase_group_farmers_entries.farmer_id | purchase_individuals.farmer_id]
+      Village  [farmers.village_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Grain  [worked out]
+      Purchase  [purchase_group_farmers_entries.purchase_group_id]
+      Bags  [purchase_group_farmers_entries.no_of_filled_bags | purchase_individuals.no_of_filled_bags (+ no_of_handful_bags)]
+      Kg  [worked out]
+      Rate/20kg  [purchase_groups.grain_rate_per_20kg | purchase_individuals.grain_rate_per_20kg]
+      Amount  [purchase_group_farmers_entries.payable_amount | purchase_individuals.payable_amount]
+      Borrowing  [purchase_group_farmers_entries.borrowed_amount | purchase_individuals.borrowed_amount]
+      Net  [worked out]
+      Paid  [worked out]
+      Balance  [worked out]
+      Due on  [purchase_group_farmers_entries.due_date | purchase_individuals.due_date]
+      Status  [worked out]
+      (note under farmer name)  [purchase_group_farmers_entries.description | purchase_individuals.description]
+      Edit button  [button]
+
+  SCREEN: Purchase Farmers - Farmer bag ledger tab   /PurchaseFarmers?view=bags
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [purchase_group_farmers_entries.purchase_entry_date | purchase_individuals.purchase_individual_date]
+      Farmer  [purchase_group_farmers_entries.farmer_id | purchase_individuals.farmer_id]
+      Village  [farmers.village_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Grain  [worked out]
+      Source  [worked out]
+      Total available  [purchase_group_farmers_entries.total_available_bags | purchase_individuals.total_available_bags]
+      Loaded on trucks  [farmers_truck_load_lines.no_of_loaded_bags]
+      Taken to stockyard  [farmer_to_stockyard_transfers.no_of_transferred_bags]
+      Remaining  [worked out]
+
+  SCREEN: Purchase group page - Entries table   /PurchaseGroup/<id>
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Date  [purchase_entry_date]
+      Farmer  [farmer_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Labour  [labour_group_id]
+      Bags  [no_of_filled_bags]
+      Handful  [no_of_handful_bags]
+      Kilos  [extra_kilos]
+      Amount  [payable_amount]
+      Borrowing  [borrowed_amount]
+      Net  [worked out]
+      Paid  [worked out]
+      Balance  [worked out]
+      Due on  [due_date]
+      Status  [worked out]
+      (note under farmer name)  [description]
+      Edit button  [button]
+
+TABLE: purchase_groups
+----------------------------------------------------------------------
+  SCREEN: Purchase Farmers - Purchase groups tab   /PurchaseFarmers?view=groups
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Date  [purchase_group_date]
+      Village  [village_id (shows village_name)]
+    RIGHT, scrolling horizontally, right-aligned:
+      Grain  [grain_id (shows grain_name)]
+      Rate/20kg  [grain_rate_per_20kg]
+      Bag kg  [grains.net_bag_weight]
+      Pay after  [pay_after_no_of_days]
+      Farmers  [worked out]
+      Bags  [worked out]
+      Payable  [worked out]
+      Paid  [worked out]
+      Due  [worked out]
+      Open button  [button]
+
+  SCREEN: Purchase group page - header cards   /PurchaseGroup/<id>
+    document / cards: not scrolling
+    LEFT : Village  [village_id]; Grain  [grain_id]; Date  [purchase_group_date]; Business year  [business_year]; Pay after  [pay_after_no_of_days]; Terms  [purchase_group_terms]; Description  [description]
+    RIGHT: Rate / 20 kg  [grain_rate_per_20kg]
+
+TABLE: purchase_individuals
+----------------------------------------------------------------------
+  SCREEN: Purchase Farmers - Purchase individuals tab   /PurchaseFarmers?view=individuals
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [purchase_individuals.purchase_individual_date]
+      Farmer  [purchase_group_farmers_entries.farmer_id | purchase_individuals.farmer_id]
+      Village  [farmers.village_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Grain  [worked out]
+      Bags  [purchase_group_farmers_entries.no_of_filled_bags | purchase_individuals.no_of_filled_bags (+ no_of_handful_bags)]
+      Kg  [worked out]
+      Rate/20kg  [purchase_groups.grain_rate_per_20kg | purchase_individuals.grain_rate_per_20kg]
+      Amount  [purchase_group_farmers_entries.payable_amount | purchase_individuals.payable_amount]
+      Borrowing  [purchase_group_farmers_entries.borrowed_amount | purchase_individuals.borrowed_amount]
+      Net  [worked out]
+      Paid  [worked out]
+      Balance  [worked out]
+      Due on  [purchase_group_farmers_entries.due_date | purchase_individuals.due_date]
+      Status  [worked out]
+      (note under farmer name)  [purchase_group_farmers_entries.description | purchase_individuals.description]
+      Edit button  [button]
+
+TABLE: receipt_allocations
+----------------------------------------------------------------------
+  SCREEN: Receipt in - Settled against   /ReceiptIn/<id>
+    document / cards: not scrolling
+    LEFT : Bill  [bilty_id (shows bill_number)]; Date  [worked out]; Truck  [worked out]
+    RIGHT: Bill amount  [worked out]; This receipt  [amount]; Still due  [worked out]
+
+TABLE: receipts
+----------------------------------------------------------------------
+  SCREEN: Receipts - rows on the industry account   /Industries/<id>/Account
+    document / cards: not scrolling
+    LEFT : No. (#)  [id]; Date  [receipt_date]; Method  [method]; Paid by  [payer_name]; Reference  [reference_no]
+    RIGHT: Amount  [amount]
+
+  SCREEN: Receipt in (printed)   /ReceiptIn/<id>
+    document / cards: not scrolling
+    LEFT : Received from  [industry_id]; Date  [receipt_date]; Paid by  [payer_name]; Method  [method]; Reference  [reference_no]; Note  [description]
+    RIGHT: Amount received  [amount]
+
+TABLE: stockyard_arrangement_entries
+----------------------------------------------------------------------
+  SCREEN: Stockyard Purchase - Arrangement entries tab   /StockyardPurchase?view=arrangements
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [stockyard_arrangement_date]
+      Purchase entry  [stockyard_purchase_entry_id]
+      Labour group  [labour_group_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Arranged bags  [no_of_arranged_bags]
+      Rate / bag  [rate_per_arranged_bag]
+      Amount  [worked out]
+      Edit button  [button]
+
+TABLE: stockyard_purchase_entries
+----------------------------------------------------------------------
+  SCREEN: Stockyard Purchase - Purchase entries tab   /StockyardPurchase?view=entries
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [stockyard_purchase_entry_date]
+      Purchase  [stockyard_purchase_id]
+      Filled bags  [no_of_filled_bags]
+    RIGHT, scrolling horizontally, right-aligned:
+      Empty bags back  [no_of_received_empty_bags]
+      Extra kg  [extra_kilos]
+      Payable  [payable_amount]
+      Borrowed  [borrowed_amount]
+      Net  [worked out]
+      Due date  [due_date]
+      Labour group  [labour_group_id]
+      Edit button  [button]
+
+TABLE: stockyard_purchases
+----------------------------------------------------------------------
+  SCREEN: Stockyard Purchase - Stockyard purchases tab   /StockyardPurchase?view=purchases
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [stockyard_purchase_date]
+      Farmer  [farmer_id]
+      Stockyard  [stockyard_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Grain  [grain_id]
+      Rate / 20 kg  [grain_rate_per_20kg]
+      Pay after  [pay_after_no_of_days]
+      Empty bags  [no_of_given_empty_bags]
+      Edit button  [button]
+
+TABLE: stockyard_truck_load_lines
+----------------------------------------------------------------------
+  SCREEN: Trip page - Loaded from stockyard   /Trips/<id>
+    document / cards: not scrolling
+    LEFT : Stockyard  [stockyard_id]
+    RIGHT: Loaded bags  [no_of_loaded_bags]
+
+TABLE: stockyards
+----------------------------------------------------------------------
+  SCREEN: Stockyard master list   /Masters/Stockyards
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Stockyard name  [name_of_stockyard]
+      Location  [location]
+    RIGHT, scrolling horizontally, right-aligned:
+      Owner name (Self if it is ours)  [stockyard_owner_name]
+      Rent of stockyard (₹)  [rent_of_stockyard]
+      Edit button  [button]
+
+  SCREEN: Stockyard Purchase - Stockyard bag ledger tab   /StockyardPurchase?view=stock
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Stockyard  [id (shows name_of_stockyard)]
+      Grain  [grains.id (shows grain_name)]
+    RIGHT, scrolling horizontally, right-aligned:
+      Filled: Bought here  [stockyard_purchase_entries.no_of_filled_bags]
+      Filled: From farmers  [farmer_to_stockyard_transfers.no_of_transferred_bags]
+      Filled: Loaded  [stockyard_truck_load_lines.no_of_loaded_bags]
+      Filled: In stock  [worked out]
+      Empty: Bought  [empty_bags.no_of_empty_bags]
+      Empty: Given  [stockyard_purchases.no_of_given_empty_bags]
+      Empty: Received back  [stockyard_purchase_entries.no_of_received_empty_bags]
+      Empty: Not accounted  [worked out]
+      Empty: In stock  [worked out]
+
+TABLE: transporters
+----------------------------------------------------------------------
+  SCREEN: Transport master list   /Masters/Transporters
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Transport name  [transporter_name]
+      Pet name  [pet_name]
+    RIGHT, scrolling horizontally, right-aligned:
+      Location  [location]
+      Mobile  [mobile]
+      Edit button  [button]
+
+TABLE: truck_trips
+----------------------------------------------------------------------
+  SCREEN: Truck trips list   /Trips
+    pinned columns N = 3   (data-sticky-left="3")
+    LEFT, pinned, left-aligned:
+      Date  [trip_date]
+      Truck  [truck_id (+ transporter_id pet name)]
+      Industry  [broker_bookings.industry_id]
+    RIGHT, scrolling horizontally, right-aligned:
+      Grain  [worked out]
+      Bags  [worked out]
+      Bill  [bilties.bill_number]
+      Our kg  [worked out]
+      Industry kg  [worked out]
+      Diff %  [worked out]
+      Freight  [worked out]
+      Receivable  [worked out]
+      Open button  [button]
+
+  SCREEN: Trip page - trip, booking and freight cards   /Trips/<id>
+    document / cards: not scrolling
+    LEFT : Date  [trip_date]; Truck  [truck_id]; Transport  [transporter_id]; Labour  [labour_group_id]; Booking  [broker_booking_id]; Business year  [business_year]; Description  [description]
+    RIGHT: Rent per ton  [rent_per_ton]; Rent per bag  [rent_per_bag]; Advance to driver  [advance_amount]; Other payable  [other_payable]; Other deduction  [other_deduction]
+
+TABLE: trucks
+----------------------------------------------------------------------
+  SCREEN: Truck master list   /Masters/Trucks
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Truck number  [truck_number]
+      Owner name (surname, name, father)  [truck_owner_name]
+    RIGHT, scrolling horizontally, right-aligned:
+      Driver name (surname, name, father)  [driver_name]
+      Driver mobile  [driver_mobile]
+      Edit button  [button]
+
+  SCREEN: Truck statement - header block   /Statements/truck/<id>
+    document / cards: not scrolling
+    LEFT : Truck  [truck_number]; Owner mobile  [truck_owner_mobile]
+    RIGHT: 
+
+TABLE: users
+----------------------------------------------------------------------
+  (no output screen of its own: only username and role are shown (top bar, and the account page))
+
+TABLE: villages
+----------------------------------------------------------------------
+  SCREEN: Village master list   /Masters/Villages
+    pinned columns N = 2   (data-sticky-left="2")
+    LEFT, pinned, left-aligned:
+      Village name  [village_name]
+      Village name (Gujarati)  [village_name_gu]
+    RIGHT, scrolling horizontally, right-aligned:
+      Edit button  [button]
+
+SCREENS BUILT FROM SEVERAL TABLES (no table of their own)
+----------------------------------------------------------------------
+  SCREEN: Receivables   /Receivables
+    pinned columns N = 1
+    LEFT, pinned, left-aligned:
+      Industry  [industries.industry_name (+ location)]
+    RIGHT, scrolling horizontally, right-aligned:
+      Trucks  [worked out]
+      Weight awaited  [worked out]
+      Shortage kg  [worked out]
+      Billed  [worked out]
+      Received  [worked out]
+      Outstanding  [worked out]
+      Receive / Account buttons  [button]
+
+  SCREEN: Payables - farmer   /Payables?type=farmer
+    pinned columns N = 3
+    LEFT, pinned, left-aligned:
+      Name  [farmers.farmer_name]
+      Village  [farmers.village_id]
+      Mobile  [farmers.mobile]
+    RIGHT, scrolling horizontally, right-aligned:
+      Items  [worked out]
+      Oldest  [worked out]
+      Overdue  [worked out]
+      Total due  [worked out]
+      Pay / Statement buttons  [button]
+
+  SCREEN: Payables - truck / labour / empty bag supplier / empty bag industry / broker   /Payables?type=<type>
+    pinned columns N = 2
+    LEFT, pinned, left-aligned:
+      Name  [the party name column]
+      Mobile  [the party mobile column]
+    RIGHT, scrolling horizontally, right-aligned:
+      Items / unpaid trips  [worked out]
+      Oldest  [worked out]
+      Total due  [worked out]
+      Pay / Statement buttons  [button]
+
+  SCREEN: Pay page - Open items   /Pay/<type>/<id>
+    pinned columns N = 2
+    LEFT, pinned, left-aligned:
+      Date  [worked out]
+      Details  [worked out]
+    RIGHT, scrolling horizontally, right-aligned:
+      Due on (farmer only)  [worked out]
+      Amount  [worked out]
+      Paid  [worked out]
+      Due  [worked out]

@@ -32,6 +32,7 @@ from app.models import (
 from app.services import audit
 from app.services.ledger import DIRECT, FARMER, all_entry_views, allocate
 from app.services.locks import advisory_lock
+from app.services.upi import effective_upi
 from app.services.years import assert_year_open
 
 
@@ -46,21 +47,23 @@ class PartySpec:
     name_gu: Callable[[Any], str | None]
     mobile: Callable[[Any], str]
     receiver: Callable[[Any], tuple[str, str]]  # default (name, mobile) of whoever collects the money
+    upi: Callable[[Any], str] = lambda p: ""  # the UPI number to pay to (the stored UPI, else the mobile); blank when the party has none
 
 
 PARTIES: dict[str, PartySpec] = {
     "farmer": PartySpec(("Farmer", "ખેડૂત"), Farmer, lambda p: p.farmer_name, lambda p: p.farmer_name_gu, lambda p: p.mobile,
-                        lambda p: (p.farmer_name if (p.head_of_family or "").lower() == "self" else (p.head_of_family or p.farmer_name), p.mobile)),
+                        lambda p: (p.farmer_name if (p.head_of_family or "").lower() == "self" else (p.head_of_family or p.farmer_name), p.mobile),
+                        lambda p: effective_upi(p.upi_number, p.mobile)),
     "truck": PartySpec(("Truck", "ટ્રક"), Truck, lambda p: p.truck_number, lambda p: None, lambda p: p.truck_owner_mobile,
-                       lambda p: (p.truck_owner_name, p.truck_owner_mobile)),  # paid to the truck owner
-    "labour_group": PartySpec(("Labour", "મજૂર"), LabourGroup, lambda p: p.group_name, lambda p: p.group_name_gu, lambda p: "",
-                              lambda p: (p.group_name, "")),
+                       lambda p: (p.truck_owner_name, p.truck_owner_mobile), lambda p: effective_upi(p.truck_owner_upi_number, p.truck_owner_mobile)),  # paid to the truck owner
+    "labour_group": PartySpec(("Labour", "મજૂર"), LabourGroup, lambda p: p.display_name, lambda p: p.display_name_gu, lambda p: "",
+                              lambda p: (p.display_name, "")),
     "empty_bag_seller": PartySpec(("Empty bag supplier", "બારદાન સપ્લાયર"), EmptyBagSeller, lambda p: p.pet_name, lambda p: p.name_gu, lambda p: p.mobile,
-                              lambda p: (p.name, p.mobile)),
+                              lambda p: (p.name, p.mobile), lambda p: effective_upi(p.upi_number, p.mobile)),
     "industry": PartySpec(("Empty Bag Industry", "બારદાન ઉદ્યોગ"), Industry, lambda p: p.industry_name, lambda p: p.industry_name_gu, lambda p: p.industry_owner_mobile,
                           lambda p: (p.industry_owner_name, p.industry_owner_mobile)),  # empty bags bought from an industry
     "broker": PartySpec(("Broker", "દલાલ"), Broker, lambda p: p.broker_name, lambda p: p.broker_name_gu, lambda p: p.mobile,
-                        lambda p: (p.broker_name, p.mobile)),
+                        lambda p: (p.broker_name, p.mobile), lambda p: effective_upi(p.upi_number, p.mobile)),
 }
 
 
@@ -156,7 +159,7 @@ async def load_payables(db: AsyncSession, party_type: str, party_id: int | None 
         rows = list((await db.scalars(stmt)).unique().all())
         paid = await _paid_map(db, pt, [r.id for r in rows])
         for r in rows:
-            out.append(Payable(pt, r.id, party_type, r.labour_group_id, r.labour_group.group_name, r.work_date, None,
+            out.append(Payable(pt, r.id, party_type, r.labour_group_id, r.labour_group.display_name, r.work_date, None,
                                r.description or "Labour work", r.net_payable, paid.get(r.id, 0),
                                (r.description or "Labour work",)))
     elif party_type == "empty_bag_seller":

@@ -25,6 +25,8 @@ templates.env.globals["can_edit_year"] = can_edit_year
 def cell(row, path: str):
     """Value of a (possibly dotted) attribute path: cell(farmer, 'village.village_name')."""
     for part in path.split("."):
+        if row is None:  # an empty link in the middle of the path (a labour group with no village yet)
+            return ""
         row = getattr(row, part)
     return "" if row is None else row
 
@@ -74,10 +76,18 @@ def inr(value) -> str:
         if head:
             groups.insert(0, head)
         tail = ",".join(groups) + "," + tail
-    return f"{sign}₹ {tail}"
+    return f"{sign}₹\u00a0{tail}"  # non-breaking space: the sign and the number never split over two lines (the column widens instead)
 
 
 templates.env.filters["inr"] = inr
+
+
+def gu_only(text):
+    """The text if it really is Gujarati (has Gujarati letters), else blank: an English name saved in a Gujarati box is not shown as Gujarati."""
+    return text if text and any("\u0A80" <= ch <= "\u0AFF" for ch in text) else ""
+
+
+templates.env.filters["gu_only"] = gu_only
 
 
 def format_mobile(value) -> str:

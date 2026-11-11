@@ -32,6 +32,7 @@ from app.services.locations import stored_locations
 from app.services.stock import Stock, stock_by_entry
 from app.services.ledger import all_entry_views, direct_entry_views, paid_for_direct, totals
 from app.services.money import payable_amount, total_available_bags
+from app.services.quality import QUALITY_HELP, QUALITY_OPTIONS
 from app.services.years import YearLockedError, allowed_years, assert_year_open, current_year_label, assert_year_editable, year_is_locked
 
 router = APIRouter()
@@ -151,13 +152,13 @@ async def direct_fields(db: AsyncSession) -> tuple[list[F], list[F], dict[int, i
     ]
     entry = [
         F("farmer_id", "Farmer", "ખેડૂત", kind="select", required=True, options=tuple((str(f.id), f"{f.farmer_name} — {f.village.village_name} — {format_mobile(f.mobile)}") for f in farmers)),
-        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True, options=tuple((str(g.id), g.group_name) for g in groups)),
+        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True, options=tuple((str(g.id), g.display_name) for g in groups)),
         F("no_of_filled_bags", "Filled bags", "ભરેલી બેગ", kind="int", required=True),
         F("extra_kilos", "Extra kilos (loose, beyond full bags)", "વધારાના કિલો (પૂરી બેગ ઉપરાંત)", kind="int"),
         F("no_of_handful_bags", "Handful bags", "હેન્ડફુલ બેગ", kind="int", help=("Counted in the stock, not in the payment", "સ્ટોકમાં ગણાય છે, ચુકવણીમાં નહીં")),
         F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)", kind="decimal",
           help=("Used only to compare with the weighbridge, never in the payment. Blank starts at the grain's value", "ફક્ત કાંટા સાથે સરખામણી માટે, ચુકવણીમાં ક્યારેય નહીં. ખાલી રાખો તો અનાજના મૂલ્યથી શરૂ")),
-        F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ"),
+        F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ", options=QUALITY_OPTIONS, help=QUALITY_HELP),
         F("grain_stored_location", "Grain stored location", "અનાજ સંગ્રહ સ્થળ", options=await stored_locations(db),
           help=("Pick a place used before, or type a new one (text in brackets is ignored when matching)", "પહેલાં વપરાયેલ સ્થળ પસંદ કરો અથવા નવું લખો (કૌંસનો લખાણ ગણાતું નથી)")),
         F("borrowed_amount", "Borrowing / advance to deduct (₹)", "ઉધાર / એડવાન્સ કાપવાના (₹)", kind="int"),
@@ -212,7 +213,7 @@ async def direct_new(request: Request, like: int = 0, user: User = Depends(curre
     village_id = toolbar_ids(request)[0]
     if village_id:  # and the farmers of that village
         entry = [replace(f, options=tuple(o for o in f.options if farmer_villages.get(int(o[0])) == village_id)) if f.name == "farmer_id" else f for f in entry]
-    ctx = _ctx(purchase, entry, values, {}, "/PurchaseFarmers?view=individuals", ("Add purchase individual", "ખરીદી વ્યક્તિગત ઉમેરો"), nets, False, farmer_villages)
+    ctx = _ctx(purchase, entry, values, {}, "/PurchaseIndividual", ("Add purchase individual", "ખરીદી વ્યક્તિગત ઉમેરો"), nets, False, farmer_villages)
     return render_with_csrf(request, csrf, "direct_form_page.html", user=user, **ctx)
 
 

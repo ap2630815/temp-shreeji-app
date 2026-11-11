@@ -14,6 +14,7 @@
         <div class="text-lg font-semibold leading-tight">{{ party_name }}</div>
         {% if party_name_gu %}<div class="gu text-base leading-tight">{{ party_name_gu }}</div>{% endif %}
         {% if party_mobile %}<div class="text-sm">{{ party_mobile | mobhtml }}</div>{% endif %}
+        {% if party_upi %}<div class="text-sm">{{ t('UPI', 'UPI') }}{% if party_upi == party_mobile %} <span class="opacity-60">({{ t('same as mobile', 'મોબાઇલ જેવો જ') }})</span>{% else %}  <b>{{ party_upi | mobhtml }}</b>{% endif %}</div>{% endif %}
       </div>
       {% if party_type == 'farmer' and party.head_of_family and party.head_of_family | lower != 'self' %}
       <div class="notice notice-warning flex-col items-start text-left gap-0 ml-auto">

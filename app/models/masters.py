@@ -1,7 +1,7 @@
 """Master (reference) tables: file1-master1.txt and file2-master2.txt. Running totals are deliberately absent:
 they are derived from transaction/ledger rows, never stored."""
 
-from sqlalchemy import BigInteger, CheckConstraint, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -75,7 +75,8 @@ class Transporter(TimestampMixin, Base):
 class Truck(TimestampMixin, Base):
     __tablename__ = "trucks"
     __table_args__ = (
-        _upi_check(),
+        _digits_check("truck_owner_upi_number", nullable=True),
+        _digits_check("driver_upi_number", nullable=True),
         CheckConstraint(f"truck_number ~ '{TRUCK_NO}'", name="ck_trucks_number_format"),
         _digits_check("truck_owner_mobile", "ck_truck_owner_mobile_10_digits"),
         _digits_check("driver_mobile"),
@@ -87,7 +88,8 @@ class Truck(TimestampMixin, Base):
     truck_owner_mobile: Mapped[str] = mapped_column(String(10))
     driver_name: Mapped[str] = mapped_column(String(120))
     driver_mobile: Mapped[str] = mapped_column(String(10))
-    upi_number: Mapped[str | None] = mapped_column(String(10))
+    truck_owner_upi_number: Mapped[str | None] = mapped_column(String(10))
+    driver_upi_number: Mapped[str | None] = mapped_column(String(10))
     description: Mapped[str | None] = mapped_column(Text)
 
 
@@ -133,12 +135,34 @@ class Village(TimestampMixin, Base):
 
 
 class LabourGroup(TimestampMixin, Base):
+    """A labour group is named "group name - village name": the name is unique per village (groups saved before villages were added have none)."""
+
     __tablename__ = "labour_groups"
+    __table_args__ = (
+        UniqueConstraint("group_name", "village_id", name="uq_labour_groups_name_village"),
+        Index("uq_labour_groups_name_no_village", "group_name", unique=True, postgresql_where=text("village_id IS NULL")),
+        Index("ix_labour_groups_village_id", "village_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    group_name: Mapped[str] = mapped_column(String(30), unique=True)
+    group_name: Mapped[str] = mapped_column(String(30))
     group_name_gu: Mapped[str | None] = mapped_column(String(30))
+    village_id: Mapped[int | None] = mapped_column(ForeignKey("villages.id"))
     description: Mapped[str | None] = mapped_column(Text)
+
+    village: Mapped["Village | None"] = relationship(lazy="joined")
+
+    @property
+    def display_name(self) -> str:
+        """What every list, drop-down and statement shows: "group name - village name"."""
+        return f"{self.group_name} - {self.village.village_name}" if self.village else self.group_name
+
+    @property
+    def display_name_gu(self) -> str | None:
+        gu = self.group_name_gu
+        if gu and self.village and self.village.village_name_gu:
+            return f"{gu} - {self.village.village_name_gu}"
+        return gu
 
 
 class Grain(TimestampMixin, Base):

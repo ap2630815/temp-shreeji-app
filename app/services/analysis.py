@@ -232,7 +232,7 @@ async def truck_report(db: AsyncSession, year: str, grain_id: int, village_id: i
         Stat("Grain weight", "અનાજનું વજન", sum(t.freight_weight_kg or 0 for t in trips), "kg"),
         Stat("Trip total (freight)", "ટ્રીપ કુલ (ભાડું)", sum(t.trip_total for t in trips)),
         Stat("Advance to drivers", "ડ્રાઇવરને એડવાન્સ", sum(t.advance_amount for t in trips)),
-        Stat("Other payable / deduction", "અન્ય ચૂકવવાપાત્ર / કપાત", sum(t.other_payable for t in trips), "inr", f"− {sum(t.other_deduction for t in trips)} deduction"),
+        Stat("Other payable | deduction", "અન્ય ચૂકવવાપાત્ર | કપાત", sum(t.other_payable for t in trips), "inr", f"− {sum(t.other_deduction for t in trips)} deduction"),
         Stat("Payable to owners", "માલિકોને ચૂકવવાપાત્ર", payable, "inr", f"avg {round(payable / len(trips)) if trips else 0} / trip"),
         Stat("Paid", "ચૂકવ્યું", paid_total, "inr", f"{pct(paid_total, payable) or 0}% of payable"),
         Stat("Due", "બાકી", payable - paid_total),
@@ -289,7 +289,7 @@ async def labour_report(db: AsyncSession, year: str, grain_id: int, village_id: 
     ]
     g = _G()
     for w in works:
-        x = g[w.labour_group.group_name]
+        x = g[w.labour_group.display_name]
         x["n"] += 1
         x["wages"] += w.payable_amount
         x["borrow"] += w.borrowing_amount
@@ -303,11 +303,11 @@ async def labour_report(db: AsyncSession, year: str, grain_id: int, village_id: 
     wage_stmt = select(LabourGroupWage)
     if grain_id:
         wage_stmt = wage_stmt.where(LabourGroupWage.grain_id == grain_id)
-    wages = sorted((await db.scalars(wage_stmt)).unique().all(), key=lambda w: (w.labour_group.group_name, w.grain.grain_name))
+    wages = sorted((await db.scalars(wage_stmt)).unique().all(), key=lambda w: (w.labour_group.display_name, w.grain.grain_name))
     if wages:
         r.tables.append(Table(("Agreed wage rates (₹ per bag)", "નક્કી મજૂરી દર (₹ બેગ દીઠ)"), [("Group", "જૂથ", "text"), ("Grain", "અનાજ", "text"), ("Weighing", "તોલાઈ", "inr"), ("Loading", "લોડિંગ", "inr"),
-                                                                                        ("Pulling", "ખેંચાઈ", "inr"), ("Mixing", "મિક્સિંગ", "inr"), ("Other", "અન્ય", "inr")],
-                              [[w.labour_group.group_name, w.grain.grain_name, w.weighing_rate, w.loading_rate, w.pulling_rate, w.mixing_rate, w.other_expenses or 0] for w in wages]))
+                                                                                        ("Pulling", "ખેંચાઈ", "inr"), ("Mixing", "મિક્સિંગ", "inr")],
+                              [[w.labour_group.display_name, w.grain.grain_name, w.weighing_rate, w.loading_rate, w.pulling_rate, w.mixing_rate] for w in wages]))
     r.bars.append(Bars(("Wages by month", "મહિના મુજબ મજૂરી"), monthly([(w.work_date, w.payable_amount) for w in works])))
     r.notes.append(("Labour work is not tied to a village or grain, so those filters do not apply here (the grain filter only narrows the wage-rate table).",
                     "મજૂર કામ ગામ કે અનાજ સાથે જોડાયેલું નથી, તેથી તે ફિલ્ટર અહીં લાગુ પડતા નથી (અનાજ ફિલ્ટર ફક્ત દર કોષ્ટક માટે)."))

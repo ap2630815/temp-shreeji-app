@@ -78,7 +78,7 @@ async def trip_fields(db: AsyncSession, grain_id: int = 0) -> list[F]:
           help=("Fixes the grain, the industry, the rate and the broker for this trip", "આ ટ્રીપ માટે અનાજ, ઉદ્યોગ, ભાવ અને દલાલ નક્કી કરે છે")),
         F("truck_id", "Truck", "ટ્રક", kind="select", required=True, options=tuple((str(t.id), f"{t.truck_number} — {t.driver_name}") for t in trucks)),
         F("transporter_id", "Transport", "ટ્રાન્સપોર્ટ", kind="select", required=True, options=tuple((str(t.id), f"{t.pet_name} — {t.location}") for t in transporters)),
-        F("labour_group_id", "Loading labour", "લોડિંગ મજૂર", kind="select", required=True, options=tuple((str(g.id), g.group_name) for g in groups)),
+        F("labour_group_id", "Loading labour", "લોડિંગ મજૂર", kind="select", required=True, options=tuple((str(g.id), g.display_name) for g in groups)),
         F("rent_per_ton", "Rent per ton (₹)", "ટન દીઠ ભાડું (₹)", kind="int",
           help=("Fill exactly one of rent per ton / rent per bag", "ટન ભાડું અથવા બેગ ભાડું — બેમાંથી એક જ ભરો")),
         F("rent_per_bag", "Rent per bag (₹)", "બેગ દીઠ ભાડું (₹)", kind="int"),

@@ -45,7 +45,7 @@ class LabourIn(BaseModel):
 async def labour_fields(db: AsyncSession) -> list[F]:
     groups = list((await db.scalars(select(LabourGroup).order_by(LabourGroup.group_name))).all())
     return [
-        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True, options=tuple((str(g.id), g.group_name) for g in groups)),
+        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True, options=tuple((str(g.id), g.display_name) for g in groups)),
         F("work_date", "Date", "તારીખ", kind="date", required=True),
         F("payable_amount", "Wages earned (₹)", "મજૂરી (₹)", kind="int"),
         F("borrowing_amount", "Borrowing to deduct (₹)", "ઉધાર કાપવાના (₹)", kind="int", help=("Taken in advance by the group; deducted from this day's wages", "જૂથે એડવાન્સ લીધેલ; આ દિવસની મજૂરીમાંથી કપાશે")),

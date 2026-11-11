@@ -25,7 +25,7 @@
   {{ meta('Transport', 'ટ્રાન્સપોર્ટ', trip.transporter.pet_name) }}
   <div class="flex flex-col leading-snug px-4 py-1"><span class="text-xs inline-flex gap-2"><span>Truck owner</span><span class="gu">ટ્રક માલિક</span></span><a class="link text-sm font-bold" href="/Statements/truck/{{ trip.truck_id }}">{{ trip.truck.truck_owner_name }}</a></div>
   <div class="flex flex-col leading-snug px-4 py-1"><span class="text-xs inline-flex gap-2"><span>Driver</span><span class="gu">ડ્રાઇવર</span></span><b class="text-sm">{{ trip.truck.driver_name }} <span class="font-normal">({{ trip.truck.driver_mobile | mobhtml }})</span></b></div>
-  {{ meta('Labour', 'મજૂર', trip.labour_group.group_name) }}
+  {{ meta('Labour', 'મજૂર', trip.labour_group.display_name) }}
 </div></div>
 <div class="card bg-base-100 shadow w-fit max-w-full mb-4"><div class="flex flex-wrap divide-x divide-base-300 py-1">
   {{ meta('Booking', 'બુકિંગ', booking.booking_date) }}

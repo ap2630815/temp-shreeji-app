@@ -63,3 +63,16 @@ A Gujarati value under an English name in a table (e.g. a farmer's Gujarati name
 - printed statements and receipts (partials/*_body.html)
 - farmer-name sub-lines in tables
 - the form pages
+
+9. Gujarati filled from the English (forms with both)
+----------------------------------------------------------------------
+- Every form that has an English box and a Gujarati twin (name / name_gu, village_name / village_name_gu, farmer_name__1..4 / farmer_name_gu__1..4 ...)
+  fills the Gujarati by itself while the English is typed or picked. The Gujarati box stays editable: once you type in it, that is a correction and it is
+  kept - changing the English afterwards does NOT overwrite it (an Edit form whose saved Gujarati differs from what the English would give is treated the
+  same). Clearing the English clears the Gujarati and starts again (auto-fill is back for the next entry).
+- Built in and offline (app/static/translit.js, loaded by base.html); nothing leaves the server. The forms stay server-rendered - no form was converted
+  to a dynamic page; a small script reads the field names (X and X_gu, or X__n and X_gu__n).
+- How the Gujarati is made: whole words from the word list GU_WORDS first (grains are translated: Wheat -> ઘઉં; surnames, first names and villages are
+  spelled), then endings (bhai, ben, kumar, lal, ji ...), then the sound rules. It is a good first draft, not perfect (long and short vowels cannot be
+  known from the English), so check the Gujarati. To fix a word for good, add it to GU_WORDS (lower-case key).
+- Rule for new forms: name the Gujarati field <English field>_gu and nothing else is needed.

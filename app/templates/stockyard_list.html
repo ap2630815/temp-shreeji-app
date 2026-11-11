@@ -65,7 +65,7 @@
         <td>{{ e.no_of_filled_bags }}</td><td>{{ e.no_of_received_empty_bags }}</td><td>{{ e.extra_kilos }}</td>
         <td>{{ e.payable_amount | inr }}</td><td>{{ e.borrowed_amount | inr }}</td><td class="font-semibold">{{ e.net_payable | inr }}</td>
         <td class="whitespace-nowrap">{{ e.due_date }}</td>
-        <td>{{ e.labour_group.group_name if e.labour_group else '—' }}</td>
+        <td>{{ e.labour_group.display_name if e.labour_group else '—' }}</td>
         <td class="text-right">{% if can_edit_year(user, year) %}<a class="btn btn-primary btn-sm" href="/StockyardPurchase/entries/{{ e.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a>{% endif %}</td>
       </tr>
     {% else %}<tr><td colspan="11" class="text-center opacity-60">{{ t('Nothing recorded', 'કંઈ નોંધાયું નથી') }}</td></tr>{% endfor %}
@@ -130,7 +130,7 @@
       <tr>
         <td class="whitespace-nowrap">{{ a.stockyard_arrangement_date }}</td>
         <td>{% if a.purchase_entry %}#{{ a.purchase_entry.id }} · {{ a.purchase_entry.purchase.farmer.farmer_name }} · {{ a.purchase_entry.purchase.grain.grain_name }}{% else %}—{% endif %}</td>
-        <td>{{ a.labour_group.group_name if a.labour_group else '—' }}</td>
+        <td>{{ a.labour_group.display_name if a.labour_group else '—' }}</td>
         <td>{{ a.no_of_arranged_bags }}</td><td>{{ a.rate_per_arranged_bag | inr }}</td><td class="font-semibold">{{ a.amount | inr }}</td>
         <td class="text-right">{% if can_edit_year(user, year) %}<a class="btn btn-primary btn-sm" href="/StockyardPurchase/arrangements/{{ a.id }}/Edit">{{ t('Edit', 'સુધારો') }}</a>{% endif %}</td>
       </tr>

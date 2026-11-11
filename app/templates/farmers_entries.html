@@ -74,12 +74,12 @@
 </div>
 {% else %}
 <div class="stats stats-vertical md:stats-horizontal shadow bg-base-100 w-full mb-4">
-  <div class="stat py-2"><div class="stat-title">{{ t('Entries / farmers', 'નોંધ / ખેડૂત') }}</div><div class="stat-value text-2xl">{{ views | length }} / {{ totals.farmers }}</div>
-    <div class="stat-desc">{{ totals.bags }} {{ t('bags', 'બેગ') }} + {{ totals.handful }} {{ t('handful', 'હેન્ડફુલ') }}</div></div>
+  <div class="stat py-2"><div class="stat-title">{{ t('Entries | Farmers', 'નોંધ | ખેડૂત') }}</div><div class="stat-value text-2xl">{{ views | length }}&nbsp;&nbsp;|&nbsp;&nbsp;{{ totals.farmers }}</div>
+    <div class="stat-desc">{{ totals.bags }}&nbsp;&nbsp;{{ t('bags', 'બેગ') }}&nbsp;&nbsp;+&nbsp;&nbsp;{{ totals.handful }}&nbsp;&nbsp;{{ t('handful', 'હેન્ડફુલ') }}</div></div>
   <div class="stat py-2"><div class="stat-title">{{ t('Net payable', 'ચોખ્ખું ચૂકવવાપાત્ર') }}</div><div class="stat-value text-2xl">{{ totals.net_payable | inr }}</div>
-    <div class="stat-desc">{{ t('Paid', 'ચૂકવ્યું') }} {{ totals.paid | inr }}</div></div>
+    <div class="stat-desc">{{ t('Paid', 'ચૂકવ્યું') }}&nbsp;&nbsp;{{ totals.paid | inr }}</div></div>
   <div class="stat py-2"><div class="stat-title">{{ t('Due', 'બાકી') }}</div><div class="stat-value text-2xl {{ 'text-error' if totals.overdue }}">{{ totals.due | inr }}</div>
-    <div class="stat-desc">{{ t('Overdue', 'મુદત વીતી') }} {{ totals.overdue | inr }}</div></div>
+    <div class="stat-desc">{{ t('Overdue', 'મુદત વીતી') }}&nbsp;&nbsp;{{ totals.overdue | inr }}</div></div>
 </div>
 
 <div class="overflow-x-auto bg-base-100 rounded-box shadow">

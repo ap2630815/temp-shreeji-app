@@ -43,7 +43,7 @@
 (function () {
   const box = document.getElementById('payable-preview');
   const rate = +box.dataset.rate, net = +box.dataset.net;
-  const fmt = n => '₹ ' + n.toLocaleString('en-IN');
+  const fmt = n => '₹\u00a0' + n.toLocaleString('en-IN');
   function update() {
     const f = document.getElementById('master-form');
     if (!f) return;

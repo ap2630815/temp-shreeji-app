@@ -40,6 +40,7 @@ from app.services import audit
 from app.services.duplicates import DUPLICATE_MSG, find_duplicate
 from app.services.locks import advisory_lock
 from app.services.money import payable_amount
+from app.services.quality import QUALITY_HELP, QUALITY_OPTIONS
 from app.services.stock import stock_by_entry
 from app.services.payables import paid_for, paid_map
 from app.services.stockyard_stock import Empty, Filled, default_received, empty_ledger, filled_ledger
@@ -216,11 +217,11 @@ async def entry_fields(db: AsyncSession, village_id: int = 0, grain_id: int = 0)
           help=("Payable = (bags × bag weight + extra kilos) ÷ 20 × rate; due date = date + pay-after days", "ચૂકવવાપાત્ર = (બેગ × બેગ વજન + વધારાના કિલો) ÷ 20 × ભાવ; મુદત = તારીખ + દિવસ")),
         F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)", kind="decimal",
           help=("Leave blank to start at the grain's expected raw weight per bag", "ખાલી રાખો તો અનાજના અપેક્ષિત કાચા વજનથી શરૂ થશે")),
-        F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ", kind="textarea"),
+        F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ", options=QUALITY_OPTIONS, help=QUALITY_HELP),
         F("no_of_received_empty_bags", "Empty bags received back", "પાછી મળેલી ખાલી બેગ", kind="int",
           help=("Leave blank to start at: bags given − filled bags of the purchase − bags already received back. If that is below zero the purchase's given bags are opened for editing",
                 "ખાલી રાખો તો: આપેલી − ખરીદીની ભરેલી − પહેલા પાછી આવેલી. શૂન્યથી ઓછું આવે તો ખરીદીની આપેલી બેગ સુધારવા ખુલશે")),
-        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", options=_opt(groups, lambda g: g.group_name)),
+        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", options=_opt(groups, lambda g: g.display_name)),
         F("description", "Description", "વર્ણન", kind="textarea"),
     ]
 
@@ -266,7 +267,7 @@ async def arrangement_fields(db: AsyncSession, keep_entry_id: int | None = None,
         F("stockyard_purchase_entry_id", "Stockyard purchase entry (optional)", "સ્ટોકયાર્ડ ખરીદી નોંધ (વૈકલ્પિક)", kind="select",
           options=_opt(entries, lambda e: f"#{e.id} · {e.stockyard_purchase_entry_date} · {e.purchase.farmer.farmer_name} · {e.purchase.grain.grain_name} · {e.no_of_filled_bags} bags"),
           help=("When chosen, the arranged bags are the filled bags of that entry", "પસંદ કરો તો ગોઠવેલી બેગ એ નોંધની ભરેલી બેગ જેટલી")),
-        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", options=_opt(groups, lambda g: g.group_name)),
+        F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", options=_opt(groups, lambda g: g.display_name)),
         F("no_of_arranged_bags", "Arranged bags", "ગોઠવેલી બેગ", kind="int",
           help=("Required when no purchase entry is chosen", "ખરીદી નોંધ પસંદ ન કરી હોય ત્યારે જરૂરી")),
         F("rate_per_arranged_bag", "Rate per arranged bag (₹, 1 to 20)", "ગોઠવેલી બેગ દીઠ ભાવ (₹, 1 થી 20)", kind="int", required=True),

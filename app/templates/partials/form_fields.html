@@ -79,7 +79,7 @@
                {% if f.options and f.kind == 'text' %}list="{{ f.name }}-suggest"{% endif %}
                class="input input-bordered {{ 'join-item flex-1 min-w-0' if f.is_mobile }} {{ 'input-error' if f.name in errors }}" {{ 'required' if f.required }} {{ 'disabled' if f.locked }}>
         {% if f.is_mobile %}</div>{% endif %}
-        {% if f.options and f.kind == 'text' %}<datalist id="{{ f.name }}-suggest">{% for val, label in f.options %}<option value="{{ val }}">{% endfor %}</datalist>{% endif %}
+        {% if f.options and f.kind == 'text' %}<datalist id="{{ f.name }}-suggest">{% for val, label in f.options %}<option value="{{ val }}"{% if label != val %} label="{{ label }}"{% endif %}>{% endfor %}</datalist>{% endif %}
       {% endif %}
       {% if f.help %}<span class="field-help text-xs opacity-60 mt-1">{{ f.help[0] }} <span class="gu gu-side">{{ f.help[1] }}</span></span>{% endif %}
       {% if f.name in errors %}

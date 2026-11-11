@@ -69,7 +69,7 @@ payable_amount              | BIGINT                   | NOT NULL
 borrowed_amount             | BIGINT                   | NOT NULL, DEFAULT 0
 due_date                    | DATE                     | NOT NULL
 expected_raw_weight_per_bag | FLOAT                    | NOT NULL (>= 0), starts at the grain's expected_raw_weight_per_bag, editable
-grain_quality_code          | TEXT                     | -
+grain_quality_code          | TEXT                     | -  (free text; forms offer T. Top, S. Super, S.B. Super Bottom, s. super, s.b. super bottom, Avg. Average, Avg.B. Average Bottom, Rej. Rejection; the code is stored)
 grain_stored_location       | TEXT                     | -  (was grain_store_at; the forms offer the distinct places used so far, text in brackets ignored)
 no_of_handful_bags          | INTEGER                  | NOT NULL, DEFAULT 0
 total_available_bags        | INTEGER                  | NOT NULL, DEFAULT 0
@@ -116,7 +116,7 @@ payable_amount              | BIGINT                   | NOT NULL
 borrowed_amount             | BIGINT                   | NOT NULL, DEFAULT 0
 due_date                    | DATE                     | NOT NULL
 expected_raw_weight_per_bag | FLOAT                    | NOT NULL (>= 0), starts at the grain's expected_raw_weight_per_bag, editable
-grain_quality_code          | TEXT                     | -
+grain_quality_code          | TEXT                     | -  (free text; forms offer T. Top, S. Super, S.B. Super Bottom, s. super, s.b. super bottom, Avg. Average, Avg.B. Average Bottom, Rej. Rejection; the code is stored)
 grain_stored_location       | TEXT                     | -  (was grain_store_at; the forms offer the distinct places used so far, text in brackets ignored)
 business_year               | VARCHAR(7)               | NOT NULL
 description                 | TEXT                     | -
@@ -191,7 +191,7 @@ labour_group_id               | INTEGER                  | NULL, FOREIGN KEY -> 
 no_of_filled_bags             | INTEGER                  | NOT NULL
 extra_kilos                   | INTEGER                  | NOT NULL, DEFAULT 0
 expected_raw_weight_per_bag   | FLOAT                    | NOT NULL (>= 0), starts at the grain's expected_raw_weight_per_bag, editable
-grain_quality_code            | TEXT                     | -
+grain_quality_code            | TEXT                     | -  (free text; forms offer T. Top, S. Super, S.B. Super Bottom, s. super, s.b. super bottom, Avg. Average, Avg.B. Average Bottom, Rej. Rejection; the code is stored)
 no_of_received_empty_bags     | INTEGER                  | NOT NULL, DEFAULT stockyard_purchases.no_of_given_empty_bags - filled bags of ALL entries of that purchase - received bags of its OTHER entries (editable)
 payable_amount                | BIGINT                   | NOT NULL
 borrowed_amount               | BIGINT                   | NOT NULL, DEFAULT 0

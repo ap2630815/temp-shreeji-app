@@ -26,6 +26,7 @@ from app.services.ledger import entry_views, paid_for_entry, purchase_group_entr
 from app.services.locations import stored_locations
 from app.services.duplicates import DUPLICATE_MSG, find_duplicate
 from app.services.money import payable_amount, total_available_bags
+from app.services.quality import QUALITY_HELP, QUALITY_OPTIONS
 from app.services.years import YearLockedError, allowed_years, assert_year_open, business_year_of, current_year_label, require_year_visible, assert_year_editable
 
 router = APIRouter(prefix="/PurchaseGroup")
@@ -101,7 +102,7 @@ def entry_fields(farmers: list[Farmer], groups: list[LabourGroup], locations: tu
         F("farmer_id", "Farmer", "ખેડૂત", kind="select", required=True,
           options=tuple((str(f.id), f"{f.farmer_name} — {f.village.village_name} — {format_mobile(f.mobile)}") for f in farmers)),
         F("labour_group_id", "Labour group", "મજૂર જૂથ", kind="select", required=True,
-          options=tuple((str(g.id), g.group_name) for g in groups)),
+          options=tuple((str(g.id), g.display_name) for g in groups)),
         F("purchase_entry_date", "Date", "તારીખ", kind="date", required=True),
         F("no_of_filled_bags", "Filled bags", "ભરેલી બેગ", kind="int", required=True),
         F("extra_kilos", "Extra kilos (loose, beyond full bags)", "વધારાના કિલો (પૂરી બેગ ઉપરાંત)", kind="int"),
@@ -109,7 +110,7 @@ def entry_fields(farmers: list[Farmer], groups: list[LabourGroup], locations: tu
           help=("Counted in the stock, not in the payment", "સ્ટોકમાં ગણાય છે, ચુકવણીમાં નહીં")),
         F("expected_raw_weight_per_bag", "Expected raw weight per bag (kg)", "બેગ દીઠ અપેક્ષિત કાચું વજન (કિલો)",
           kind="decimal", help=("Used only to compare with the weighbridge, never in the payment. Blank starts at the grain's value", "ફક્ત કાંટા સાથે સરખામણી માટે, ચુકવણીમાં ક્યારેય નહીં. ખાલી રાખો તો અનાજના મૂલ્યથી શરૂ")),
-        F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ"),
+        F("grain_quality_code", "Grain quality code", "અનાજ ગુણવત્તા કોડ", options=QUALITY_OPTIONS, help=QUALITY_HELP),
         F("grain_stored_location", "Grain stored location", "અનાજ સંગ્રહ સ્થળ", options=locations,
           help=("Pick a place used before, or type a new one (text in brackets is ignored when matching)", "પહેલાં વપરાયેલ સ્થળ પસંદ કરો અથવા નવું લખો (કૌંસનો લખાણ ગણાતું નથી)")),
         F("borrowed_amount", "Borrowing / advance to deduct (₹)", "ઉધાર / એડવાન્સ કાપવાના (₹)", kind="int"),

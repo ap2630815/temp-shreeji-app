@@ -15,7 +15,7 @@ mobile                  | VARCHAR(10)              | NOT NULL, UNIQUE
 email                   | VARCHAR(60)              | UNIQUE
 village_id              | INTEGER                  | NOT NULL, FOREIGN KEY -> villages.id
 house                   | TEXT                     | -
-upi_number              | VARCHAR(10)              | UNIQUE
+upi_number              | VARCHAR(10)              | UNIQUE  (if different from mobile)
 bank_account_number     | VARCHAR(30)              | UNIQUE
 bank_name               | VARCHAR(30)              | -
 bank_branch             | VARCHAR(30)              | -
@@ -40,7 +40,7 @@ labour_name     | VARCHAR(120)             | NOT NULL
 labour_name_gu  | VARCHAR(120)             | -
 labour_group_id | INTEGER                  | NOT NULL, FOREIGN KEY -> labour_groups.id
 mobile          | VARCHAR(10)              | NOT NULL, UNIQUE
-upi_number      | VARCHAR(10)              | UNIQUE
+upi_number      | VARCHAR(10)              | UNIQUE  (if different from mobile)
 description     | TEXT                     | -
 created_at      | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now()
 

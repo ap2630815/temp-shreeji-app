@@ -1,0 +1,334 @@
+DECISION MAKING 2 - OUTPUT SCREEN COLUMNS: SHOWN AND NOT SHOWN, PER TABLE
+==============================================================================
+For each table: the columns that appear on an output screen (list, tab, page, statement or printed receipt) with the screen and the column heading
+they appear under, and the columns that appear on NO output screen (they are only on New / Edit forms, or used inside the application).
+Foreign-key columns (..._id) are shown on screen as the name they point to. Columns that come from another table are listed with that table.
+Screen columns that are worked out (totals, balances, status) are not table columns and are listed in file 3 and at the end of this file.
+
+TABLE: audit_log
+----------------------------------------------------------------------
+  not shown on any screen (kept for the record, written by every save)
+  NOT SHOWN: id, at, user_id, username, action, table_name, record_id, changes
+
+TABLE: bilties
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    bilty_date, bill_number, total_bags_in_truck, any_rate_change, merchant_total_weight, merchant_tare_weight, industry_total_weight, industry_tare_weight, description
+  NOT SHOWN at any screen:
+    id, truck_trip_id, business_year, created_by, created_at
+  Screens that show it: Trip page - weights and sale cards (bilty); Truck trips list
+
+TABLE: broker_bookings
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    booking_date, brokerage_id, industry_id, grain_rate_per_booking_weight, truck_size, percentage_deduction
+  NOT SHOWN at any screen:
+    id, business_year, description, created_by, created_at
+  Screens that show it: Broker bookings list; Truck trips list
+
+TABLE: brokerages
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    broker_id, grain_id, brokerage_per_bag
+  NOT SHOWN at any screen:
+    id, description, created_at
+  Screens that show it: Brokerage master list; Broker bookings list
+
+TABLE: brokers
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    broker_name, broker_name_gu, mobile
+  NOT SHOWN at any screen:
+    id, upi_number, description, created_at
+  Screens that show it: Broker master list; Broker statement - header block
+
+TABLE: empty_bag_movers
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    name, pet_name, mobile
+  NOT SHOWN at any screen:
+    id, name_gu, upi_number, description, created_at, pet_name_gu
+  Screens that show it: Empty Bag Mover master list
+
+TABLE: empty_bag_movers_entries
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    empty_bag_mover_id, farmer_id, mover_date, cost_per_mover, no_of_empty_bags
+  NOT SHOWN at any screen:
+    id, business_year, description, created_by, created_at
+  Screens that show it: Empty Bag Suppliers - Movers tab; Empty Bag Suppliers - Storage by farmer tab (sellers + movers)
+
+TABLE: empty_bag_sellers
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    name, name_gu, pet_name, mobile
+  NOT SHOWN at any screen:
+    id, upi_number, description, created_at, pet_name_gu
+  Screens that show it: Empty Bag Seller master list; Empty bag supplier statement - header block
+
+TABLE: empty_bag_sellers_entries
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    empty_bag_seller_id, farmer_id, selling_date, payable_amount, rate_per_bag, no_of_empty_bags
+  NOT SHOWN at any screen:
+    id, business_year, description, created_by, created_at
+  Screens that show it: Empty Bag Suppliers - Sellers tab; Empty Bag Suppliers - Storage by farmer tab (sellers + movers)
+
+TABLE: empty_bags
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    empty_bags_entry_date, stockyard_id, grain_id, empty_bag_seller_id, empty_bag_mover_id, no_of_empty_bags, industry_id, rate_per_empty_bag
+  NOT SHOWN at any screen:
+    id, business_year, description, created_by, created_at
+  Screens that show it: Stockyard Purchase - Empty bags tab; Stockyard Purchase - Stockyard bag ledger tab
+
+TABLE: farmer_to_stockyard_transfers
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    transfer_date, purchase_farmer_entry_id, purchase_individual_id, stockyard_id, no_of_transferred_bags
+  NOT SHOWN at any screen:
+    id, business_year, description, created_by, created_at
+  Screens that show it: Stockyard Purchase - Farmer to stockyard tab; Purchase Farmers - Farmer bag ledger tab; Stockyard Purchase - Stockyard bag ledger tab
+
+TABLE: farmers
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    farmer_name, farmer_name_gu, head_of_family, mobile, village_id
+  NOT SHOWN at any screen:
+    id, email, house, upi_number, bank_account_number, bank_name, bank_branch, ifsc_code, description, created_at, private_note_owner_only
+  Screens that show it: Farmer master list; Farmer statement - header block; Purchase Farmers - Farmer entries tab (group and individual rows together); Purchase Farmers - Purchase individuals tab; Purchase Farmers - Farmer bag ledger tab; Purchase group page - Farmers in this purchase; Empty Bag Suppliers - Storage by farmer tab (sellers + movers)
+
+TABLE: farmers_truck_load_lines
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    purchase_farmer_entry_id, no_of_loaded_bags, purchase_individual_id
+  NOT SHOWN at any screen:
+    id, trip_id
+  Screens that show it: Trip page - Loaded from farmers; Purchase Farmers - Farmer bag ledger tab
+
+TABLE: grains
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    id, grain_name, grain_name_gu, net_bag_weight, booking_weight, expected_raw_weight_per_bag
+  NOT SHOWN at any screen:
+    grain_terms, description, created_at
+  Screens that show it: Stockyard Purchase - Stockyard bag ledger tab; Grain master list; Purchase Farmers - Purchase groups tab
+
+TABLE: industries
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    industry_name, industry_name_gu, industry_owner_name, industry_owner_mobile, supervisor_name, supervisor_mobile, grain, location
+  NOT SHOWN at any screen:
+    id, quality_expectation, description, created_at
+  Screens that show it: Industry master list; Industry account - header block
+
+TABLE: labour_group_wages
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    labour_group_id, grain_id, weighing_rate, loading_rate, pulling_rate, mixing_rate
+  NOT SHOWN at any screen:
+    id, other_rate, description, created_at
+  Screens that show it: Labour Wages master list
+
+TABLE: labour_groups
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    group_name, group_name_gu, village_id
+  NOT SHOWN at any screen:
+    id, description, created_at
+  Screens that show it: Labour Group master list; Labour group statement - header block
+
+TABLE: labour_work
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    work_date, labour_group_id, payable_amount, borrowing_amount, petrol, meal, description
+  NOT SHOWN at any screen:
+    id, business_year, created_by, created_at
+  Screens that show it: Labour work list
+
+TABLE: labours
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    labour_name, labour_group_id, mobile
+  NOT SHOWN at any screen:
+    id, labour_name_gu, upi_number, description, created_at
+  Screens that show it: Labour master list
+
+TABLE: payment_allocations
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    payable_type, payable_id, amount
+  NOT SHOWN at any screen:
+    id, payment_id
+  Screens that show it: Payment receipt - Settled against
+
+TABLE: payments
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    id, amount, payment_date, method, receiver_name, receiver_mobile, reference_no, description
+  NOT SHOWN at any screen:
+    party_type, party_id, business_year, status, created_by, created_at
+  Screens that show it: Payments (ledger) - rows on statement pages; Payment receipt (printed)
+
+TABLE: purchase_group_add_farmers
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    farmer_id
+  NOT SHOWN at any screen:
+    id, purchase_group_id, created_by, created_at
+  Screens that show it: Purchase group page - Farmers in this purchase
+
+TABLE: purchase_group_farmers_entries
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    purchase_entry_date, purchase_group_id, farmer_id, labour_group_id, no_of_filled_bags, extra_kilos, payable_amount, borrowed_amount, due_date, no_of_handful_bags, total_available_bags, description
+  NOT SHOWN at any screen:
+    id, expected_raw_weight_per_bag, grain_quality_code, grain_stored_location, business_year, created_by, created_at
+  Screens that show it: Purchase Farmers - Farmer entries tab (group and individual rows together); Purchase Farmers - Farmer bag ledger tab; Purchase group page - Entries table; Purchase Farmers - Purchase individuals tab
+
+TABLE: purchase_groups
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    purchase_group_date, village_id, grain_id, grain_rate_per_20kg, pay_after_no_of_days, purchase_group_terms, business_year, description
+  NOT SHOWN at any screen:
+    id, created_by, created_at
+  Screens that show it: Purchase Farmers - Purchase groups tab; Purchase group page - header cards; Purchase Farmers - Farmer entries tab (group and individual rows together); Purchase Farmers - Purchase individuals tab
+
+TABLE: purchase_individuals
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    purchase_individual_date, grain_rate_per_20kg, farmer_id, no_of_filled_bags, total_available_bags, payable_amount, borrowed_amount, due_date, description
+  NOT SHOWN at any screen:
+    id, village_id, grain_id, pay_after_no_of_days, terms, labour_group_id, extra_kilos, no_of_handful_bags, expected_raw_weight_per_bag, grain_quality_code, grain_stored_location, business_year, created_by, created_at
+  Screens that show it: Purchase Farmers - Farmer entries tab (group and individual rows together); Purchase Farmers - Purchase individuals tab; Purchase Farmers - Farmer bag ledger tab
+
+TABLE: receipt_allocations
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    bilty_id, amount
+  NOT SHOWN at any screen:
+    id, receipt_id
+  Screens that show it: Receipt in - Settled against
+
+TABLE: receipts
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    id, industry_id, amount, receipt_date, method, reference_no, payer_name, description
+  NOT SHOWN at any screen:
+    business_year, created_by, created_at
+  Screens that show it: Receipts - rows on the industry account; Receipt in (printed)
+
+TABLE: stockyard_arrangement_entries
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    stockyard_arrangement_date, stockyard_purchase_entry_id, labour_group_id, no_of_arranged_bags, rate_per_arranged_bag
+  NOT SHOWN at any screen:
+    id, business_year, description, created_by, created_at
+  Screens that show it: Stockyard Purchase - Arrangement entries tab
+
+TABLE: stockyard_purchase_entries
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    stockyard_purchase_entry_date, stockyard_purchase_id, no_of_filled_bags, extra_kilos, payable_amount, borrowed_amount, due_date, labour_group_id, no_of_received_empty_bags
+  NOT SHOWN at any screen:
+    id, grain_quality_code, business_year, description, created_by, created_at, expected_raw_weight_per_bag
+  Screens that show it: Stockyard Purchase - Purchase entries tab; Stockyard Purchase - Stockyard bag ledger tab
+
+TABLE: stockyard_purchases
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    stockyard_purchase_date, stockyard_id, farmer_id, grain_id, grain_rate_per_20kg, pay_after_no_of_days, no_of_given_empty_bags
+  NOT SHOWN at any screen:
+    id, terms, business_year, description, created_by, created_at
+  Screens that show it: Stockyard Purchase - Stockyard purchases tab; Stockyard Purchase - Stockyard bag ledger tab
+
+TABLE: stockyard_truck_load_lines
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    stockyard_id, no_of_loaded_bags
+  NOT SHOWN at any screen:
+    id, trip_id
+  Screens that show it: Trip page - Loaded from stockyard; Stockyard Purchase - Stockyard bag ledger tab
+
+TABLE: stockyards
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    id, name_of_stockyard, location, stockyard_owner_name, rent_of_stockyard
+  NOT SHOWN at any screen:
+    stockyard_owner_mobile, stockyard_upi_number, storage_capacity, description, created_at
+  Screens that show it: Stockyard Purchase - Stockyard bag ledger tab; Stockyard master list
+
+TABLE: transporters
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    transporter_name, pet_name, location, mobile
+  NOT SHOWN at any screen:
+    id, owner_name, owner_name_gu, upi_number, description, created_at, pet_name_gu
+  Screens that show it: Transport master list
+
+TABLE: truck_trips
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    trip_date, broker_booking_id, truck_id, transporter_id, labour_group_id, rent_per_ton, rent_per_bag, advance_amount, other_payable, other_deduction, business_year, description
+  NOT SHOWN at any screen:
+    id, created_by, created_at
+  Screens that show it: Truck trips list; Trip page - trip, booking and freight cards
+
+TABLE: trucks
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    truck_number, truck_owner_name, truck_owner_mobile, driver_name, driver_mobile
+  NOT SHOWN at any screen:
+    id, truck_owner_upi_number, description, created_at, driver_upi_number
+  Screens that show it: Truck master list; Truck statement - header block
+
+TABLE: users
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    username, role
+  NOT SHOWN at any screen:
+    id, password_hash, is_active, created_at
+  Screens that show it: Top bar
+
+TABLE: villages
+----------------------------------------------------------------------
+  SHOWN at the screen:
+    village_name, village_name_gu
+  NOT SHOWN at any screen:
+    id, description, created_at
+  Screens that show it: Village master list
+
+SCREENS BUILT FROM SEVERAL TABLES (no table of their own)
+----------------------------------------------------------------------
+  Receivables  [/Receivables]
+    Industry
+    Trucks
+    Weight awaited
+    Shortage kg
+    Billed
+    Received
+    Outstanding
+
+  Payables - farmer  [/Payables?type=farmer]
+    Name
+    Village
+    Mobile
+    Items
+    Oldest
+    Overdue
+    Total due
+
+  Payables - truck / labour / empty bag supplier / empty bag industry / broker  [/Payables?type=<type>]
+    Name
+    Mobile
+    Items / unpaid trips
+    Oldest
+    Total due
+
+  Pay page - Open items  [/Pay/<type>/<id>]
+    Date
+    Details
+    Due on (farmer only)
+    Amount
+    Paid
+    Due
